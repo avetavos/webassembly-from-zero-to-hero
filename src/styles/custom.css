@@ -46,4 +46,4 @@ html.read-mode .sl-container, html.read-mode .sl-markdown-content { max-width: 5
 .callout :not(pre) > code { background: var(--sl-color-accent-high); color: var(--sl-color-accent-low); border: 0; padding: .05rem .35rem; border-radius: 5px; font-weight: 600; }
 
 /* Runner layout: cancel Starlight's flow margin-top between the bar / code textarea / output so the bordered sections stay flush */
-.sl-markdown-content .nr > * { margin-top: 0; }
+.sl-markdown-content .nr * { margin-top: 0; }
