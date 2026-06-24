@@ -1,0 +1,97 @@
+---
+title: 'Memory Basics'
+description: 'Declare WebAssembly memory with (memory N), allocate pages, load and store integers with i32.load and i32.store.'
+sidebar:
+  order: 2
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly modules can declare a block of raw bytes called **linear memory**. Unlike the JavaScript heap, this memory is a flat, untyped array of bytes that both the Wasm module and JavaScript can read and write directly. It is the primary mechanism for passing complex data — strings, arrays, structs — between WebAssembly and the host.
+
+## Declaring memory with `(memory N)`
+
+The `(memory N)` declaration reserves N **pages** of memory, where each page is exactly 64 KiB (65 536 bytes). The minimum useful size is one page:
+
+```wasm
+(memory 1)
+```
+
+This gives your module 65 536 bytes of addressable memory, all initialised to zero at instantiation time.
+
+## Loading and storing integers
+
+WebAssembly provides typed load and store instructions for reading and writing values at specific byte addresses.
+
+- `i32.store` — pops an address and a 32-bit integer from the stack, writes 4 bytes at that address
+- `i32.load` — pops an address from the stack, reads 4 bytes and pushes an `i32` result
+
+Both instructions accept an optional static `offset` attribute that is added to the runtime address, which is useful for accessing fields within a struct.
+
+## Exporting memory to JavaScript
+
+JavaScript cannot access Wasm memory unless the module exports it. Use the inline export syntax:
+
+```wasm
+(memory (export "mem") 1)
+```
+
+On the JavaScript side you can also create a `WebAssembly.Memory` object and pass it in as an import:
+
+```js
+const memory = new WebAssembly.Memory({ initial: 1 });
+```
+
+## Store and load example
+
+Here is a complete module that stores an `i32` value at byte address 100 and immediately loads it back:
+
+```wasm
+(module
+  (memory (export "mem") 1)
+  (func (export "storeAndLoad") (param $val i32) (result i32)
+    i32.const 100   ;; address
+    local.get $val  ;; value to store
+    i32.store
+    i32.const 100   ;; address
+    i32.load))      ;; load back
+```
+
+The stack discipline here is: push address, push value, call `i32.store` (consumes both). Then push address again, call `i32.load` (consumes address, pushes result).
+
+## Run it
+
+The runner below stores 999 at offset 100, reads it back, and also reads `mem[0]` (which should be 0 since nothing was written there).
+
+export const memoryBasicsCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (func (export "storeAndLoad") (param \$val i32) (result i32)
+    i32.const 100
+    local.get \$val
+    i32.store
+    i32.const 100
+    i32.load))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+const result = instance.exports.storeAndLoad(999);
+console.log('stored and loaded:', result);
+const view = new Uint8Array(instance.exports.mem.buffer);
+console.log('byte at offset 100:', view[100]);`;
+
+<WasmRunner client:visible code={memoryBasicsCode} />
+
+<Callout title="64 KiB pages">
+Each page is exactly 65 536 bytes. A minimal module with `(memory 1)` has 65 536 bytes available, all initialised to zero.
+</Callout>
+
+export const quizMemoryBasics = [
+  { q: "How many bytes are in one WebAssembly memory page?", options: ["4 096", "65 536", "1 048 576", "512"], answer: 1 },
+  { q: "Which instruction writes a 4-byte integer to linear memory?", options: ["i32.set", "mem.store", "i32.store", "memory.put"], answer: 2 },
+  { q: "What is the initial value of all bytes in a freshly created WebAssembly memory?", options: ["0xFF", "undefined", "1", "0"], answer: 3 },
+];
+
+<Quiz client:visible id="linear-memory/memory-basics" questions={quizMemoryBasics} />
+
+<ProgressTracker client:visible id="linear-memory/memory-basics" />

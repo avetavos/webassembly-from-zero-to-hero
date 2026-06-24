@@ -1,0 +1,108 @@
+---
+title: 'ทำไมต้องใช้ Wasm? มันรันที่ไหนได้บ้าง?'
+description: 'ทำความเข้าใจ 4 เหตุผลในการใช้ WebAssembly ได้แก่ ความเร็ว, portability, การเลือกภาษา, ความปลอดภัย และที่ที่มันรันได้ในปัจจุบัน'
+sidebar:
+  order: 3
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly ไม่ได้เกิดขึ้นโดยบังเอิญ มันถูกออกแบบมาเพื่อแก้ปัญหาเฉพาะกลุ่มที่ JavaScript เพียงอย่างเดียวไม่สามารถแก้ได้ การทำความเข้าใจ *ว่าทำไม* Wasm ถึงมีอยู่ และ *ที่ไหน* มันรัน จะให้ mental model ที่คุณต้องการในการตัดสินใจว่าเมื่อใดควรหยิบมันขึ้นมาใช้
+
+## 4 เหตุผลในการใช้ Wasm
+
+### 1. ความเร็ว
+
+Wasm ถูกคอมไพล์เป็นไบนารีกะทัดรัดก่อนที่จะถึง runtime engine ไม่ต้อง parse source text, tokenize หรือสร้าง AST เมื่อโหลด การคอมไพล์แบบ AOT หรือ JIT จาก binary format นั้นรวดเร็วและสร้าง machine code ใกล้เคียง native สำหรับงาน compute-intensive เช่น image processing, audio codec, cryptography, physics simulation ช่องว่างนี้วัดได้และมีนัยสำคัญ
+
+### 2. Portability
+
+ไฟล์ `.wasm` เพียงไฟล์เดียวรันเหมือนกันทุกที่: laptop x86-64, โทรศัพท์ ARM, embedded board RISC-V, browser, edge node ไม่มีขั้นตอน recompile สำหรับแต่ละ target architecture runtime ตรวจสอบและรัน binary ตาม instruction set ที่ระบุไว้อย่างดี
+
+### 3. การเลือกภาษา
+
+Wasm คือ *target* สำหรับการคอมไพล์ ไม่ใช่ภาษาที่คุณเขียนด้วยมือในการใช้งานจริง ซึ่งหมายความว่าคุณเลือกเครื่องมือที่เหมาะสมสำหรับงาน:
+
+- **Rust** — zero-cost abstraction, ไม่มี garbage collector, toolchain `wasm-pack` ที่ยอดเยี่ยม
+- **C / C++** — native library ที่มีอยู่มานานหลายทศวรรษ, คอมไพล์ด้วย Emscripten
+- **Go** — รองรับ standard library ดี, ecosystem กำลังเติบโต
+- **AssemblyScript** — syntax คล้าย TypeScript ที่คอมไพล์ตรงไปยัง Wasm
+- **Python** — ผ่าน Pyodide ซึ่งเป็น CPython เต็มรูปแบบที่คอมไพล์เป็น Wasm รันใน browser
+
+### 4. ความปลอดภัย
+
+Wasm รันใน sandbox ที่เข้มงวด module ไม่สามารถเข้าถึง memory, file system หรือ network ของ host ได้ เว้นแต่ host จะ provide ความสามารถเหล่านั้นอย่างชัดเจนในรูปแบบ import linear memory ถูกตรวจสอบขอบเขตทุกครั้งที่เข้าถึง ไม่มี ambient permission Wasm module เริ่มต้นโดยไม่มีอะไรและได้รับเฉพาะสิ่งที่จำเป็นเท่านั้น
+
+## ที่ที่ Wasm รันได้ในปัจจุบัน
+
+### ใน Browser
+
+บ้านหลักของ Wasm คือ browser ผ่าน WebAssembly JavaScript API หน้าเว็บโหลดไฟล์ `.wasm` ไบนารี, instantiate มันด้วย `WebAssembly.instantiate` และเรียกฟังก์ชันที่ export มาโดยตรงจาก JavaScript
+
+```js
+const response = await fetch('module.wasm');
+const bytes = await response.arrayBuffer();
+const { instance } = await WebAssembly.instantiate(bytes, {});
+instance.exports.myFunction();
+```
+
+browser หลักทุกตัว ได้แก่ Chrome, Firefox, Safari, Edge ได้รองรับ Wasm เต็มรูปแบบตั้งแต่ปี 2017
+
+### บน Server และ Edge
+
+Node.js เปิดเผย `WebAssembly.*` API เดียวกับ browser Deno และ Bun ก็ทำเช่นเดียวกัน Cloudflare Workers และ Fastly Compute รองรับ Wasm module โดยกำเนิด ซึ่งหมายความว่าคุณสามารถ deploy ไบนารีเดิมไปยัง browser และ edge ได้โดยไม่ต้องเปลี่ยนแปลงอะไร
+
+### ผ่าน WASI
+
+**WebAssembly System Interface (WASI)** คือ ABI มาตรฐานที่ให้ Wasm code รันนอก browser ด้วยการเข้าถึง OS capabilities อย่างควบคุม ไม่ว่าจะเป็น file, socket, clock, random โดยไม่ต้องมี JavaScript host เลย runtime อย่าง `wasmtime` และ `wasmer` implement WASI ทำให้คุณรันไฟล์ `.wasm` เป็น standalone process ได้
+
+### ในระบบ Plugin
+
+Sandboxing ของ Wasm ทำให้มันเหมาะสำหรับ plugin architecture อย่างยิ่ง เครื่องมืออย่าง **Extism** และ embedded `wasmtime` ให้แอปพลิเคชันโหลด Wasm plugin ที่ไม่น่าไว้ใจ, expose API surface ที่ควบคุมได้ และบังคับใช้ข้อจำกัด memory และ capability ที่เข้มงวด ทั้งหมดนี้โดยไม่ต้องเปิด process แยกต่างหาก
+
+## Wasm เสริม JavaScript
+
+Wasm ไม่ได้แทน JavaScript DOM, event handling, fetch และ web platform API ส่วนใหญ่เข้าถึงได้เฉพาะจาก JavaScript pattern ในทางปฏิบัติคือการแบ่งงาน: เก็บ IO, event และการจัดการ DOM ไว้ใน JavaScript และส่งงาน algorithm ที่ใช้ CPU หนักไปให้ Wasm module
+
+<Callout title="Wasm และ JS เป็นหุ้นส่วนกัน">
+  ใน browser, Wasm โดดเด่นสำหรับงาน CPU หนัก เช่น codec, cryptography, image/audio processing, physics engine, game ส่วน DOM manipulation, event handling และ network IO เก็บไว้ใน JavaScript ทั้งสองทำงานร่วมกันได้ดีที่สุด
+</Callout>
+
+export const quizWhyAndWhere = [
+  {
+    q: 'ข้อใดต่อไปนี้ไม่ใช่เหตุผลหลักในการใช้ WebAssembly?',
+    options: [
+      'ความเร็วการรันใกล้เคียง native',
+      'การเข้าถึง DOM แบบ built-in',
+      'การรันโค้ดที่เขียนด้วยหลายภาษา',
+      'การรันแบบ deterministic sandboxed',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'WASI ย่อมาจากอะไร?',
+    options: [
+      'WebAssembly Scripting Interface',
+      'Web API Standard Integration',
+      'WebAssembly System Interface',
+      'Wide-Area Script Interpreter',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'ข้อใดอธิบาย Wasm และ JavaScript ใน browser ได้ดีที่สุด?',
+    options: [
+      'Wasm แทน JavaScript ทั้งหมด',
+      'JavaScript แทน Wasm สำหรับทุกงาน',
+      'Wasm จัดการงาน CPU หนักในขณะที่ JS จัดการ DOM และ IO',
+      'ทั้งสองไม่สามารถใช้ในหน้าเดียวกันได้',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/why-and-where" questions={quizWhyAndWhere} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/why-and-where" />

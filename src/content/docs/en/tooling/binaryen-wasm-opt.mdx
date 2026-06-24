@@ -1,0 +1,101 @@
+---
+title: 'Binaryen and wasm-opt'
+description: 'Optimise WebAssembly binaries for speed (-O3) or size (-Oz) with wasm-opt, and understand how toolchains run it for you automatically.'
+sidebar:
+  order: 3
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+**Binaryen** is Google's optimising compiler infrastructure for WebAssembly. Its most widely used tool is `wasm-opt`, which takes an existing `.wasm` binary and rewrites it to produce a smaller or faster output. You do not need to understand Binaryen's internal IR to benefit from it — a single command can cut 20–40 % off a release binary.
+
+## What wasm-opt does
+
+`wasm-opt` applies a sequence of compiler passes: dead-code elimination, constant folding, function inlining, local CSE, and many more. It works entirely on the binary level — it does not need the original source or any metadata.
+
+```bash
+# Install globally via npm
+npm install -g binaryen
+
+# Or install via Homebrew on macOS
+brew install binaryen
+```
+
+## Optimisation levels
+
+`wasm-opt` uses the same level flags as Clang/GCC:
+
+```bash
+# -O1  — light optimisation (fast build)
+wasm-opt -O1 input.wasm -o output.wasm
+
+# -O2  — balanced (same as release builds in most toolchains)
+wasm-opt -O2 input.wasm -o output.wasm
+
+# -O3  — aggressive (maximise speed, larger code possible)
+wasm-opt -O3 input.wasm -o output.wasm
+
+# -Os  — optimise for size (speed is secondary)
+wasm-opt -Os input.wasm -o output.wasm
+
+# -Oz  — maximise size reduction (slowest optimisation)
+wasm-opt -Oz input.wasm -o output.wasm
+```
+
+For most production deployments, `-Oz` offers the best trade-off: smaller download, faster parse, warm cache.
+
+## Toolchains run it for you
+
+In practice you rarely call `wasm-opt` directly. These popular toolchains invoke it automatically in release mode:
+
+| Toolchain | When it runs wasm-opt |
+|---|---|
+| **Emscripten** | `-O2` / `-O3` release flags |
+| **wasm-pack** (Rust) | `wasm-pack build --release` |
+| **AssemblyScript** | `asc --optimize` |
+| **Go (TinyGo)** | `-opt=z` flag |
+
+If you are consuming a `.wasm` from any of these, the binary is probably already optimised. Running `wasm-opt` a second time is safe but yields diminishing returns.
+
+## Additional useful flags
+
+```bash
+# Strip the DWARF debug section (reduces size, loses stack traces)
+wasm-opt -Oz --strip-dwarf input.wasm -o output.wasm
+
+# Strip all custom sections
+wasm-opt -Oz --strip-producers input.wasm -o output.wasm
+
+# Print module statistics before and after
+wasm-opt -Oz --print-stats input.wasm -o output.wasm
+
+# Keep a name section for readable stack traces
+wasm-opt -Oz --debuginfo input.wasm -o output.wasm
+```
+
+## Measuring the effect
+
+Always measure before and after. A quick bash one-liner shows the size difference:
+
+```bash
+wasm-opt -Oz input.wasm -o output.wasm
+echo "Before: $(wc -c < input.wasm) bytes"
+echo "After:  $(wc -c < output.wasm) bytes"
+```
+
+<Callout title="Let the toolchain optimise — then measure">
+If you use Emscripten, wasm-pack, or AssemblyScript, `wasm-opt` is already part of the release pipeline. Only run it manually when you consume a pre-compiled binary from a third party, or when you are hand-writing WAT and want to squeeze out every byte.
+</Callout>
+
+export const quizBinaryen = [
+  { q: "Which wasm-opt flag maximises binary size reduction?", options: ["-O3", "-Os", "-Oz", "-O2"], answer: 2 },
+  { q: "Do you need the original source code to run wasm-opt?", options: ["Yes, wasm-opt needs the C/Rust source", "Yes, wasm-opt needs the WAT source", "No, wasm-opt works on the binary alone", "Only if you use -O3 or higher"], answer: 2 },
+  { q: "Which toolchain calls wasm-opt automatically during a release build?", options: ["tsc (TypeScript)", "Babel", "wasm-pack (Rust)", "esbuild"], answer: 2 },
+  { q: "What does --strip-dwarf do?", options: ["Removes all exported functions", "Removes DWARF debug info to reduce binary size", "Strips the import section", "Converts f64 to f32"], answer: 1 },
+];
+
+<Quiz client:visible id="tooling/binaryen-wasm-opt" questions={quizBinaryen} />
+
+<ProgressTracker client:visible id="tooling/binaryen-wasm-opt" />

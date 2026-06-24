@@ -1,0 +1,111 @@
+---
+title: 'การตรวจสอบ WebAssembly Binaries'
+description: 'อ่าน section layout ของไฟล์ .wasm ใดก็ได้โดยใช้ wasm2wat, wasm-objdump, twiggy และ browser DevTools เพื่อทำความเข้าใจขนาดและโครงสร้าง'
+sidebar:
+  order: 4
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+ทุกไฟล์ `.wasm` คือลำดับของ **sections** ที่มีหมายเลขกำกับ การทำความเข้าใจว่า section ใด contribute อะไรทำให้สามารถกำหนดเป้าหมายความพยายามในการ optimise ได้อย่างแม่นยำ บทเรียนนี้แสดงเครื่องมือที่นำข้อมูลนั้นขึ้นมา
+
+## โครงสร้าง section ของ .wasm
+
+WebAssembly binary แบ่งออกเป็น sections มาตรฐานสูงสุดสิบสาม sections แต่ละ section มี ID เฉพาะ แผนภาพด้านล่างแสดง sections ที่พบบ่อยที่สุดและความสัมพันธ์กัน
+
+export const sectionsDiagram = `flowchart TD
+  A[".wasm binary"] --> B["Type section\\nfunction signatures"]
+  A --> C["Import section\\nJS / host imports"]
+  A --> D["Function section\\ntype index per function"]
+  A --> E["Export section\\npublic API names"]
+  A --> F["Code section\\nactual instructions"]
+  A --> G["Data section\\nmemory initialisers"]
+  A --> H["Custom sections\\nname debug DWARF producers"]`;
+
+<Mermaid code={sectionsDiagram} title=".wasm section layout" />
+
+## wasm2wat — human-readable disassembly
+
+วิธีที่เร็วที่สุดในการอ่านไบนารีใดก็ตามคือ `wasm2wat` มันสร้าง WAT text representation ขึ้นมาใหม่ รวมถึงชื่อฟังก์ชันหาก name section มีอยู่
+
+```bash
+# Dump WAT ทั้งหมดไปยัง stdout
+wasm2wat add.wasm
+
+# บันทึกลงไฟล์สำหรับแก้ไขหรือ diff
+wasm2wat add.wasm -o add.wat
+
+# สร้างชื่อ synthetic เมื่อไม่มีชื่อ
+wasm2wat add.wasm --generate-names
+```
+
+## wasm-objdump — การตรวจสอบทีละ section
+
+`wasm-objdump -x` แสดงสรุปที่มีโครงสร้างของทุก section: type signatures, imports, exports และ function indices มันเร็วกว่า full disassembly เมื่อคุณต้องการแค่ public API ของโมดูล
+
+```bash
+# สรุป section ทั้งหมด
+wasm-objdump -x my.wasm
+
+# Disassemble code section เท่านั้น (แสดงคำสั่งดิบ)
+wasm-objdump -d my.wasm
+
+# แสดง section เดียว
+wasm-objdump -j export my.wasm
+wasm-objdump -j import my.wasm
+```
+
+## twiggy — size profiling
+
+`twiggy` คือ code-size profiler ที่กำหนดทุก byte ใน binary `.wasm` ให้กับฟังก์ชันหรือ section มันคือวิธีที่เร็วที่สุดในการตอบคำถาม "ฟังก์ชันใดทำให้ binary ใหญ่?"
+
+```bash
+# ติดตั้ง
+cargo install twiggy
+
+# แสดง contributors หลักต่อขนาด binary
+twiggy top my.wasm
+
+# แสดง retaining paths สำหรับฟังก์ชันเฉพาะ
+twiggy paths my.wasm --function "some_large_function"
+
+# Output เป็น JSON สำหรับการประมวลผลต่อ
+twiggy top my.wasm --output-format json
+```
+
+รายงาน `twiggy top` มีลักษณะประมาณนี้:
+
+```bash
+ Shallow Bytes  | Shallow % | Item
+----------------+-----------+------------------------------
+          14512 ┊    42.38% ┊ "function names" subsection
+           8032 ┊    23.46% ┊ code[42]: some_large_function
+           3200 ┊     9.35% ┊ code[17]: decode_utf8
+```
+
+## Browser DevTools
+
+เบราว์เซอร์สมัยใหม่มาพร้อมกับการสนับสนุน WebAssembly debugging โดยตรงใน DevTools ใน Chrome และ Firefox คุณสามารถเปิด **Sources → wasm** เพื่อดู disassembly ของทุกโมดูลที่ instantiate แล้ว ตั้ง breakpoints บนคำสั่งแต่ละตัว และตรวจสอบ local variables และ value stack ที่แต่ละ breakpoint
+
+เพื่อให้ได้ชื่อฟังก์ชันที่อ่านได้ใน DevTools คุณต้องการ:
+
+- **name section** ใน binary (ผลิตโดย `wat2wasm --debug-names` หรือ `wasm-opt --debuginfo`) หรือ
+- **DWARF section** ที่ emit โดย Emscripten หรือ clang ด้วย `-g`
+
+<Callout title="เริ่มด้วย wasm-objdump จบด้วย twiggy">
+ใช้ `wasm-objdump -x` สำหรับภาพรวมเร็วของ section layout และ exports ใช้ `twiggy top` เมื่อต้องการระบุฟังก์ชันที่ทำให้ binary ขยายใหญ่ ใช้ `wasm2wat` เมื่อต้องการอ่านคำสั่งจริงๆ
+</Callout>
+
+export const quizInspecting = [
+  { q: "Which tool attributes each byte of a .wasm file to a specific function?", options: ["wasm-objdump", "wasm2wat", "twiggy", "wasm-validate"], answer: 2 },
+  { q: "What does wasm-objdump -x print?", options: ["Optimised binary output", "A full WAT disassembly", "Section headers, types, imports, and exports", "Only the code section"], answer: 2 },
+  { q: "Which section holds the actual instructions of each function?", options: ["Type section", "Export section", "Function section", "Code section"], answer: 3 },
+  { q: "What do you need in the binary to see readable function names in DevTools?", options: ["A data section", "A name section or DWARF section", "An import section", "A memory section"], answer: 1 },
+];
+
+<Quiz client:visible id="tooling/inspecting-wasm" questions={quizInspecting} />
+
+<ProgressTracker client:visible id="tooling/inspecting-wasm" />

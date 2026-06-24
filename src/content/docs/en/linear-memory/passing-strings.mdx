@@ -1,0 +1,94 @@
+---
+title: 'Passing Strings'
+description: 'Round-trip a JavaScript string through WebAssembly linear memory using TextEncoder to write UTF-8 bytes and TextDecoder to read them back.'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly functions only accept and return numeric types — integers and floats. There is no string type. The standard workaround is to encode string data as bytes in linear memory and pass integer coordinates (a pointer and a length) to identify where those bytes live.
+
+## The pattern
+
+The round-trip from JavaScript string to Wasm and back has five steps:
+
+1. **Encode** the string to a `Uint8Array` of UTF-8 bytes using `TextEncoder`
+2. **Write** those bytes into a known region of Wasm memory
+3. **Call** the Wasm function with the byte offset (pointer) and the byte count (length)
+4. **Wasm** does its work and returns the pointer and length of the result bytes
+5. **Decode** the result bytes back to a JavaScript string using `TextDecoder`
+
+export const stringFlowDiagram = `flowchart LR
+  A["JS string\\n'Hello'"] --> B["TextEncoder\\n-> Uint8Array"]
+  B --> C["mem.buffer\\n(write at ptr)"]
+  C --> D["Wasm function\\n(ptr, len)"]
+  D --> C
+  C --> E["TextDecoder\\n-> JS string"]`;
+
+<Mermaid code={stringFlowDiagram} title="String round-trip through linear memory" />
+
+## Encoding with TextEncoder
+
+`TextEncoder.encode(str)` converts a JavaScript string to a `Uint8Array` of UTF-8 bytes. Multi-byte characters (emoji, accented letters, CJK) produce more bytes than characters, so always use the byte length for memory operations, not the string length.
+
+## Writing bytes into Wasm memory
+
+Pick an address in Wasm memory that you control (for example, a static region starting at byte 256) and write the encoded bytes there:
+
+```js
+const encoded = new TextEncoder().encode(str);
+const ptr = 256;
+new Uint8Array(mem.buffer).set(encoded, ptr);
+```
+
+## Reading bytes back with TextDecoder
+
+After calling the Wasm function you get back `(ptr, len)`. Slice the memory view and decode:
+
+```js
+const decoded = new TextDecoder().decode(
+  new Uint8Array(mem.buffer, outPtr, outLen)
+);
+```
+
+The three-argument `Uint8Array` constructor creates a view starting at `outPtr` with `outLen` elements — no copy, no allocation.
+
+## Run it
+
+The Wasm module below exposes an `echo` function that simply returns the same `(ptr, len)` pair it receives. The JavaScript side encodes `"Hello Wasm"`, writes it at offset 256, calls `echo`, then decodes the result.
+
+export const passingStringsCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (func (export "echo") (param \$ptr i32) (param \$len i32) (result i32 i32)
+    local.get \$ptr
+    local.get \$len))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+const mem = instance.exports.mem;
+const str = 'Hello Wasm';
+const encoded = new TextEncoder().encode(str);
+const ptr = 256;
+new Uint8Array(mem.buffer).set(encoded, ptr);
+const [outPtr, outLen] = instance.exports.echo(ptr, encoded.length);
+const decoded = new TextDecoder().decode(new Uint8Array(mem.buffer, outPtr, outLen));
+console.log('round-trip:', decoded);`;
+
+<WasmRunner client:visible code={passingStringsCode} />
+
+<Callout title="Pass (ptr, len), not strings">
+WebAssembly functions cannot accept JavaScript strings directly. The universal convention is to write UTF-8 bytes into memory and pass an integer pointer plus an integer length to the Wasm function.
+</Callout>
+
+export const quizPassingStrings = [
+  { q: "How do you pass a JavaScript string to a WebAssembly function?", options: ["Pass it directly as a parameter", "Write UTF-8 bytes into memory and pass (ptr, len)", "Convert it to a number first", "Use postMessage"], answer: 1 },
+  { q: "What does TextEncoder.encode(str) return?", options: ["A base64 string", "A UTF-16 ArrayBuffer", "A Uint8Array of UTF-8 bytes", "A number array"], answer: 2 },
+  { q: "What is the standard Wasm convention for representing a string?", options: ["A null-terminated byte sequence only", "A length-prefixed string", "An integer pointer and an integer byte length", "A JavaScript Symbol"], answer: 2 },
+];
+
+<Quiz client:visible id="linear-memory/passing-strings" questions={quizPassingStrings} />
+
+<ProgressTracker client:visible id="linear-memory/passing-strings" />

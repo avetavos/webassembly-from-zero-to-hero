@@ -1,0 +1,122 @@
+---
+title: 'wabt — The Binary Toolkit'
+description: 'ใช้ wat2wasm, wasm2wat, wasm-objdump และ wasm-validate เพื่อแปลง ตรวจสอบ และ validate โมดูล WebAssembly'
+sidebar:
+  order: 2
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+**wabt** — WebAssembly Binary Toolkit — คือ reference implementation ของ WAT text format งานแปลง ตรวจสอบ หรือ validate ใดก็ตามที่เกี่ยวข้องกับ text ↔ binary boundary จะผ่านหนึ่งในสี่โปรแกรมหลักของมัน
+
+## wat2wasm
+
+`wat2wasm` คือ compiler หลัก มันแยกวิเคราะห์ต้นฉบับ `.wat`, type-check และ emit binary `.wasm` ที่ถูกต้อง flags ที่มีประโยชน์ได้แก่ `--debug-names` (เก็บ annotation `$name` ไว้ใน name section ของ binary) และ `--output` / `-o` เพื่อควบคุมไฟล์ output
+
+```bash
+# การคอมไพล์พื้นฐาน
+wat2wasm add.wat -o add.wasm
+
+# เก็บ debug names ไว้ใน binary
+wat2wasm add.wat --debug-names -o add.debug.wasm
+
+# Validate เท่านั้น ไม่เขียน output
+wat2wasm add.wat --no-check=false --output=/dev/null
+```
+
+## wasm2wat
+
+`wasm2wat` ทำกระบวนการย้อนกลับ: อ่านไบนารี `.wasm` และ emit WAT text ที่อ่านได้ สิ่งนี้มีค่ามากเมื่อคุณต้องการตรวจสอบว่า compiler ระดับสูง (Emscripten, wasm-pack ฯลฯ) ผลิตอะไรออกมาจริงๆ
+
+```bash
+# Disassemble ไปยัง stdout
+wasm2wat add.wasm
+
+# Disassemble ไปยังไฟล์
+wasm2wat add.wasm -o add.wat
+
+# รวม source locations จาก DWARF section
+wasm2wat add.wasm --generate-names
+```
+
+## wasm-objdump
+
+`wasm-objdump` แสดง metadata ที่มีโครงสร้างเกี่ยวกับไฟล์ `.wasm` — การจัดเรียง section, imports, exports และ function signatures — โดยไม่ต้องสร้าง WAT disassembly ทั้งหมด ใช้ `-x` สำหรับสรุปทั้งหมด หรือ `-d` เพื่อ disassemble เฉพาะ code section
+
+```bash
+# สรุป section ทั้งหมด
+wasm-objdump -x add.wasm
+
+# Disassemble code section เท่านั้น
+wasm-objdump -d add.wasm
+
+# แสดงเฉพาะ export section
+wasm-objdump -j export add.wasm
+```
+
+ผลลัพธ์ `-x` โดยทั่วไปมีลักษณะดังนี้:
+
+```bash
+add.wasm:	file format wasm 0x1
+
+Section Details:
+
+Type[1]:
+ - type[0] (i32, i32) -> i32
+Function[1]:
+ - func[0] sig=0
+Export[1]:
+ - func[0] <add> -> "add"
+Code[1]:
+ - func[0] size=7
+```
+
+## wasm-validate
+
+`wasm-validate` ตรวจสอบว่าไบนารีเป็นไปตามข้อกำหนด WebAssembly มันออกด้วย code 0 เมื่อสำเร็จและแสดง diagnostic เมื่อล้มเหลว ใช้ใน CI เพื่อตรวจจับโมดูลที่เสียหายหรือไม่ถูกต้องก่อนที่จะถึง production
+
+```bash
+# Validate โมดูล
+wasm-validate add.wasm
+# → add.wasm: OK
+
+# Validate โมดูลพร้อม future proposal
+wasm-validate --enable-threads shared.wasm
+```
+
+## Run it — magic bytes และความยาว binary
+
+สี่ไบต์แรกที่ offset 0 ของทุกไฟล์ `.wasm` ที่ถูกต้องคือ `00 61 73 6d` — module magic (`\0asm`) runnable ด้านล่างคอมไพล์โมดูล WAT ขั้นต่ำและแสดงทั้งความยาว binary และสี่ magic bytes เหล่านั้น
+
+export const wabtCode = `const wat = \`(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add))\`;
+const bytes = await compileWat(wat);
+console.log('Binary length:', bytes.length, 'bytes');
+const magic = Array.from(bytes.slice(0, 4))
+  .map(b => b.toString(16).padStart(2, '0'))
+  .join(' ');
+console.log('Magic bytes (offset 0):', magic);
+console.log('Decoded magic:', String.fromCharCode(...bytes.slice(1, 4)));`;
+
+<WasmRunner client:visible code={wabtCode} />
+
+<Callout title="Magic number ระบุทุกไฟล์ .wasm">
+ไบนารี WebAssembly ทั้งหมดเริ่มต้นด้วย magic number สี่ไบต์ `00 61 73 6d` ตามด้วย version `01 00 00 00` เครื่องมือหรือ loader ใดก็ตามที่อ่านไฟล์ `.wasm` จะตรวจสอบไบต์เหล่านี้ก่อนเสมอ
+</Callout>
+
+export const quizWabt = [
+  { q: "Which flag tells wat2wasm to keep $name annotations in the output binary?", options: ["--keep-names", "--debug-names", "--names=true", "--preserve-symbols"], answer: 1 },
+  { q: "What are the first four bytes of every valid .wasm file?", options: ["ff fe 00 00", "00 61 73 6d", "77 61 73 6d", "01 00 00 00"], answer: 1 },
+  { q: "Which wabt tool prints section headers and exports without a full disassembly?", options: ["wasm2wat", "wasm-validate", "wasm-objdump -x", "wat2wasm --inspect"], answer: 2 },
+  { q: "What exit code does wasm-validate return on a valid module?", options: ["1", "0", "2", "It depends on the OS"], answer: 1 },
+];
+
+<Quiz client:visible id="tooling/wabt" questions={quizWabt} />
+
+<ProgressTracker client:visible id="tooling/wabt" />

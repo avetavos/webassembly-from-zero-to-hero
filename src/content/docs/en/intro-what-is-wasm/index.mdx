@@ -5,6 +5,7 @@ sidebar:
   order: 1
 ---
 
+import WasmRunner from '../../../../components/WasmRunner.tsx';
 import Mermaid from '../../../../components/Mermaid.astro';
 import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
@@ -32,13 +33,20 @@ This course takes you from zero familiarity to confident Wasm practitioner. Here
 
 Every `.wasm` file starts life as source code in a higher-level language. A compiler reads that source and emits the compact binary that the runtime loads directly.
 
-export const sourceDiagram = `flowchart LR
-  A["Rust / C / C++ / AssemblyScript"] --> B["Compiler\n(rustc / emcc / asc)"]
-  B --> C[".wasm binary"]
-  C --> D["Browser\n(JS + Wasm API)"]
-  C --> E["Server / Edge\n(Node.js / WASI)"]`;
+export const sourceDiagram = `flowchart LR\n  A["Rust / C / C++ / AssemblyScript"] --> B["Compiler\\n(rustc / emcc / asc)"]\n  B --> C[".wasm binary"]\n  C --> D["Browser\\n(JS + Wasm API)"]\n  C --> E["Server / Edge\\n(Node.js / WASI)"]`;
 
 <Mermaid code={sourceDiagram} title="Source language → compiler → .wasm binary → runtime" />
+
+## Try It Now
+
+Even in this very first lesson you can run real WebAssembly. The runner below compiles a tiny WAT module that returns the answer to life, the universe, and everything.
+
+export const introIndexCode = `const wat = \`(module (func (export "answer") (result i32) i32.const 42))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('answer() =', instance.exports.answer());`;
+
+<WasmRunner client:visible code={introIndexCode} />
 
 <Callout title="Wasm is a compilation target">
   You almost never write Wasm by hand in production. Instead you write Rust, C, C++, AssemblyScript (or WAT for learning) and compile to a compact `.wasm` binary. The browser or server loads the binary directly.

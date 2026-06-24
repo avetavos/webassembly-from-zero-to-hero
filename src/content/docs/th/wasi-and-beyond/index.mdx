@@ -1,0 +1,61 @@
+---
+title: 'WASI & Beyond the Browser'
+description: 'ค้นพบการรัน WebAssembly นอกเบราว์เซอร์ด้วย WASI เรียนรู้การรักษาความปลอดภัยแบบ capability-based, รันไทม์ wasmtime/wasmer, Component Model และ use case จริง'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly ถูกออกแบบมาสำหรับเบราว์เซอร์ แต่คุณสมบัติของมัน (sandbox ที่ปลอดภัย, ความเร็วใกล้เคียง native, และความพกพาข้ามภาษา) ทำให้มีคุณค่าเท่ากันบนเซิร์ฟเวอร์, edge node, อุปกรณ์ embedded และระบบ plugin กุญแจที่ปลดล็อกทุกสภาพแวดล้อมเหล่านี้คือ **WASI** — WebAssembly System Interface
+
+## ทำไมต้องรัน Wasm นอกเบราว์เซอร์?
+
+ในเบราว์เซอร์ JavaScript engine คือ host ที่ให้สภาพแวดล้อมรันไทม์, จัดการหน่วยความจำ และเปิดเผย browser API นอกเบราว์เซอร์ไม่มี JavaScript engine, DOM หรือ `fetch` โมดูล Wasm ที่ต้องการอ่านไฟล์, เขียน stdout หรือเปิด socket ต้องการ host อื่นมาจัดหาความสามารถเหล่านั้น
+
+WASI คือคำตอบที่เป็นมาตรฐาน: ชุดนิยาม system-call คล้าย POSIX ที่แสดงออกมาเป็น Wasm import รันไทม์ใดก็ตามที่ implement WASI สามารถรัน binary `.wasm` เดียวกัน — บน Linux, macOS, Windows หรือไมโครคอนโทรลเลอร์ขนาดเล็ก
+
+## ความสัมพันธ์ระหว่าง host, runtime และ module
+
+export const overviewDiagram = `flowchart LR
+  H["Host\\n(OS / Edge Platform)"]
+  R["WASI Runtime\\n(wasmtime / wasmer)"]
+  M["Wasm Module\\n(.wasm binary)"]
+  H -->|"grants capabilities\\n(dirs, sockets, env vars)"| R
+  R -->|"exposes WASI imports\\n(fd_write, path_open …)"| M
+  M -->|"calls imports to\\nread/write/execute"| R`;
+
+<Mermaid code={overviewDiagram} title="Host → WASI runtime → Wasm module" />
+
+ไดอะแกรมแสดงโมเดลสามชั้น:
+
+1. **Host** — ระบบปฏิบัติการหรือ cloud platform ที่ตัดสินใจว่าทรัพยากร (directories, sockets, environment variable) ใดที่รันไทม์จะส่งผ่านได้
+2. **WASI Runtime** — executable อิสระเช่น `wasmtime` หรือ `wasmer` ที่ implement WASI spec เป็น Wasm import function และบังคับใช้ capability grant
+3. **Wasm Module** — binary ที่คอมไพล์แล้ว มัน import WASI function แบบเดียวกับ Wasm import อื่น ๆ ไม่มีการเรียก OS โดยตรง
+
+## บทเรียนในโมดูลนี้
+
+| # | บทเรียน | สิ่งที่คุณจะเรียนรู้ |
+|---|---------|---------------------|
+| 1 | **ภาพรวมนี้** | เหตุผลและสถาปัตยกรรม |
+| 2 | [WASI Deep Dive](./wasi) | ความปลอดภัย capability, Preview 1 vs 2, คอมไพล์ Rust ไป WASI |
+| 3 | [wasmtime & wasmer](./wasmtime-wasmer) | รันและ embed Wasm binary ด้วยรันไทม์จริง |
+| 4 | [Component Model, SIMD & Threads](./component-model-simd-threads) | WIT interface, SIMD `v128`, และภาพรวม threads |
+| 5 | [Use Cases & When to Use Wasm](./use-cases-and-when) | Plugin, edge, sandboxing, portable CLI และข้อพิจารณา |
+
+<Callout title="หนึ่ง binary หลาย host">
+Binary `.wasm` ที่คอมไพล์สำหรับ WASI ทำงานได้โดยไม่ต้องเปลี่ยนแปลงบน wasmtime, wasmer, Cloudflare Workers, Fermyon Spin และ WASI-compliant host อื่น ๆ ไม่จำเป็นต้องคอมไพล์ใหม่
+</Callout>
+
+export const quizWasiIndex = [
+  { q: "WASI ย่อมาจากอะไร?", options: ["WebAssembly System Interface", "Web API Security Integration", "Wasm Application Standard Initialization", "WebAssembly Standard Imports"], answer: 0 },
+  { q: "ชั้นใดบังคับใช้ capability grant ในโมเดล host–runtime–module?", options: ["โมดูล Wasm เอง", "OS host โดยตรง", "WASI runtime (เช่น wasmtime)", "JavaScript engine"], answer: 2 },
+  { q: "ทำไม binary .wasm ที่คอมไพล์สำหรับ WASI จึงรันได้หลายแพลตฟอร์มโดยไม่ต้องคอมไพล์ใหม่?", options: ["มันถูกคอมไพล์เป็น native machine code", "ทุกแพลตฟอร์มใช้ OS syscall เดียวกัน", "WASI spec นิยาม portable import interface ที่รันไทม์ compliant ทุกตัว implement", "มันฝัง OS ไว้ภายใน"], answer: 2 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/index" questions={quizWasiIndex} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/index" />

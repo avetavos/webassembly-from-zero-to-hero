@@ -1,0 +1,108 @@
+---
+title: 'The Imports Object'
+description: 'Provide JavaScript functions, memory, and globals to a Wasm module through the imports object — including calling JS console.log from inside Wasm.'
+sidebar:
+  order: 3
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Not every WebAssembly module is self-contained. When a module needs to call a JavaScript function, read from shared memory, or access a global value managed by the host, it declares those dependencies with `(import ...)` statements. At instantiation time, JavaScript must supply matching values — this is the **imports object**.
+
+## Import declaration syntax
+
+An import declaration names the thing being imported and describes its type. The first two string arguments form a two-level namespace: a **module name** (the outer key) and a **field name** (the inner key):
+
+```wasm
+(module
+  (import "env" "log" (func $log (param i32)))
+)
+```
+
+Here `"env"` is the module namespace and `"log"` is the field name. The declaration says: "this module requires a function called `log` inside the `env` namespace; that function must accept one `i32` argument."
+
+## Shape of the imports object
+
+The imports object passed to `WebAssembly.instantiate()` mirrors that two-level namespace — the outer key is the module name and the inner key is the field name:
+
+```js
+const importObject = {
+  env: {
+    log: (n) => console.log(n)
+  }
+};
+```
+
+Each inner value must match the type declared in the WAT. A function import needs a JS function; a memory import needs a `WebAssembly.Memory`; a global import needs a `WebAssembly.Global`.
+
+## Importing a JS function
+
+Here is a complete WAT module that imports the `log` function and calls it from an exported `run` function:
+
+```wasm
+(module
+  (import "env" "log" (func $log (param i32)))
+  (func (export "run")
+    i32.const 42
+    call $log))
+```
+
+The `run` function pushes the constant `42` onto the stack, then calls `$log` — which consumes that value and passes it to whatever JS function was provided in the imports object.
+
+On the JavaScript side:
+
+```js
+const { instance } = await WebAssembly.instantiate(bytes, {
+  env: { log: (n) => console.log('Wasm says:', n) }
+});
+instance.exports.run(); // prints: Wasm says: 42
+```
+
+## Run it
+
+export const importsCode = `const wat = \`(module
+  (import "env" "log" (func $log (param i32)))
+  (func (export "run")
+    i32.const 42
+    call $log))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {
+  env: { log: n => console.log('Wasm says:', n) }
+});
+instance.exports.run();`;
+
+<WasmRunner client:visible code={importsCode} />
+
+## What else can be imported
+
+Functions are the most common import, but the same mechanism works for memory, globals, and tables:
+
+```js
+// Import a shared Memory
+const memory = new WebAssembly.Memory({ initial: 1 });
+const importObject = {
+  env: {
+    memory,
+    log: (n) => console.log(n)
+  }
+};
+```
+
+A `WebAssembly.Memory` import lets JavaScript and Wasm share the same `ArrayBuffer`, making it possible to pass strings, arrays, and other structured data back and forth by reading and writing raw bytes. Globals and tables follow the same pattern — declare them in WAT with `(import ...)` and supply the matching `WebAssembly.Global` or `WebAssembly.Table` instance in the imports object.
+
+<Callout title="Imports must match exactly">
+The namespace string (`"env"`) and field name (`"log"`) in the imports object must match what the WAT `(import ...)` declaration specifies — including capitalisation. A mismatch throws a `LinkError` at instantiation time.
+</Callout>
+
+export const quizImports = [
+  { q: 'In `(import "env" "log" ...)`, which is the module namespace?', options: ['"log"', '"env"', '"import"', '"func"'], answer: 1 },
+  { q: 'What is the shape of the imports object for `(import "env" "log" (func ...))`?', options: ['`{ log: fn }`', '`{ env: { log: fn } }`', '`{ env: fn }`', '`{ "env.log": fn }`'], answer: 1 },
+  { q: "What error is thrown when the imports object is missing a required import?", options: ["TypeError", "RangeError", "LinkError", "SyntaxError"], answer: 2 },
+];
+
+<Quiz client:visible id="js-interop/imports" questions={quizImports} />
+
+<ProgressTracker client:visible id="js-interop/imports" />

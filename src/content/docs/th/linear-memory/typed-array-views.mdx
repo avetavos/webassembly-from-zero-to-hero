@@ -1,0 +1,91 @@
+---
+title: 'Typed Array Views'
+description: 'เข้าถึง WebAssembly memory จาก JavaScript ด้วย Uint8Array, Int32Array, Float64Array และ DataView พร้อม byte offset และ little-endian layout'
+sidebar:
+  order: 3
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+เมื่อโมดูล WebAssembly export memory ของมัน JavaScript จะได้รับ `WebAssembly.Memory` object property `.buffer` ของมันคือ `ArrayBuffer` มาตรฐาน — ชนิดเดิมที่ใช้ทั่ว Web Platform ซึ่งหมายความว่าคุณสามารถวาง typed-array view ใดก็ได้ทับลงไปเพื่ออ่านและเขียน memory ได้อย่างมีประสิทธิภาพ
+
+## ArrayBuffer และ typed views
+
+`instance.exports.mem.buffer` เป็น `ArrayBuffer` คุณสามารถสร้าง typed view ทับลงไปโดยไม่ต้อง copy ข้อมูล:
+
+- `new Uint8Array(buf)` — แต่ละ element คือ unsigned byte หนึ่งตัว
+- `new Int32Array(buf)` — แต่ละ element คือ 4 byte ที่ตีความเป็น signed 32-bit integer
+- `new Float64Array(buf)` — แต่ละ element คือ 8 byte ที่ตีความเป็น 64-bit float
+- `new DataView(buf)` — การเข้าถึงระดับต่ำพร้อม method และการควบคุม endianness
+
+View ทั้งหมดนี้แชร์ memory พื้นฐานเดียวกัน การเขียนผ่าน view หนึ่งจะมองเห็นได้ทันทีผ่าน view อื่นที่อยู่บน buffer เดียวกัน
+
+## Byte offset และ element index
+
+Typed view ต่างชนิดมีขนาด element ต่างกัน ความสัมพันธ์ระหว่าง typed-array index กับ byte offset คือ:
+
+```
+byte offset = index × ขนาด element เป็น bytes
+```
+
+ตัวอย่างเช่น `Int32Array` มีขนาด element 4 ดังนั้น `i32[2]` อยู่ที่ byte offset 8 และ `Float64Array` มีขนาด element 8 ดังนั้น `f64[1]` อยู่ที่ byte offset 8 เช่นกัน — address เดียวกัน ตีความต่างกัน
+
+```js
+const buf = instance.exports.mem.buffer;
+const u8  = new Uint8Array(buf);
+const i32 = new Int32Array(buf);
+const f64 = new Float64Array(buf);
+// Write an i32 at byte offset 0 (element index 0 of i32 view)
+i32[0] = 42;
+// Read the same 4 bytes as individual bytes
+console.log(u8[0], u8[1], u8[2], u8[3]); // 42 0 0 0
+```
+
+## Little-endian layout
+
+WebAssembly memory เป็น **little-endian**: byte ที่มีนัยสำคัญน้อยที่สุดของค่าหลาย byte จะถูกเก็บที่ address ต่ำสุด ตัวอย่างเช่น ค่า 32-bit `0x01020304` ที่เก็บที่ offset 0 จะถูก layout ใน memory เป็น byte `[04, 03, 02, 01]`
+
+สิ่งนี้สอดคล้องกับ x86/ARM และกับ typed array ของ JavaScript เองบนทุกแพลตฟอร์มในปัจจุบัน หากต้องการจัดการ endianness เฉพาะอย่างชัดเจน ใช้ `DataView` — method เช่น `.getInt32(offset, true)` รับ boolean `isLittleEndian`
+
+## ลองรัน
+
+Runner นี้เก็บค่าสองตัวจาก Wasm — `0x41424344` ที่ offset 0 และ `100` ที่ offset 8 — แล้วอ่านกลับผ่าน typed view หลายแบบเพื่อแสดงว่า byte เดียวกันมองผ่าน "เลนส์" ต่างกันอย่างไร
+
+export const typedViewsCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (func (export "storeValues")
+    ;; store i32 value 0x41424344 at byte offset 0
+    i32.const 0
+    i32.const 0x41424344
+    i32.store
+    ;; store i32 value 100 at byte offset 8
+    i32.const 8
+    i32.const 100
+    i32.store))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+instance.exports.storeValues();
+const buf = instance.exports.mem.buffer;
+const u8  = new Uint8Array(buf);
+const i32 = new Int32Array(buf);
+console.log('i32[0] =', i32[0]);          // 0x41424344
+console.log('u8[0..3] =', u8[0], u8[1], u8[2], u8[3]); // little-endian
+console.log('i32[2] =', i32[2]);          // 100 (at byte offset 8)`;
+
+<WasmRunner client:visible code={typedViewsCode} />
+
+<Callout title="Little-endian layout">
+WebAssembly memory ใช้ little-endian ซึ่งหมายความว่าเมื่อเก็บ `i32` byte ที่มีนัยสำคัญน้อยที่สุดจะอยู่ก่อน เมธอด `DataView` อย่าง `.getInt32(offset, true)` ช่วยให้กำหนด endianness ได้อย่างชัดเจน
+</Callout>
+
+export const quizTypedArrayViews = [
+  { q: "ถ้า element ของ Int32Array อยู่ที่ index 2 จะอยู่ที่ byte offset เท่าใด?", options: ["2", "4", "8", "16"], answer: 2 },
+  { q: "integer หลาย bytes ถูกจัดเรียงอย่างไรใน WebAssembly linear memory?", options: ["Big-endian (byte ที่มีนัยสำคัญมากสุดก่อน)", "Little-endian (byte ที่มีนัยสำคัญน้อยสุดก่อน)", "ขึ้นอยู่กับแพลตฟอร์ม", "Packed BCD"], answer: 1 },
+  { q: "JavaScript class ใดที่ควบคุม endianness ในการอ่าน/เขียน memory ได้อย่างสมบูรณ์?", options: ["ArrayBuffer", "Int32Array", "DataView", "SharedArrayBuffer"], answer: 2 },
+];
+
+<Quiz client:visible id="linear-memory/typed-array-views" questions={quizTypedArrayViews} />
+
+<ProgressTracker client:visible id="linear-memory/typed-array-views" />

@@ -1,0 +1,145 @@
+---
+title: 'Calls and Recursion'
+description: 'Use call to invoke functions directly in WAT, and write recursive algorithms like factorial and Fibonacci.'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Functions in WebAssembly call each other with the `call` instruction. Arguments are pushed onto the stack before the call; the return value (if any) is left on the stack when the callee returns. Wasm fully supports direct recursion — a function may call itself — and mutual recursion between functions defined in the same module.
+
+## The call instruction
+
+`call $funcname` invokes the named function. You can also call by index (`call 0`) but named references are far easier to read. Before executing `call`, push all arguments in left-to-right order:
+
+```wasm
+(module
+  (func $double (param $n i32) (result i32)
+    local.get $n
+    i32.const 2
+    i32.mul)
+  (func (export "quadruple") (param $x i32) (result i32)
+    local.get $x
+    call $double    ;; passes $x; result replaces it on stack
+    call $double))  ;; doubles again
+```
+
+`quadruple(3)` calls `$double` twice, producing `3 → 6 → 12`.
+
+## Recursive functions
+
+WAT allows a function to call itself. The pattern mirrors every other language: push arguments, call self, combine results. The base case uses `if` to return directly without a recursive call.
+
+```wasm
+(module
+  (func $factorial (export "factorial") (param $n i32) (result i32)
+    local.get $n
+    i32.const 1
+    i32.le_s          ;; n <= 1?
+    if (result i32)
+      i32.const 1     ;; base case: 0! = 1! = 1
+    else
+      local.get $n
+      local.get $n
+      i32.const 1
+      i32.sub
+      call $factorial ;; factorial(n-1)
+      i32.mul         ;; n * factorial(n-1)
+    end))
+```
+
+The function is given both an internal name (`$factorial`) so it can call itself and an export name so JavaScript can invoke it.
+
+## Fibonacci example
+
+Two recursive calls in the `else` arm work the same way — push arguments, call, then add the two results:
+
+```wasm
+(module
+  (func $fib (export "fib") (param $n i32) (result i32)
+    local.get $n
+    i32.const 1
+    i32.le_s          ;; n <= 1?
+    if (result i32)
+      local.get $n    ;; fib(0)=0, fib(1)=1
+    else
+      local.get $n
+      i32.const 1
+      i32.sub
+      call $fib       ;; fib(n-1)
+      local.get $n
+      i32.const 2
+      i32.sub
+      call $fib       ;; fib(n-2)
+      i32.add
+    end))
+```
+
+## Run it
+
+export const callsRecursionCode = `const wat = \`(module
+  (func $factorial (export "factorial") (param $n i32) (result i32)
+    local.get $n
+    i32.const 1
+    i32.le_s
+    if (result i32)
+      i32.const 1
+    else
+      local.get $n
+      local.get $n
+      i32.const 1
+      i32.sub
+      call $factorial
+      i32.mul
+    end))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('factorial(5)  =', instance.exports.factorial(5),  '(expected 120)');
+console.log('factorial(10) =', instance.exports.factorial(10), '(expected 3628800)');`;
+
+<WasmRunner client:visible code={callsRecursionCode} />
+
+<Callout title="call: arguments on the stack, result on the stack">
+Before `call $fn`, push the function's arguments left-to-right. After the call returns, the result sits on top of the stack — ready for the next instruction. Wasm has no named argument syntax; position on the stack is everything.
+</Callout>
+
+export const quizCallsRecursion = [
+  {
+    q: "How do you call a function named `$add` in WAT?",
+    options: [
+      "`call $add`",
+      "`invoke $add`",
+      "`$add()`",
+      "`call_direct $add`"
+    ],
+    answer: 0
+  },
+  {
+    q: "What must be on the stack before a `call $fn` that takes two i32 parameters?",
+    options: [
+      "Nothing — parameters are passed by name",
+      "Two i32 values (the arguments)",
+      "A function reference to $fn",
+      "The return address"
+    ],
+    answer: 1
+  },
+  {
+    q: "Does basic WebAssembly optimize tail calls automatically?",
+    options: [
+      "Yes — all tail calls are optimized by the engine",
+      "No — each call adds a frame to the call stack",
+      "Only if the function is exported",
+      "Only for mutual recursion"
+    ],
+    answer: 1
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/calls-recursion" questions={quizCallsRecursion} />
+
+<ProgressTracker client:visible id="control-flow-functions/calls-recursion" />

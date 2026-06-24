@@ -1,0 +1,101 @@
+---
+title: 'Binaryen และ wasm-opt'
+description: 'Optimise binary WebAssembly เพื่อความเร็ว (-O3) หรือขนาด (-Oz) ด้วย wasm-opt และทำความเข้าใจว่า toolchains เรียกใช้มันโดยอัตโนมัติอย่างไร'
+sidebar:
+  order: 3
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+**Binaryen** คือโครงสร้างพื้นฐาน optimising compiler สำหรับ WebAssembly ของ Google เครื่องมือที่ใช้กันมากที่สุดคือ `wasm-opt` ซึ่งรับไบนารี `.wasm` ที่มีอยู่และเขียนใหม่เพื่อผลิต output ที่เล็กลงหรือเร็วขึ้น คุณไม่จำเป็นต้องเข้าใจ IR ภายในของ Binaryen เพื่อได้รับประโยชน์จากมัน — คำสั่งเดียวสามารถลด release binary ได้ 20–40%
+
+## สิ่งที่ wasm-opt ทำ
+
+`wasm-opt` ใช้ลำดับของ compiler passes: dead-code elimination, constant folding, function inlining, local CSE และอื่นๆ อีกมาก มันทำงานในระดับ binary ทั้งหมด — ไม่จำเป็นต้องมีต้นฉบับหรือ metadata ใดๆ
+
+```bash
+# ติดตั้งทั่วโลกผ่าน npm
+npm install -g binaryen
+
+# หรือติดตั้งผ่าน Homebrew บน macOS
+brew install binaryen
+```
+
+## ระดับการ optimise
+
+`wasm-opt` ใช้ flags ระดับเดียวกับ Clang/GCC:
+
+```bash
+# -O1  — การ optimise เบา (build รวดเร็ว)
+wasm-opt -O1 input.wasm -o output.wasm
+
+# -O2  — สมดุล (เหมือนกับ release builds ในส่วนใหญ่ของ toolchains)
+wasm-opt -O2 input.wasm -o output.wasm
+
+# -O3  — เชิงรุก (เพิ่มความเร็วสูงสุด, code อาจใหญ่ขึ้น)
+wasm-opt -O3 input.wasm -o output.wasm
+
+# -Os  — optimise เพื่อขนาด (ความเร็วรอง)
+wasm-opt -Os input.wasm -o output.wasm
+
+# -Oz  — ลดขนาดสูงสุด (การ optimise ช้าที่สุด)
+wasm-opt -Oz input.wasm -o output.wasm
+```
+
+สำหรับการ deploy production ส่วนใหญ่ `-Oz` ให้การแลกเปลี่ยนที่ดีที่สุด: download ที่เล็กลง parse ที่เร็วขึ้น cache ที่อุ่นขึ้น
+
+## Toolchains เรียกใช้มันให้คุณ
+
+ในทางปฏิบัติคุณแทบไม่เคยเรียก `wasm-opt` โดยตรง toolchains ยอดนิยมเหล่านี้เรียกมันโดยอัตโนมัติในโหมด release:
+
+| Toolchain | เมื่อ wasm-opt ทำงาน |
+|---|---|
+| **Emscripten** | flags release `-O2` / `-O3` |
+| **wasm-pack** (Rust) | `wasm-pack build --release` |
+| **AssemblyScript** | `asc --optimize` |
+| **Go (TinyGo)** | flag `-opt=z` |
+
+หากคุณใช้ `.wasm` จากสิ่งเหล่านี้ ไบนารีน่าจะถูก optimise แล้ว การเรียก `wasm-opt` ครั้งที่สองนั้นปลอดภัยแต่ได้ผลลัพธ์ที่ลดน้อยลง
+
+## Flags เพิ่มเติมที่มีประโยชน์
+
+```bash
+# ลบ DWARF debug section (ลดขนาด สูญเสีย stack traces)
+wasm-opt -Oz --strip-dwarf input.wasm -o output.wasm
+
+# ลบ custom sections ทั้งหมด
+wasm-opt -Oz --strip-producers input.wasm -o output.wasm
+
+# แสดงสถิติโมดูลก่อนและหลัง
+wasm-opt -Oz --print-stats input.wasm -o output.wasm
+
+# เก็บ name section สำหรับ stack traces ที่อ่านได้
+wasm-opt -Oz --debuginfo input.wasm -o output.wasm
+```
+
+## การวัดผล
+
+วัดผลก่อนและหลังเสมอ one-liner bash ง่ายๆ แสดงความแตกต่างของขนาด:
+
+```bash
+wasm-opt -Oz input.wasm -o output.wasm
+echo "Before: $(wc -c < input.wasm) bytes"
+echo "After:  $(wc -c < output.wasm) bytes"
+```
+
+<Callout title="ให้ toolchain optimise — แล้วจึงวัดผล">
+หากคุณใช้ Emscripten, wasm-pack หรือ AssemblyScript `wasm-opt` เป็นส่วนหนึ่งของ release pipeline อยู่แล้ว เรียกใช้มันด้วยตนเองเฉพาะเมื่อคุณใช้ binary ที่คอมไพล์ล่วงหน้าจากบุคคลที่สาม หรือเมื่อคุณเขียน WAT ด้วยมือและต้องการบีบทุก byte
+</Callout>
+
+export const quizBinaryen = [
+  { q: "Which wasm-opt flag maximises binary size reduction?", options: ["-O3", "-Os", "-Oz", "-O2"], answer: 2 },
+  { q: "Do you need the original source code to run wasm-opt?", options: ["Yes, wasm-opt needs the C/Rust source", "Yes, wasm-opt needs the WAT source", "No, wasm-opt works on the binary alone", "Only if you use -O3 or higher"], answer: 2 },
+  { q: "Which toolchain calls wasm-opt automatically during a release build?", options: ["tsc (TypeScript)", "Babel", "wasm-pack (Rust)", "esbuild"], answer: 2 },
+  { q: "What does --strip-dwarf do?", options: ["Removes all exported functions", "Removes DWARF debug info to reduce binary size", "Strips the import section", "Converts f64 to f32"], answer: 1 },
+];
+
+<Quiz client:visible id="tooling/binaryen-wasm-opt" questions={quizBinaryen} />
+
+<ProgressTracker client:visible id="tooling/binaryen-wasm-opt" />

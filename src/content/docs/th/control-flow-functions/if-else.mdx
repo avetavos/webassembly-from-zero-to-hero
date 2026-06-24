@@ -1,0 +1,134 @@
+---
+title: 'Conditionals: if, else และ select'
+description: 'ใช้ if/else สำหรับ conditional execution พร้อม optional result values และ select สำหรับ branchless ternary ใน WAT'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+`if` construct ใน WebAssembly ทำหน้าที่ทั้ง control-flow branch และ expression มันจะ pop ค่า `i32` condition จาก stack แล้วรัน arm ใด arm หนึ่ง — และถ้ามี result type มันจะฝากค่าไว้บน stack ทำให้ `if` รู้สึกเหมือน ternary operator มากกว่า `if` statement แบบดั้งเดิม
+
+## If construct
+
+`if` จะ pop `i32` บนสุด ถ้าค่าไม่ใช่ศูนย์จะรัน `then` arm ถ้าเป็นศูนย์จะรัน `else` arm ที่เป็น optional construct สิ้นสุดด้วย `end`
+
+```wasm
+(module
+  (func (export "sign") (param $x i32) (result i32)
+    local.get $x
+    i32.const 0
+    i32.gt_s          ;; x > 0?
+    if (result i32)
+      i32.const 1     ;; then: return 1
+    else
+      i32.const -1    ;; else: return -1
+    end))
+```
+
+Annotation `(result i32)` ระบุว่า `if` expression จะฝากค่า `i32` หนึ่งตัวบน stack ไม่ว่า arm ใดจะรัน ทั้งสอง arm ต้องฝากค่าจำนวนและชนิดเท่ากัน
+
+## if ที่ไม่มี result
+
+เมื่อ condition ใช้เพื่อ side effect เท่านั้น — เช่น การเรียก imported function — สามารถละ result type ได้:
+
+```wasm
+(module
+  (func (export "clampNeg") (param $x i32) (result i32)
+    local.get $x
+    i32.const 0
+    i32.lt_s
+    if
+      i32.const 0
+      local.set $x    ;; clamp $x to 0 if negative
+    end
+    local.get $x))
+```
+
+ในกรณีนี้ `if` ไม่มี result มันเพียง conditionally update local
+
+## select: branchless ternary
+
+`select` เป็นทางเลือกที่กระชับกว่า `if` สำหรับการเลือกค่าง่ายๆ มันจะ pop สามค่า: `condition`, `val_if_false`, `val_if_true` (ตามลำดับ push: push true-val, push false-val, push condition) แล้ว push ค่าที่ถูกเลือก ไม่มีการ branch — CPU ประเมินทั้งสองค่าก่อน select
+
+```wasm
+(module
+  (func (export "minVal") (param $a i32) (param $b i32) (result i32)
+    local.get $a   ;; val if condition is true ($a <= $b)
+    local.get $b   ;; val if condition is false
+    local.get $a
+    local.get $b
+    i32.le_s       ;; condition: a <= b?
+    select))       ;; choose $a if true, $b if false
+```
+
+## ทดลองรัน
+
+export const ifElseCode = `const wat = \`(module
+  (func (export "max") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.gt_s
+    if (result i32)
+      local.get $a
+    else
+      local.get $b
+    end)
+  (func (export "abs") (param $x i32) (result i32)
+    local.get $x
+    i32.const 0
+    i32.lt_s
+    if (result i32)
+      i32.const 0
+      local.get $x
+      i32.sub
+    else
+      local.get $x
+    end))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('max(3, 7)  =', instance.exports.max(3, 7),  '(expected 7)');
+console.log('max(10, 2) =', instance.exports.max(10, 2), '(expected 10)');
+console.log('abs(-5)    =', instance.exports.abs(-5),    '(expected 5)');
+console.log('abs(3)     =', instance.exports.abs(3),     '(expected 3)');`;
+
+<WasmRunner client:visible code={ifElseCode} />
+
+<Callout title="if ใน WAT คือ expression">
+`if (result i32)` construct ฝากค่าบน stack — ทำงานเหมือน ternary operator ไม่ใช่ statement ทั้ง `then` และ `else` arm ต้องสร้าง stack shape เดียวกัน `select` เป็นทางเลือกที่ถูกกว่าแบบ branchless เมื่อทั้งสองค่าสามารถคำนวณได้ล่วงหน้า
+</Callout>
+
+export const quizIfElse = [
+  {
+    q: "`if` pop อะไรเพื่อตัดสินใจว่าจะรัน branch ไหน?",
+    options: [
+      "boolean จาก flag register",
+      "ค่า i32 จาก stack",
+      "memory address",
+      "local variable ตามชื่อ"
+    ],
+    answer: 1
+  },
+  {
+    q: "`select` ใน WAT คืออะไร?",
+    options: [
+      "branchless ternary ที่เลือกค่าหนึ่งจากสองค่าบน stack โดยอ้างอิง condition",
+      "multi-way branch เหมือน switch statement",
+      "คำสั่งที่เลือก local variable",
+      "ชื่ออื่นของ br_table"
+    ],
+    answer: 0
+  },
+  {
+    q: "keyword ใดที่ปิด `if` block ใน WAT?",
+    options: ["close", "}", "end", "fi"],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/if-else" questions={quizIfElse} />
+
+<ProgressTracker client:visible id="control-flow-functions/if-else" />

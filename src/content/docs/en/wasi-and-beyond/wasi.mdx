@@ -1,0 +1,107 @@
+---
+title: 'WASI Deep Dive'
+description: 'Capability-based security, WASI Preview 1 vs Preview 2, compiling Rust to wasm32-wasip1, and the _start entry point.'
+sidebar:
+  order: 2
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WASI does not just expose system calls — it redesigns how a program is granted access to system resources. Instead of the POSIX model where a process inherits ambient authority from its user ID, WASI uses **capability-based security**: a module can only use a resource if the runtime explicitly passes a capability for it.
+
+## Capability-based security
+
+In a traditional Unix process, opening `/etc/passwd` succeeds as long as the process's UID has read permission. There is no sandboxing at the application boundary.
+
+In WASI the module has no ambient access at all. The runtime acts as a gatekeeper:
+
+- To read from the filesystem, the host must pass a pre-opened directory file descriptor via `--dir`.
+- To access an environment variable, the host must allow it via `--env`.
+- By default, a WASI module has **zero** filesystem access, **zero** network access, and **zero** environment variable access.
+
+This means you can safely run untrusted `.wasm` binaries — the worst a compromised module can do is limited to exactly what it was handed.
+
+## WASI Preview 1 vs Preview 2
+
+WASI has gone through two major revisions:
+
+| | Preview 1 (0.1) | Preview 2 (0.2) |
+|-|-----------------|-----------------|
+| **Status** | Stable, widely supported | Stable since early 2024 |
+| **Interface style** | Flat C-like imports (`fd_write`, `path_open`) | Component Model WIT interfaces |
+| **Target triple** | `wasm32-wasi` / `wasm32-wasip1` | `wasm32-wasip2` |
+| **Networking** | Not in core (vendor extensions) | `wasi:sockets` in core |
+| **Toolchain** | Rust stable, WASI SDK | `cargo component`, `wasm-tools` |
+
+For most production work today, Preview 1 (`wasm32-wasip1`) is the safe default. Preview 2 is the future, and tooling is maturing quickly.
+
+## Compiling Rust to WASI
+
+Add the target once, then build normally:
+
+```bash
+# Install the WASI target
+rustup target add wasm32-wasip1
+
+# Build a release binary
+cargo build --target wasm32-wasip1 --release
+# Output: target/wasm32-wasip1/release/my_app.wasm
+```
+
+A minimal Rust `main.rs` for WASI:
+
+```rust
+fn main() {
+    println!("Hello from WASI!");
+    let args: Vec<String> = std::env::args().collect();
+    println!("Args: {:?}", args);
+}
+```
+
+`println!` maps to the WASI `fd_write` import on file descriptor 1 (stdout). `std::env::args()` uses the WASI `args_get` / `args_sizes_get` imports. Both are part of Preview 1.
+
+## The `_start` entry point
+
+When `wasmtime` (or any WASI runtime) executes a `.wasm` binary it looks for an exported function named `_start`. This is the WASI equivalent of `main()`.
+
+The Rust compiler generates `_start` automatically when you compile with a `main` function and the `wasm32-wasip1` target. You can verify this with `wasm-objdump`:
+
+```bash
+wasm-objdump -x target/wasm32-wasip1/release/my_app.wasm | grep export
+# ...
+# - func[N] <_start> -> "_start"
+```
+
+export const wasiCapDiagram = `flowchart TD
+  RT["wasmtime / wasmer\\n(runtime)"]
+  subgraph "Capability grants"
+    D["--dir /data\\n(pre-opened fd)"]
+    E["--env KEY=VAL"]
+    A["argv via --"]
+  end
+  RT -->|"pre-opens"| D
+  RT -->|"injects"| E
+  RT -->|"passes"| A
+  D --> M["Wasm Module\\n(_start)"]
+  E --> M
+  A --> M`;
+
+<Mermaid code={wasiCapDiagram} title="Capability grants flow into the module at startup" />
+
+<Callout title="Principle of least privilege">
+WASI enforces least privilege by default. A module receives only the capabilities the runtime operator explicitly grants — not everything the current OS user can access.
+</Callout>
+
+export const quizWasi = [
+  { q: "In WASI, how does a module gain access to a directory on the host filesystem?", options: ["It calls open() with an absolute path", "The runtime pre-opens the directory and passes a file descriptor", "WASI grants read access to all directories by default", "The module reads /etc/fstab"], answer: 1 },
+  { q: "Which Rust target triple compiles to WASI Preview 1?", options: ["wasm32-unknown-unknown", "wasm32-wasip2", "wasm32-wasip1", "x86_64-unknown-linux-musl"], answer: 2 },
+  { q: "What is the WASI entry-point function that runtimes look for?", options: ["main", "wasm_start", "_start", "init"], answer: 2 },
+  { q: "What is the main security advantage of WASI capability-based security over POSIX ambient authority?", options: ["Wasm modules run faster", "Modules can only use resources explicitly passed by the runtime", "Modules inherit the host user's full permissions", "WASI disables all syscalls"], answer: 1 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/wasi" questions={quizWasi} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/wasi" />

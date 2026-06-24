@@ -1,0 +1,153 @@
+---
+title: การคำนวณทางคณิตศาสตร์และการเปรียบเทียบ
+description: 'การคำนวณกับจำนวนเต็มและ float, การหารแบบมีเครื่องหมายเทียบกับไม่มีเครื่องหมาย และคำสั่งเปรียบเทียบที่คืนค่า 0 หรือ 1'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly มีชุดคำสั่งทางคณิตศาสตร์และการเปรียบเทียบที่หลากหลาย แต่ละคำสั่งมีชนิด (typed) — คุณรู้เสมอว่ากำลังทำงานกับจำนวนเต็มหรือ float และสำหรับจำนวนเต็ม การดำเนินการนั้นเป็นแบบมีเครื่องหมายหรือไม่มีเครื่องหมาย
+
+## การคำนวณกับจำนวนเต็ม
+
+การดำเนินการพื้นฐานสี่อย่างสำหรับ `i32` คือ `i32.add`, `i32.sub`, `i32.mul` และการหาร ทั้งหมด pop ตัวถูกดำเนินการสองตัวและ push ผลลัพธ์หนึ่งตัว:
+
+```wasm
+(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add)
+  (func (export "sub") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.sub)
+  (func (export "mul") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.mul))
+```
+
+คำสั่งเดียวกันนี้มีอยู่สำหรับ `i64` เช่นกัน: `i64.add`, `i64.sub`, `i64.mul`
+
+## การหารแบบมีเครื่องหมายเทียบกับไม่มีเครื่องหมาย
+
+การหารเป็นจุดที่ชนิดจำนวนเต็มเผยให้เห็นความซับซ้อนของมัน `i32` ก็แค่ 32 บิต — ตัวบิตเองไม่ได้พกพาข้อมูลเครื่องหมายใด ๆ **คำสั่ง** เป็นตัวตัดสินว่าจะตีความบิตเหล่านั้นเป็นจำนวนเต็มแบบมีเครื่องหมายในรูป two's-complement หรือเป็นจำนวนเต็มแบบไม่มีเครื่องหมาย:
+
+```wasm
+(module
+  ;; signed: -7 / 2 = -3 (rounds toward zero)
+  (func (export "divSigned") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.div_s)
+
+  ;; unsigned: the same bit pattern as -7 (0xFFFFFFF9) / 2 = 2147483644
+  (func (export "divUnsigned") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.div_u))
+```
+
+ในทำนองเดียวกัน `i32.rem_s` และ `i32.rem_u` ให้เศษเหลือแบบมีเครื่องหมายและไม่มีเครื่องหมาย
+
+## การคำนวณกับ float
+
+คำสั่งสำหรับ float สะท้อนคำสั่งของจำนวนเต็ม แต่คำนำหน้าชนิด (type prefix) เปลี่ยนไป:
+
+```wasm
+(module
+  (func (export "fadd") (param $a f64) (param $b f64) (result f64)
+    local.get $a
+    local.get $b
+    f64.add))
+```
+
+`f64.sub`, `f64.mul`, `f64.div`, `f64.sqrt`, `f64.floor`, `f64.ceil`, `f64.min` และ `f64.max` มีให้ใช้ทั้งหมด ชุดเดียวกันนี้มีอยู่สำหรับ `f32` เช่นกัน
+
+## คำสั่งเปรียบเทียบ
+
+การเปรียบเทียบจะ pop ค่าสองค่าและ push ผลลัพธ์ `i32`: `1` หมายถึง true, `0` หมายถึง false ไม่มีชนิดบูลีน — WebAssembly ใช้ `i32` เป็นบูลีนเมื่อใดก็ตามที่ต้องการ
+
+```wasm
+(module
+  ;; returns 1 if $a equals $b, else 0
+  (func (export "eq") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.eq)
+
+  ;; signed less-than: returns 1 if $a < $b (signed), else 0
+  (func (export "ltSigned") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.lt_s))
+```
+
+ตัวแปรของการเปรียบเทียบเป็นไปตามรูปแบบ signed/unsigned เดียวกัน: `i32.lt_s` เทียบกับ `i32.lt_u`, `i32.gt_s` เทียบกับ `i32.gt_u`, `i32.le_s`, `i32.ge_u` และอื่น ๆ
+
+## ลองรันดู
+
+ตัวอย่างด้านล่างคอมไพล์โมดูลที่มีการลบ การหารแบบมีเครื่องหมาย และการเปรียบเทียบแบบน้อยกว่าชนิดมีเครื่องหมาย
+
+export const arithmeticCode = `const wat = \`(module
+  (func (export "sub") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.sub)
+  (func (export "divS") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.div_s)
+  (func (export "isLess") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.lt_s))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('sub(10, 3) =', instance.exports.sub(10, 3));
+console.log('divS(-7, 2) =', instance.exports.divS(-7, 2));
+console.log('isLess(3, 5) =', instance.exports.isLess(3, 5), '(1 = true)');
+console.log('isLess(5, 3) =', instance.exports.isLess(5, 3), '(0 = false)');`;
+
+<WasmRunner client:visible code={arithmeticCode} />
+
+<Callout title="ความมีเครื่องหมายอยู่ในคำสั่ง ไม่ใช่ในชนิด">
+ชนิดจำนวนเต็มของ WebAssembly (`i32`, `i64`) ก็แค่รูปแบบบิต — มันไม่ได้พกพาเครื่องหมายในตัวเอง การหารและเศษเหลือมีอยู่สองตัวแปร: `div_s` / `rem_s` ตีความบิตเป็นจำนวนเต็มแบบมีเครื่องหมายในรูป two's-complement; `div_u` / `rem_u` ตีความมันเป็นแบบไม่มีเครื่องหมาย การเปรียบเทียบก็เป็นไปตามกฎเดียวกัน: `i32.lt_s` เทียบกับ `i32.lt_u` ชนิดเพียงอย่างเดียวไม่เคยบอกคุณว่าใช้การตีความแบบใด
+</Callout>
+
+export const quizArithmetic = [
+  {
+    q: "`i32.lt_s` คืนค่าอะไรเมื่อการเปรียบเทียบเป็นจริง?",
+    options: ["true (boolean)", "1 (i32)", "0 (i32)", "-1 (i32)"],
+    answer: 1
+  },
+  {
+    q: "ความแตกต่างระหว่าง `i32.div_s` กับ `i32.div_u` คืออะไร?",
+    options: [
+      "div_s เร็วกว่า",
+      "div_s ปฏิบัติต่อตัวถูกดำเนินการเป็นแบบมีเครื่องหมาย; div_u ปฏิบัติต่อมันเป็นแบบไม่มีเครื่องหมาย",
+      "div_u ใช้งานได้กับค่า 64 บิตเท่านั้น",
+      "ทั้งสองเหมือนกัน — ผลลัพธ์เป็นค่าเดียวกันเสมอ"
+    ],
+    answer: 1
+  },
+  {
+    q: "คำสั่งใดที่คูณค่า i32 สองค่า?",
+    options: ["i32.mul", "i32.times", "i32.product", "int.mul32"],
+    answer: 0
+  },
+  {
+    q: "การเปรียบเทียบของ Wasm อย่าง `i32.eq` push ชนิดใดขึ้นไปบน stack?",
+    options: ["bool", "f64", "i32 (0 หรือ 1)", "i1"],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="wat-text-format/arithmetic" questions={quizArithmetic} />
+
+<ProgressTracker client:visible id="wat-text-format/arithmetic" />

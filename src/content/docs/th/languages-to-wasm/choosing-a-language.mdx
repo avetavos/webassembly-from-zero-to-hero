@@ -1,0 +1,95 @@
+---
+title: 'การเลือกภาษา'
+description: 'กรอบการตัดสินใจสำหรับเลือก Toolchain ที่ถูกต้อง — Rust, C/Emscripten, AssemblyScript หรือ TinyGo — สำหรับโปรเจกต์ WebAssembly ของคุณ'
+sidebar:
+  order: 5
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+ทุก Wasm Toolchain มีจุดหมายปลายทางเดียวกัน — ไฟล์ `.wasm` Binary ที่รันในเบราว์เซอร์ — แต่แต่ละตัวเดินบนเส้นทางที่ต่างกัน การเลือกที่ถูกต้องขึ้นอยู่กับ Codebase ที่มีอยู่, ทักษะของทีม และข้อจำกัดของโปรเจกต์
+
+## ตารางเปรียบเทียบ
+
+| คำถาม | Rust | C / Emscripten | AssemblyScript | TinyGo |
+|-------|------|----------------|----------------|--------|
+| ทีมเขียนภาษานี้อยู่แล้วหรือ? | บางที | บางที | ถ้ารู้จัก TS | ถ้ารู้จัก Go |
+| มี Codebase ที่ต้อง Port หรือ? | ไม่ | ใช่ | ไม่ | ไม่ |
+| ขนาด Binary เป็นหลัก? | ยอดเยี่ยม | ใหญ่ (libc overhead) | ยอดเยี่ยม | ดี |
+| GC / Runtime Overhead? | ไม่มี | เฉพาะ libc | ไม่มี | น้อยมาก |
+| JS Interop ที่สมบูรณ์ (String, Object)? | ใช่ (wasm-bindgen) | ผ่าน ccall/cwrap | ผ่าน Loader | จำกัด |
+| ครอบคลุม Standard Library? | ครบถ้วน | ครบถ้วน libc | จำกัด | บางส่วน |
+| รองรับ Async / Concurrency? | ผ่าน Futures | ผ่าน Asyncify | จำกัด | จำกัด |
+| Learning Curve (เฉพาะ Wasm)? | ปานกลาง | ต่ำ (ถ้ารู้ C) | ต่ำมาก (TS) | ต่ำ (ถ้ารู้ Go) |
+
+## Rust — เมื่อใดควรเลือก
+
+เลือก Rust เมื่อคุณ **เขียนโค้ด Wasm ใหม่** และต้องการ:
+
+- Binary ที่เล็กที่สุดเท่าที่เป็นไปได้ (ไม่มี GC, ไม่มี Runtime Heap)
+- JS Binding ที่ปลอดภัยและอัตโนมัติผ่าน `wasm-bindgen`
+- Crate Ecosystem ที่ออกแบบมาสำหรับ `wasm32-unknown-unknown`
+- แพ็กเกจ npm ที่ Publish ได้จาก `wasm-pack`
+
+```bash
+wasm-pack build --target web
+# → pkg/ พร้อม npm publish
+```
+
+## C / C++ กับ Emscripten — เมื่อใดควรเลือก
+
+เลือก Emscripten เมื่อคุณ **Port ไลบรารี C/C++ ที่มีอยู่** และต้องการ:
+
+- `printf`, `malloc`, File I/O และ POSIX API ทำงานได้โดยไม่แก้โค้ด
+- OpenGL Emulation ผ่าน WebGL (`-sUSE_WEBGL2`)
+- Build ขั้นตอนเดียวจาก Makefile หรือ CMake Project ที่มีอยู่
+
+```bash
+emcc existing_lib.c -o out.js -sEXPORTED_FUNCTIONS='["_my_api"]' -O2
+```
+
+## AssemblyScript — เมื่อใดควรเลือก
+
+เลือก AssemblyScript เมื่อทีมของคุณ **เขียน TypeScript** และต้องการ:
+
+- Learning Curve ที่ต่ำมาก (Syntax เดิม แค่ Numeric Type ต่างกัน)
+- Wasm Module เล็กและ Self-contained โดยไม่มี Dependency
+- วน Iteration เร็วโดยไม่ต้องตั้งค่า Rust หรือ C Toolchain
+
+```bash
+npx asc assembly/index.ts --outFile build/release.wasm --optimize
+```
+
+## TinyGo — เมื่อใดควรเลือก
+
+เลือก TinyGo เมื่อทีมของคุณ **เขียน Go** และต้องการแชร์แพ็กเกจ Pure Logic ระหว่าง Go Backend กับ Browser Frontend:
+
+```bash
+tinygo build -o wasm.wasm -target wasm ./main.go
+```
+
+หมายเหตุ: TinyGo ไม่รองรับ Go Standard Library ทั้งหมด แพ็กเกจที่ใช้ `net`, `os` หรือ Reflection อาจคอมไพล์ไม่ได้ ตรวจสอบ [ตาราง Package Support ของ TinyGo](https://tinygo.org/docs/reference/lang-support/) ก่อนตัดสินใจ
+
+## Flowchart การตัดสินใจ
+
+1. **มีโค้ด C/C++ ที่ทำงานได้อยู่แล้วหรือ?** → Emscripten
+2. **ทีมเขียน TypeScript และต้องการเริ่มต้นเร็ว?** → AssemblyScript
+3. **ทีมเขียน Go หรือ?** → TinyGo
+4. **เขียนโค้ดใหม่และต้องการขนาด Binary ที่ดีที่สุดพร้อม JS Interop?** → Rust
+
+<Callout title="เริ่มจากง่าย เปลี่ยนได้ในภายหลัง">
+AssemblyScript คือวิธีที่เร็วที่สุดในการ Ship Wasm Module แรก ถ้าภายหลังต้องการการควบคุมในระดับต่ำกว่าหรือ JS Binding ที่สมบูรณ์กว่า การย้ายไป Rust ทำได้ไม่ยากเพราะทั้งคู่ผลิต Interface `.wasm` เดิม — ฝั่ง JavaScript ที่เรียกใช้ไม่ต้องเปลี่ยน
+</Callout>
+
+export const quizChoosingLang = [
+  { q: "Toolchain ใดเหมาะที่สุดเมื่อต้อง Port ไลบรารี C ที่มีอยู่ซึ่งใช้ printf และ malloc?", options: ["wasm-pack (Rust)", "Emscripten (emcc)", "asc (AssemblyScript)", "tinygo"], answer: 1 },
+  { q: "Toolchain สองตัวใดที่ผลิต Wasm Binary ขนาดเล็กที่สุดเพราะไม่มี Garbage Collector หรือ Runtime Heap?", options: ["Emscripten และ TinyGo", "Rust และ AssemblyScript", "AssemblyScript และ TinyGo", "Rust และ Emscripten"], answer: 1 },
+  { q: "ข้อจำกัดหลักของ TinyGo เมื่อคอมไพล์โค้ด Go ไปยัง Wasm คืออะไร?", options: ["ไม่สามารถ Export ฟังก์ชันไปยัง JavaScript ได้", "รองรับเฉพาะ Target wasm32-wasi", "ไม่รองรับ Go Standard Library ทั้งหมด", "ต้องการไฟล์ JS Loader แยกต่างหาก"], answer: 2 },
+  { q: "คำสั่งใด Publish โปรเจกต์ Rust Wasm เป็นแพ็กเกจ npm?", options: ["cargo publish --target wasm32", "wasm-pack publish", "emcc --publish", "npx asc --publish"], answer: 1 },
+];
+
+<Quiz client:visible id="languages-to-wasm/choosing-a-language" questions={quizChoosingLang} />
+
+<ProgressTracker client:visible id="languages-to-wasm/choosing-a-language" />

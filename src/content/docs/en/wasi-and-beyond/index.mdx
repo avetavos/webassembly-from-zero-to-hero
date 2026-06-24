@@ -1,0 +1,61 @@
+---
+title: 'WASI & Beyond the Browser'
+description: 'Discover how WebAssembly runs outside the browser via WASI, learn about capability-based security, wasmtime/wasmer runtimes, the Component Model, and real-world use cases.'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly was designed for the browser — but its properties (safe sandboxing, near-native speed, and language-agnostic portability) make it equally valuable on servers, edge nodes, embedded devices, and plugin systems. The key that unlocks all of these environments is **WASI** — the WebAssembly System Interface.
+
+## Why run Wasm outside the browser?
+
+In the browser, the JavaScript engine is the host. It provides the runtime environment, handles memory, and exposes browser APIs. Outside the browser there is no JavaScript engine, no DOM, no `fetch`. A Wasm module that wants to read a file, write to stdout, or open a network socket needs a different host to supply those capabilities.
+
+WASI is the standardised answer: a set of POSIX-like system-call definitions expressed as Wasm imports. Any runtime that implements WASI can run the same `.wasm` binary — on Linux, macOS, Windows, or a tiny microcontroller.
+
+## The host–runtime–module relationship
+
+export const overviewDiagram = `flowchart LR
+  H["Host\\n(OS / Edge Platform)"]
+  R["WASI Runtime\\n(wasmtime / wasmer)"]
+  M["Wasm Module\\n(.wasm binary)"]
+  H -->|"grants capabilities\\n(dirs, sockets, env vars)"| R
+  R -->|"exposes WASI imports\\n(fd_write, path_open …)"| M
+  M -->|"calls imports to\\nread/write/execute"| R`;
+
+<Mermaid code={overviewDiagram} title="Host → WASI runtime → Wasm module" />
+
+The diagram shows the three-layer model:
+
+1. **Host** — the operating system or cloud platform. It decides which resources (directories, sockets, environment variables) the runtime may pass through.
+2. **WASI Runtime** — a standalone executable such as `wasmtime` or `wasmer`. It implements the WASI spec as Wasm import functions and enforces capability grants.
+3. **Wasm Module** — the compiled binary. It imports WASI functions the same way it would import any other Wasm import. It never calls the OS directly.
+
+## Lessons in this module
+
+| # | Lesson | What you will learn |
+|---|--------|---------------------|
+| 1 | **This overview** | The why and the architecture |
+| 2 | [WASI Deep Dive](./wasi) | Capability security, Preview 1 vs 2, compiling Rust to WASI |
+| 3 | [wasmtime & wasmer](./wasmtime-wasmer) | Running and embedding Wasm binaries with real runtimes |
+| 4 | [Component Model, SIMD & Threads](./component-model-simd-threads) | WIT interfaces, SIMD `v128`, and threads overview |
+| 5 | [Use Cases & When to Use Wasm](./use-cases-and-when) | Plugins, edge, sandboxing, portable CLIs, and trade-offs |
+
+<Callout title="One binary, many hosts">
+A `.wasm` binary compiled against WASI runs unchanged on wasmtime, wasmer, Cloudflare Workers, Fermyon Spin, and any other WASI-compliant host. No recompilation required.
+</Callout>
+
+export const quizWasiIndex = [
+  { q: "What does WASI stand for?", options: ["WebAssembly System Interface", "Web API Security Integration", "Wasm Application Standard Initialization", "WebAssembly Standard Imports"], answer: 0 },
+  { q: "Which layer enforces capability grants in the host–runtime–module model?", options: ["The Wasm module itself", "The host operating system directly", "The WASI runtime (e.g. wasmtime)", "The JavaScript engine"], answer: 2 },
+  { q: "Why can a WASI-compiled .wasm binary run on multiple platforms without recompilation?", options: ["It is compiled to native machine code", "All platforms share the same OS syscalls", "The WASI spec defines a portable import interface any compliant runtime implements", "It embeds a copy of the OS"], answer: 2 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/index" questions={quizWasiIndex} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/index" />

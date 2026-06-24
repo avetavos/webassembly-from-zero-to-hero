@@ -1,0 +1,107 @@
+---
+title: 'WASI Deep Dive'
+description: 'ความปลอดภัยแบบ capability-based, WASI Preview 1 vs Preview 2, การคอมไพล์ Rust ไป wasm32-wasip1 และ entry point _start'
+sidebar:
+  order: 2
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WASI ไม่ได้แค่เปิดเผย system call — มันออกแบบใหม่วิธีที่โปรแกรมได้รับสิทธิ์เข้าถึงทรัพยากรระบบ แทนที่โมเดล POSIX ซึ่งโปรเซสสืบทอด ambient authority จาก user ID, WASI ใช้ **capability-based security**: โมดูลสามารถใช้ทรัพยากรได้เฉพาะเมื่อรันไทม์ส่ง capability มาให้อย่างชัดเจน
+
+## ความปลอดภัยแบบ capability-based
+
+ในโปรเซส Unix ทั่วไป การเปิด `/etc/passwd` สำเร็จตราบใดที่ UID ของโปรเซสมีสิทธิ์อ่าน ไม่มี sandboxing ที่ขอบเขตแอปพลิเคชัน
+
+ใน WASI โมดูลไม่มี ambient access เลย รันไทม์ทำหน้าที่เป็นยาม:
+
+- เพื่ออ่านจาก filesystem host ต้องส่ง pre-opened directory file descriptor ผ่าน `--dir`
+- เพื่อเข้าถึง environment variable host ต้องอนุญาตผ่าน `--env`
+- โดยค่าเริ่มต้น โมดูล WASI มีสิทธิ์เข้าถึง filesystem **ศูนย์**, network **ศูนย์** และ environment variable **ศูนย์**
+
+ซึ่งหมายความว่าคุณสามารถรัน binary `.wasm` ที่ไม่น่าเชื่อถือได้อย่างปลอดภัย สิ่งเลวร้ายที่สุดที่โมดูลที่ถูก compromise สามารถทำได้ถูกจำกัดเฉพาะสิ่งที่มันได้รับมาเท่านั้น
+
+## WASI Preview 1 vs Preview 2
+
+WASI ผ่านการแก้ไขหลักสองครั้ง:
+
+| | Preview 1 (0.1) | Preview 2 (0.2) |
+|-|-----------------|-----------------|
+| **สถานะ** | Stable, รองรับอย่างกว้างขวาง | Stable ตั้งแต่ต้นปี 2024 |
+| **สไตล์ interface** | C-like imports แบบ flat (`fd_write`, `path_open`) | Component Model WIT interface |
+| **Target triple** | `wasm32-wasi` / `wasm32-wasip1` | `wasm32-wasip2` |
+| **Networking** | ไม่อยู่ใน core (vendor extension) | `wasi:sockets` อยู่ใน core |
+| **Toolchain** | Rust stable, WASI SDK | `cargo component`, `wasm-tools` |
+
+สำหรับงาน production ส่วนใหญ่ในปัจจุบัน Preview 1 (`wasm32-wasip1`) คือค่าเริ่มต้นที่ปลอดภัย Preview 2 คืออนาคต และ tooling กำลังพัฒนาอย่างรวดเร็ว
+
+## การคอมไพล์ Rust ไป WASI
+
+เพิ่ม target หนึ่งครั้ง แล้ว build ตามปกติ:
+
+```bash
+# ติดตั้ง WASI target
+rustup target add wasm32-wasip1
+
+# Build release binary
+cargo build --target wasm32-wasip1 --release
+# Output: target/wasm32-wasip1/release/my_app.wasm
+```
+
+`main.rs` ของ Rust ขั้นต่ำสำหรับ WASI:
+
+```rust
+fn main() {
+    println!("Hello from WASI!");
+    let args: Vec<String> = std::env::args().collect();
+    println!("Args: {:?}", args);
+}
+```
+
+`println!` map ไปยัง WASI `fd_write` import บน file descriptor 1 (stdout) `std::env::args()` ใช้ WASI `args_get` / `args_sizes_get` imports ทั้งคู่เป็นส่วนหนึ่งของ Preview 1
+
+## Entry point `_start`
+
+เมื่อ `wasmtime` (หรือรันไทม์ WASI ใด ๆ) รัน binary `.wasm` มันจะมองหา exported function ชื่อ `_start` นี่คือเทียบเท่า WASI ของ `main()`
+
+Rust compiler สร้าง `_start` อัตโนมัติเมื่อคอมไพล์ด้วย `main` function และ target `wasm32-wasip1` คุณสามารถตรวจสอบด้วย `wasm-objdump`:
+
+```bash
+wasm-objdump -x target/wasm32-wasip1/release/my_app.wasm | grep export
+# ...
+# - func[N] <_start> -> "_start"
+```
+
+export const wasiCapDiagram = `flowchart TD
+  RT["wasmtime / wasmer\\n(runtime)"]
+  subgraph "Capability grants"
+    D["--dir /data\\n(pre-opened fd)"]
+    E["--env KEY=VAL"]
+    A["argv via --"]
+  end
+  RT -->|"pre-opens"| D
+  RT -->|"injects"| E
+  RT -->|"passes"| A
+  D --> M["Wasm Module\\n(_start)"]
+  E --> M
+  A --> M`;
+
+<Mermaid code={wasiCapDiagram} title="Capability grants ไหลเข้าโมดูลเมื่อ startup" />
+
+<Callout title="หลักการสิทธิ์น้อยที่สุด">
+WASI บังคับใช้ least privilege โดยค่าเริ่มต้น โมดูลได้รับเฉพาะ capability ที่ผู้ดำเนินการรันไทม์ grant อย่างชัดเจน ไม่ใช่ทุกอย่างที่ OS user ปัจจุบันเข้าถึงได้
+</Callout>
+
+export const quizWasi = [
+  { q: "ใน WASI โมดูลจะได้รับสิทธิ์เข้าถึง directory บน host filesystem อย่างไร?", options: ["เรียก open() ด้วย absolute path", "รันไทม์ pre-open directory และส่ง file descriptor", "WASI ให้สิทธิ์อ่านทุก directory โดยค่าเริ่มต้น", "โมดูลอ่าน /etc/fstab"], answer: 1 },
+  { q: "Rust target triple ใดที่คอมไพล์ไป WASI Preview 1?", options: ["wasm32-unknown-unknown", "wasm32-wasip2", "wasm32-wasip1", "x86_64-unknown-linux-musl"], answer: 2 },
+  { q: "Entry-point function ของ WASI ที่รันไทม์มองหาคืออะไร?", options: ["main", "wasm_start", "_start", "init"], answer: 2 },
+  { q: "ข้อได้เปรียบด้านความปลอดภัยหลักของ WASI capability-based security เทียบกับ POSIX ambient authority คืออะไร?", options: ["Wasm module รันเร็วขึ้น", "โมดูลใช้ได้เฉพาะทรัพยากรที่รันไทม์ส่งมาให้อย่างชัดเจน", "โมดูลสืบทอดสิทธิ์ full ของ host user", "WASI ปิดการใช้งาน syscall ทั้งหมด"], answer: 1 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/wasi" questions={quizWasi} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/wasi" />

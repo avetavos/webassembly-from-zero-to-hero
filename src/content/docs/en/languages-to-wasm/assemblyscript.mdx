@@ -1,0 +1,132 @@
+---
+title: 'AssemblyScript'
+description: 'Compile a TypeScript-like language directly to WebAssembly using the asc compiler.'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+AssemblyScript is a compiler that turns a **strict subset of TypeScript** into WebAssembly. If you already know TypeScript, you can be productive in AssemblyScript in minutes. There is no Rust borrow checker, no C memory management — just typed TypeScript with a few Wasm-specific annotations.
+
+## Install AssemblyScript
+
+```bash
+# Create a new Node.js project
+mkdir as-demo && cd as-demo
+npm init -y
+
+# Install the AssemblyScript compiler
+npm install --save-dev assemblyscript
+
+# Scaffold the project (creates assembly/ and tsconfig.json)
+npx asinit .
+```
+
+The `assembly/` directory holds your `.ts` source files. `asconfig.json` configures the compiler.
+
+## Write AssemblyScript functions
+
+Open `assembly/index.ts`:
+
+```ts
+// Integer addition — notice the explicit i32 types
+export function add(a: i32, b: i32): i32 {
+  return a + b;
+}
+
+// Factorial — recursive, i64 to avoid overflow for larger inputs
+export function factorial(n: i64): i64 {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
+}
+
+// Clamp a float value between lo and hi
+export function clamp(value: f64, lo: f64, hi: f64): f64 {
+  if (value < lo) return lo;
+  if (value > hi) return hi;
+  return value;
+}
+```
+
+Key differences from regular TypeScript:
+
+- Types like `i32`, `i64`, `f32`, `f64` are **Wasm-native** numeric types, not TypeScript's `number`.
+- There is no `any`, no `unknown`, and no implicit type coercion.
+- `export` makes functions accessible from JavaScript (same as WAT's `(export ...)`).
+
+## Compile with asc
+
+```bash
+# Development build (readable, not optimised)
+npx asc assembly/index.ts --outFile build/release.wasm --textFile build/release.wat
+
+# Release build (optimised, smaller binary)
+npx asc assembly/index.ts --outFile build/release.wasm --optimize
+
+# With bindings for use as an ES module
+npx asc assembly/index.ts --outFile build/release.wasm --bindings esm
+```
+
+## Call from JavaScript
+
+```js
+// Using the @assemblyscript/loader helper
+import { instantiateStreaming } from '@assemblyscript/loader';
+
+const { exports } = await instantiateStreaming(fetch('./build/release.wasm'));
+
+console.log(exports.add(10, 32));            // 42
+console.log(exports.factorial(BigInt(10)));  // 3628800n (i64 → BigInt)
+console.log(exports.clamp(1.5, 0.0, 1.0));  // 1
+```
+
+Or use the WebAssembly API directly without the loader:
+
+```js
+const response = await fetch('./build/release.wasm');
+const bytes = await response.arrayBuffer();
+const { instance } = await WebAssembly.instantiate(bytes, {});
+
+console.log(instance.exports.add(3, 4));  // 7
+```
+
+## Try it in the browser
+
+The editor below opens a live AssemblyScript project in StackBlitz where you can edit, compile, and run the code directly in your browser.
+
+export const asCode = `// assembly/index.ts
+export function add(a: i32, b: i32): i32 {
+  return a + b;
+}
+
+export function factorial(n: i64): i64 {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
+}
+
+export function clamp(value: f64, lo: f64, hi: f64): f64 {
+  if (value < lo) return lo;
+  if (value > hi) return hi;
+  return value;
+}`;
+
+<WasmRunner stackblitz client:visible code={asCode} />
+
+<Callout title="AssemblyScript is TypeScript with Wasm types">
+AssemblyScript uses `i32`, `i64`, `f32`, `f64` instead of TypeScript's `number`. This makes the mapping to Wasm instructions explicit and produces very small binaries — no runtime or GC overhead.
+</Callout>
+
+export const quizAssemblyScript = [
+  { q: "Which numeric type does AssemblyScript use for a 32-bit integer?", options: ["number", "int", "i32", "Int32"], answer: 2 },
+  { q: "How do you make an AssemblyScript function callable from JavaScript?", options: ["Using the export keyword", "Using module.exports", "Annotating with @extern", "Declaring it in asconfig.json"], answer: 0 },
+  { q: "What does 'npx asinit .' do when scaffolding an AssemblyScript project?", options: ["Installs the Wasm runtime globally", "Creates the assembly/ directory and configuration files", "Compiles all .ts files to .wasm", "Publishes the package to npm"], answer: 1 },
+  { q: "Why does AssemblyScript produce small Wasm binaries?", options: ["It uses Brotli compression automatically", "There is no garbage collector or runtime heap", "It strips TypeScript types at compile time", "It targets wasm32-wasi instead of the browser"], answer: 1 },
+];
+
+<Quiz client:visible id="languages-to-wasm/assemblyscript" questions={quizAssemblyScript} />
+
+<ProgressTracker client:visible id="languages-to-wasm/assemblyscript" />

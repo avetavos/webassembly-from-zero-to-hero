@@ -1,0 +1,92 @@
+---
+title: 'Growing Memory & Data Segments'
+description: 'Grow WebAssembly memory at runtime with memory.grow, handle buffer detachment when re-creating typed-array views, and initialise memory with (data ...) segments.'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+A WebAssembly module starts with however many pages you declare in `(memory N)`. But sometimes you need more memory at runtime — for example, when the user uploads a large file or your data grows beyond what you anticipated. The `memory.grow` instruction and the `(data ...)` segment cover these two related concerns: growing memory and pre-seeding it with static bytes.
+
+## The `memory.grow` instruction
+
+`memory.grow` takes one `i32` argument from the stack: the number of additional pages to allocate. It returns the **previous** size in pages, or `-1` if the grow failed (e.g., out of memory or would exceed the declared maximum).
+
+```wasm
+(module
+  (memory (export "mem") 1)
+  (func (export "grow") (param $pages i32) (result i32)
+    local.get $pages
+    memory.grow))
+```
+
+You can also grow memory from the JavaScript side using `mem.grow(n)`:
+
+```js
+const mem = instance.exports.mem;
+const oldPages = mem.grow(1);   // returns previous page count, or -1
+```
+
+## Buffer detachment after grow
+
+This is the most important gotcha: when WebAssembly memory grows, the underlying `ArrayBuffer` is **detached**. Any `Uint8Array`, `Int32Array`, or other typed view that was constructed from the old buffer becomes empty and unusable. You must re-create all views from `mem.buffer` immediately after every grow.
+
+```js
+let view = new Uint8Array(mem.buffer);   // valid before grow
+mem.grow(1);
+// view is now detached — do NOT use it
+view = new Uint8Array(mem.buffer);       // re-create from fresh buffer
+```
+
+## Data segments
+
+The `(data ...)` segment lets you embed static bytes directly in the module and have them written into memory automatically at instantiation time. This is how compiled languages initialise string literals and read-only tables.
+
+```wasm
+(module
+  (memory (export "mem") 1)
+  (data (i32.const 0) "Hello"))  ;; writes 5 UTF-8 bytes at offset 0
+```
+
+The bytes are copied from the module into memory before any function runs, so the data is available immediately when your first exported function is called.
+
+## Run it
+
+The example below uses a `(data ...)` segment to write `"Hi"` at offset 0, grows memory by one page, re-creates the typed-array view after the grow, and checks that both the new size and the original data are correct.
+
+export const growingDataCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (data (i32.const 0) "Hi")
+  (func (export "grow1") (result i32)
+    i32.const 1
+    memory.grow))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+const mem = instance.exports.mem;
+let view = new Uint8Array(mem.buffer);
+console.log('before grow - size (pages):', mem.buffer.byteLength / 65536);
+console.log('data[0..1]:', view[0], view[1]); // 72='H', 105='i'
+const oldPages = instance.exports.grow1();
+console.log('memory.grow returned (old pages):', oldPages);
+// MUST re-create view after grow — old ArrayBuffer is detached
+view = new Uint8Array(mem.buffer);
+console.log('after grow - size (pages):', mem.buffer.byteLength / 65536);`;
+
+<WasmRunner client:visible code={growingDataCode} />
+
+<Callout title="Re-create views after grow">
+After `memory.grow`, the previous `ArrayBuffer` is detached and any typed-array views pointing to it stop working. Always re-create your views from `mem.buffer` immediately after a grow.
+</Callout>
+
+export const quizGrowingAndData = [
+  { q: "What does the memory.grow instruction return?", options: ["The new total number of pages", "The number of bytes added", "The old size in pages, or -1 on failure", "0 on success"], answer: 2 },
+  { q: "What happens to existing typed-array views when WebAssembly memory grows?", options: ["They automatically resize", "They become detached and stop working — you must re-create them", "They are garbage collected", "They reflect the new size after one tick"], answer: 1 },
+  { q: "What does a (data (i32.const 0) \"Hello\") segment do?", options: ["Declares a global string constant", "Writes 5 bytes into memory at offset 0 during instantiation", "Creates a Wasm string variable named Hello", "Allocates 5 pages of memory"], answer: 1 },
+];
+
+<Quiz client:visible id="linear-memory/growing-and-data" questions={quizGrowingAndData} />
+
+<ProgressTracker client:visible id="linear-memory/growing-and-data" />

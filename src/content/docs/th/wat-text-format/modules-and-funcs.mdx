@@ -1,0 +1,109 @@
+---
+title: 'โมดูลและฟังก์ชัน'
+description: 'ทำความเข้าใจตัวห่อ (module ...) วิธีประกาศฟังก์ชันด้วย (func ...) และวิธี export มันไปยัง JavaScript'
+sidebar:
+  order: 2
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+โค้ด WebAssembly ทุกชิ้นอยู่ภายใน **โมดูล** โมดูลเป็นหน่วยระดับบนสุดของการคอมไพล์และการดีพลอย — มันคือสิ่งที่คุณคอมไพล์ ส่งผ่านเครือข่าย และ instantiate ในเบราว์เซอร์ ภายในโมดูลคุณกำหนดฟังก์ชัน ประกาศหน่วยความจำ import จาก JavaScript และเลือกว่าจะ export อะไร
+
+## ตัวห่อโมดูล
+
+s-expression ที่อยู่นอกสุดในไฟล์ WAT ทุกไฟล์คือ `(module ...)` ทุกอย่างที่เหลือถูกซ้อนอยู่ภายในมัน:
+
+```wasm
+(module
+  ;; functions, imports, exports, memory, globals go here
+)
+```
+
+โมดูลที่ไม่มีเนื้อหาเป็น WAT ที่ถูกต้องและคอมไพล์ออกมาเป็นไฟล์ `.wasm` เล็ก ๆ — เพียงแต่มันยังไม่มีอะไรที่มีประโยชน์อยู่ในนั้น
+
+## การประกาศฟังก์ชัน
+
+ฟังก์ชันถูกประกาศด้วย `(func ...)` ฟังก์ชันที่ไม่รับอาร์กิวเมนต์และไม่คืนค่าอะไรเลยมีหน้าตาแบบนี้:
+
+```wasm
+(module
+  (func
+    ;; empty body — does nothing
+  )
+)
+```
+
+หากต้องการรับอาร์กิวเมนต์ คุณเพิ่มแอตทริบิวต์ `(param <name> <type>)` หากต้องการประกาศชนิดของค่าที่คืนกลับ คุณเพิ่ม `(result <type>)` ชื่อพารามิเตอร์ขึ้นต้นด้วย `$` และเป็นทางเลือก แต่แนะนำอย่างยิ่งเพื่อความอ่านง่าย:
+
+```wasm
+(module
+  (func (param $x i32) (param $y i32) (result i32)
+    local.get $x
+    local.get $y
+    i32.mul)
+)
+```
+
+โมดูลนี้คอมไพล์ได้ดี แต่ฟังก์ชันนั้นเข้าถึงไม่ได้เลยจาก JavaScript เพราะมันยังไม่ได้ถูก export
+
+## การ export ฟังก์ชัน
+
+JavaScript สามารถเรียกได้เฉพาะฟังก์ชันที่โมดูล export ออกมาอย่างชัดเจนเท่านั้น มีไวยากรณ์ที่เทียบเท่ากันสองแบบ
+
+**คำสั่ง export แยกต่างหาก** — กำหนดฟังก์ชันพร้อมชื่อ แล้ว export มัน:
+
+```wasm
+(module
+  (func $multiply (param $x i32) (param $y i32) (result i32)
+    local.get $x
+    local.get $y
+    i32.mul)
+  (export "multiply" (func $multiply))
+)
+```
+
+**Inline export** — แนบการ export เข้ากับการประกาศ `func` โดยตรง:
+
+```wasm
+(module
+  (func (export "multiply") (param $x i32) (param $y i32) (result i32)
+    local.get $x
+    local.get $y
+    i32.mul)
+)
+```
+
+ทั้งสองรูปแบบสร้างไบต์ `.wasm` ที่เหมือนกัน สไตล์ inline กระชับกว่า ส่วนสไตล์คำสั่งแยกต่างหากมีประโยชน์เมื่อคุณต้องการ export ฟังก์ชันเดียวกันภายใต้หลายชื่อ หรือต้องการแยกการประกาศกับการ export ให้เห็นชัดเจน
+
+## ลองรันดู
+
+ตัวอย่างด้านล่างกำหนดฟังก์ชัน `multiply` โดยใช้ไวยากรณ์ inline export และเรียกมันจาก JavaScript
+
+export const modulesCode = `const wat = \`(module
+  (func (export "multiply") (param $x i32) (param $y i32) (result i32)
+    local.get $x
+    local.get $y
+    i32.mul))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('multiply(6, 7) =', instance.exports.multiply(6, 7));
+console.log('multiply(3, 4) =', instance.exports.multiply(3, 4));`;
+
+<WasmRunner client:visible code={modulesCode} />
+
+<Callout title="ทุกอย่างอยู่ในโมดูล">
+ฟังก์ชัน, global, memory และ table ของ WebAssembly ทุกอย่างอยู่ภายในตัวห่อ `(module ...)` JavaScript สามารถเรียกได้เฉพาะฟังก์ชันที่โมดูล export ออกมาอย่างชัดเจนเท่านั้น
+</Callout>
+
+export const quizModulesAndFuncs = [
+  { q: "ไวยากรณ์ใดที่ export ฟังก์ชันจากโมดูล WAT?", options: ['`(export "name" (func $f))`', '`(public func $f)`', '`export default func $f`', '`module.exports.f = $f`'], answer: 0 },
+  { q: "JavaScript สามารถเรียกฟังก์ชันที่ถูกกำหนดไว้แต่ไม่ได้ถูก export ได้หรือไม่?", options: ["ได้ โดยใช้ WebAssembly.Module.exports()", "ได้ โดยใช้ดัชนี (index)", "ไม่ได้ — เข้าถึงได้เฉพาะฟังก์ชันที่ถูก export จาก JS เท่านั้น", "ได้ ถ้าฟังก์ชันมีชื่อขึ้นต้นด้วย $"], answer: 2 },
+  { q: "s-expression ที่อยู่นอกสุดในไฟล์ WAT ทุกไฟล์คืออะไร?", options: ["(func ...)", "(export ...)", "(module ...)", "(wasm ...)"], answer: 2 },
+];
+
+<Quiz client:visible id="wat-text-format/modules-and-funcs" questions={quizModulesAndFuncs} />
+
+<ProgressTracker client:visible id="wat-text-format/modules-and-funcs" />

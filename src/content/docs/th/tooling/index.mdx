@@ -1,0 +1,101 @@
+---
+title: 'เครื่องมือ (Tooling)'
+description: 'สำรวจ WebAssembly toolchain ที่จำเป็น ได้แก่ wabt, Binaryen และ wasm-tools และทำความเข้าใจว่าแต่ละตัวอยู่ในตำแหน่งใดของ build pipeline'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+การส่ง WebAssembly ที่มีประสิทธิภาพเริ่มต้นก่อนที่คุณจะเขียนคำสั่งแรก คุณต้องมีเครื่องมือเพื่อแปลงข้อความ `.wat` ให้เป็นไบนารี `.wasm` เพื่อตรวจสอบว่ามีอะไรอยู่ในโมดูลที่คอมไพล์แล้ว และเพื่อลดขนาดไบต์ก่อนที่จะส่งผ่านเครือข่าย โปรเจกต์สามตัวครอบคลุมความต้องการเกือบทั้งหมด: **wabt**, **Binaryen** และ **wasm-tools**
+
+## ตระกูลเครื่องมือทั้งสาม
+
+| ตระกูลเครื่องมือ | ดูแลโดย | จุดแข็งหลัก |
+|---|---|---|
+| **wabt** (WebAssembly Binary Toolkit) | WebAssembly CG | การแปลง WAT ↔ binary, การ validate, การตรวจสอบ |
+| **Binaryen** | Google / Emscripten | การ optimise และ code generation, `wasm-opt` |
+| **wasm-tools** | Bytecode Alliance | ชุดเครื่องมือที่เขียนด้วย Rust: parse, validate, compose, encode |
+
+แต่ละตระกูลครอบครองขั้นตอนที่แตกต่างกันใน pipeline แผนภาพด้านล่างแสดงให้เห็นว่าไฟล์ต้นฉบับ `.wat` เดินทางผ่านเครื่องมือเหล่านี้อย่างไรจนกลายเป็นโมดูลที่ถูก deploy และ optimise แล้ว
+
+export const toolingOverviewDiagram = `flowchart LR
+  A[".wat source"] -->|"wat2wasm"| B[".wasm binary"]
+  B -->|"wasm-opt -O3"| C["optimised .wasm"]
+  C -->|"wasm2wat / wasm-objdump"| D["inspection / debug"]
+  B -->|"wasm-validate"| E["validation report"]
+  B -->|"wasm-tools parse"| F["structured analysis"]`;
+
+<Mermaid code={toolingOverviewDiagram} title="WAT → .wasm → optimised → inspect" />
+
+## wabt — ชั้นการแปล
+
+`wabt` คือ reference implementation ของ WAT text format binary หลักคือ `wat2wasm` ซึ่งแปลงไฟล์ `.wat` เป็นไบนารี `.wasm` ทิศทางย้อนกลับ — การ disassemble `.wasm` กลับเป็น WAT ที่อ่านได้ — จัดการโดย `wasm2wat` เครื่องมือเสริมสองตัวทำให้ครบชุด: `wasm-objdump` แสดง section headers และ symbol table ของไบนารีใดก็ได้ และ `wasm-validate` ตรวจสอบว่าโมดูลเป็นไปตามข้อกำหนดหรือไม่
+
+```bash
+# ติดตั้งผ่าน npm (ทำงานโดยไม่ต้องสร้าง native)
+npm install -g wabt
+
+# คอมไพล์ WAT ให้เป็น binary
+wat2wasm add.wat -o add.wasm
+
+# Disassemble กลับเป็น text
+wasm2wat add.wasm -o add.wat
+
+# ตรวจสอบ section headers
+wasm-objdump -x add.wasm
+
+# Validate โมดูล
+wasm-validate add.wasm
+```
+
+## Binaryen — ตัว optimise
+
+Binaryen คือโครงสร้างพื้นฐาน compiler สำหรับ WebAssembly ที่ทำการ optimise เครื่องมือที่ใช้กันมากที่สุดคือ `wasm-opt` ซึ่งเขียนไบนารี `.wasm` ที่มีอยู่ใหม่เพื่อผลิต output ที่เล็กลงหรือเร็วขึ้น Emscripten, AssemblyScript และ `wasm-pack` (สำหรับ Rust) ทั้งหมดเรียก `wasm-opt` โดยอัตโนมัติเป็นส่วนหนึ่งของ release builds
+
+```bash
+# ติดตั้ง
+npm install -g binaryen
+
+# Optimise เพื่อความเร็ว (ต้องการการทำงานที่รวดเร็ว)
+wasm-opt -O3 input.wasm -o output.wasm
+
+# Optimise เพื่อขนาด (ต้องการ download ที่เล็ก)
+wasm-opt -Oz input.wasm -o output.wasm
+```
+
+## wasm-tools — ชุดเครื่องมือสมัยใหม่
+
+`wasm-tools` คือชุดเครื่องมือรุ่นใหม่ของ Bytecode Alliance เขียนด้วย Rust และมีทั้งในรูปแบบ CLI และ library รองรับ WebAssembly Component Model proposals การรวมหลายโมดูลเข้าด้วยกัน การลบ custom sections และการ encode/decode ในรูปแบบ binary
+
+```bash
+# ติดตั้ง
+cargo install wasm-tools
+
+# Validate
+wasm-tools validate add.wasm
+
+# แสดง text format
+wasm-tools print add.wasm
+
+# ลบ custom sections (ลบ debug info)
+wasm-tools strip add.wasm -o add.stripped.wasm
+```
+
+<Callout title="เลือกเครื่องมือที่เหมาะกับงาน">
+ใช้ `wabt` เมื่อต้องการแปลง WAT ↔ binary หรือ validate ตามข้อกำหนด ใช้ `wasm-opt` (Binaryen) เมื่อต้องการลดขนาดหรือเพิ่มความเร็วของไบนารี ใช้ `wasm-tools` เมื่อทำงานกับ Component Model modules หรือต้องการ Rust API แบบ programmatic
+</Callout>
+
+export const quizToolingIndex = [
+  { q: "Which tool converts a .wat text file into a .wasm binary?", options: ["wasm-opt", "wat2wasm", "wasm-tools validate", "wasm2wat"], answer: 1 },
+  { q: "Which tool family is primarily focused on size and speed optimisation?", options: ["wabt", "wasm-tools", "Binaryen (wasm-opt)", "wasm-validate"], answer: 2 },
+  { q: "Which organisation maintains the wasm-tools project?", options: ["Google", "Mozilla", "Bytecode Alliance", "WebAssembly CG"], answer: 2 },
+  { q: "What does wasm2wat do?", options: ["Compiles C to WebAssembly", "Optimises a .wasm binary", "Disassembles a .wasm binary back to WAT text", "Validates spec compliance"], answer: 2 },
+];
+
+<Quiz client:visible id="tooling/index" questions={quizToolingIndex} />
+
+<ProgressTracker client:visible id="tooling/index" />

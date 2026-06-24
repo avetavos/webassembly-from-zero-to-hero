@@ -1,0 +1,134 @@
+---
+title: 'Component Model, SIMD & Threads'
+description: 'Build composable Wasm components with WIT interfaces using wasm-tools, and get an overview of SIMD v128 and the threads proposal.'
+sidebar:
+  order: 4
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+The **Component Model** is the next evolution of WebAssembly beyond raw modules. Where a core Wasm module exposes only numeric functions, a **component** exposes rich typed interfaces — strings, records, lists, variants — defined in **WIT** (the Wasm Interface Type language). Components can be composed together at the toolchain level before deployment, enabling true language-agnostic plugin ecosystems.
+
+## WIT — Wasm Interface Types
+
+A `.wit` file is the contract between components. It looks like a typed IDL:
+
+```wit
+package example:greeter@0.1.0;
+
+interface greeter {
+  greet: func(name: string) -> string;
+}
+
+world greeter-world {
+  export greeter;
+}
+```
+
+The `world` defines what a component exports and imports. `wasm-tools` (the reference toolchain) can validate, compose, and inspect components from WIT definitions.
+
+## Building a component from Rust
+
+```bash
+# Install cargo-component (Rust Component Model toolchain)
+cargo install cargo-component
+
+# Create a new component project
+cargo component new greeter --lib
+
+# Build to a component .wasm
+cargo component build --release
+# Output: target/wasm32-wasip2/release/greeter.wasm
+
+# Inspect the component's interface
+wasm-tools component wit greeter.wasm
+```
+
+The `wasm-tools` suite handles the low-level mechanics:
+
+```bash
+# Compose two components: a greeter and a logger
+wasm-tools compose greeter.wasm -d logger.wasm -o composed.wasm
+
+# Validate a component
+wasm-tools validate --features component-model greeter.wasm
+
+# Convert a core module to a component (adapter pattern)
+wasm-tools component new core.wasm --adapt wasi_snapshot_preview1.wasm -o component.wasm
+```
+
+## Component composition model
+
+export const componentDiagram = `flowchart LR
+  subgraph "Component A (Rust)"
+    A_wit["WIT: export greeter"]
+    A_core["core wasm\\n(compiled Rust)"]
+  end
+  subgraph "Component B (Go)"
+    B_wit["WIT: import greeter\\nexport http-handler"]
+    B_core["core wasm\\n(compiled Go)"]
+  end
+  T["wasm-tools compose"]
+  OUT["composed.wasm\\n(deployable component)"]
+  A_wit --> T
+  B_wit --> T
+  T --> OUT`;
+
+<Mermaid code={componentDiagram} title="Two components composed into one deployable artifact" />
+
+## SIMD — v128 type
+
+The **Fixed-Width SIMD** proposal (now standardised) adds a single new value type: `v128`. A `v128` register holds 128 bits that can be interpreted as different lane configurations:
+
+- `i8x16` — sixteen 8-bit integers
+- `i16x8` — eight 16-bit integers
+- `i32x4` — four 32-bit integers
+- `f32x4` — four 32-bit floats
+- `f64x2` — two 64-bit floats
+
+In WAT this looks like:
+
+```wasm
+(module
+  (func (export "add4f") (param $a v128) (param $b v128) (result v128)
+    local.get $a
+    local.get $b
+    f32x4.add)
+)
+```
+
+Compilers (Rust, C/Clang) use SIMD automatically via auto-vectorisation when you enable it. You rarely write SIMD WAT by hand — it appears in compiler output for compute-heavy kernels (image processing, audio codecs, ML inference).
+
+## Threads proposal
+
+The **Threads** proposal (Phase 4 — available in most browsers and runtimes) adds:
+
+- **Shared memory** — `(memory (shared) N N)` declares a memory that can be shared across threads.
+- **Atomic instructions** — `i32.atomic.load`, `i32.atomic.store`, `i32.atomic.rmw.add` etc.
+- **`wait` and `notify`** — `memory.atomic.wait32` / `memory.atomic.notify` (Wasm equivalents of `futex`).
+
+In Rust, compiling with `RUSTFLAGS="-C target-feature=+atomics,+bulk-memory"` and the `wasm32-unknown-unknown` target (with a custom allocator) enables multi-threaded Wasm. In the browser, threads require `SharedArrayBuffer`, which requires `COOP`/`COEP` response headers.
+
+```bash
+# Compile Rust with atomics + bulk-memory for browser threads
+RUSTFLAGS="-C target-feature=+atomics,+bulk-memory" \
+  cargo build --target wasm32-unknown-unknown --release
+```
+
+<Callout title="Component Model is the future of Wasm composition">
+The Component Model replaces ad-hoc FFI glue between Wasm modules. With WIT you define typed interfaces once; `cargo-component` and `wasm-tools` generate all the binding code in both directions.
+</Callout>
+
+export const quizComponentModelSimdThreads = [
+  { q: "What language is used to define Component Model interface contracts?", options: ["WAT", "WIT", "WASM-IDL", "Protobuf"], answer: 1 },
+  { q: "What is the single new value type introduced by the SIMD proposal?", options: ["f128", "simd256", "v128", "i128"], answer: 2 },
+  { q: "Which tool composes two Wasm components into one deployable artifact?", options: ["wasmtime compose", "cargo component", "wasm-tools compose", "wasm-pack"], answer: 2 },
+  { q: "What browser security headers are required to use SharedArrayBuffer for Wasm threads?", options: ["Access-Control-Allow-Origin: *", "COOP and COEP headers", "Content-Security-Policy", "X-Frame-Options"], answer: 1 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/component-model-simd-threads" questions={quizComponentModelSimdThreads} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/component-model-simd-threads" />

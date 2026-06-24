@@ -1,0 +1,95 @@
+---
+title: 'Choosing a Language'
+description: 'A decision framework for picking the right toolchain — Rust, C/Emscripten, AssemblyScript, or TinyGo — for your WebAssembly project.'
+sidebar:
+  order: 5
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Every Wasm toolchain reaches the same finish line — a `.wasm` binary that runs in the browser — but each follows a different road. The right choice depends on your existing codebase, your team's skills, and the constraints of your project.
+
+## Decision table
+
+| Question | Rust | C / Emscripten | AssemblyScript | TinyGo |
+|----------|------|----------------|----------------|--------|
+| Team already writes this language? | Maybe | Maybe | If you know TS | If you know Go |
+| Existing codebase to port? | No | Yes | No | No |
+| Binary size priority? | Excellent | Large (libc overhead) | Excellent | Good |
+| GC / runtime overhead? | None | Libc only | None | Minimal |
+| Rich JS interop (strings, objects)? | Yes (wasm-bindgen) | Via ccall/cwrap | Via loader | Limited |
+| Standard library coverage? | Full std | Full libc | Limited | Partial |
+| Async / concurrency support? | Via futures | Via Asyncify | Limited | Limited |
+| Learning curve (Wasm-specific)? | Medium | Low (if you know C) | Very low (TS) | Low (if you know Go) |
+
+## Rust — when to choose it
+
+Choose Rust when you are **writing new Wasm-first code** and want:
+
+- The smallest possible binary (no GC, no runtime heap).
+- Automatic, type-safe JS bindings via `wasm-bindgen`.
+- A crate ecosystem designed for `wasm32-unknown-unknown`.
+- Publishable npm packages from `wasm-pack`.
+
+```bash
+wasm-pack build --target web
+# → pkg/ ready to npm publish
+```
+
+## C / C++ with Emscripten — when to choose it
+
+Choose Emscripten when you are **porting an existing C/C++ library** and need:
+
+- `printf`, `malloc`, file I/O, and POSIX APIs to work without changes.
+- OpenGL emulation via WebGL (`-sUSE_WEBGL2`).
+- A single-step build from a standard Makefile or CMake project.
+
+```bash
+emcc existing_lib.c -o out.js -sEXPORTED_FUNCTIONS='["_my_api"]' -O2
+```
+
+## AssemblyScript — when to choose it
+
+Choose AssemblyScript when your team **writes TypeScript** and you need:
+
+- A very gentle learning curve (same syntax, different numeric types).
+- A tiny, self-contained Wasm module with no dependencies.
+- Fast iteration without setting up a Rust or C toolchain.
+
+```bash
+npx asc assembly/index.ts --outFile build/release.wasm --optimize
+```
+
+## TinyGo — when to choose it
+
+Choose TinyGo when your team **writes Go** and you want to share pure-logic packages between a Go backend and a browser frontend:
+
+```bash
+tinygo build -o wasm.wasm -target wasm ./main.go
+```
+
+Note: TinyGo does not support the full Go standard library. Packages that use `net`, `os`, or reflection may not compile. Check the [TinyGo package support table](https://tinygo.org/docs/reference/lang-support/) before committing.
+
+## Quick-pick flowchart
+
+1. **Have C/C++ code that already works?** → Emscripten.
+2. **Team writes TypeScript and wants a quick win?** → AssemblyScript.
+3. **Team writes Go?** → TinyGo.
+4. **Writing new code and want the best binary size + JS interop?** → Rust.
+
+<Callout title="Start simple, switch later">
+AssemblyScript is the fastest way to ship a first Wasm module. If you later need lower-level control or richer JS bindings, migrating to Rust is straightforward because both produce the same `.wasm` interface — your JavaScript caller does not change.
+</Callout>
+
+export const quizChoosingLang = [
+  { q: "Which toolchain is the best choice when porting an existing C library that uses printf and malloc?", options: ["wasm-pack (Rust)", "Emscripten (emcc)", "asc (AssemblyScript)", "tinygo"], answer: 1 },
+  { q: "Which two toolchains produce the smallest Wasm binaries because they have no garbage collector or runtime heap?", options: ["Emscripten and TinyGo", "Rust and AssemblyScript", "AssemblyScript and TinyGo", "Rust and Emscripten"], answer: 1 },
+  { q: "What is the main limitation of TinyGo when compiling Go code to Wasm?", options: ["It cannot export functions to JavaScript", "It only supports the wasm32-wasi target", "It does not support the full Go standard library", "It requires a separate JS loader file"], answer: 2 },
+  { q: "Which command publishes a Rust Wasm project as an npm package?", options: ["cargo publish --target wasm32", "wasm-pack publish", "emcc --publish", "npx asc --publish"], answer: 1 },
+];
+
+<Quiz client:visible id="languages-to-wasm/choosing-a-language" questions={quizChoosingLang} />
+
+<ProgressTracker client:visible id="languages-to-wasm/choosing-a-language" />

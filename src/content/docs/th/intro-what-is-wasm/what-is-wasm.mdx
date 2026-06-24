@@ -1,0 +1,99 @@
+---
+title: 'WebAssembly คืออะไร?'
+description: 'สำรวจ Wasm binary format, stack VM, determinism, sandboxing, ความเร็วใกล้เคียง native และความสัมพันธ์ระหว่าง .wasm กับ .wat'
+sidebar:
+  order: 2
+---
+
+import Callout from '../../../../components/Callout.astro';
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly ถูกกำหนดด้วยคุณสมบัติหลัก 4 ประการ ได้แก่ **รูปแบบไบนารีกะทัดรัด**, **virtual machine แบบ stack-based**, **การรันแบบ deterministic** และ **การแยกแบบ sandboxed** การทำความเข้าใจแต่ละข้อจะอธิบายว่าทำไม Wasm จึงกลายเป็น universal portable execution layer ที่มันเป็นอยู่ทุกวันนี้
+
+## รูปแบบไบนารี
+
+ไฟล์ `.wasm` คือไบนารีที่หนาแน่นและมีการระบุ type ครบถ้วน ต่างจาก JavaScript source มันไม่ต้องผ่านการ parse นอกจาก validation pass เดียว runtime สามารถเริ่มคอมไพล์เป็น native machine code ได้เกือบทันที นี่คือเหตุผลที่ Wasm สามารถทำได้ใกล้ native performance แม้ในการโหลดครั้งแรก
+
+ไบนารียังมีขนาดเล็กอีกด้วย function body, type signature, import และ export ทั้งหมดถูก encode ในรูปแบบ section-based ที่มีขนาดขั้นต่ำ module ที่ทำงานจริงอาจมีน้ำหนักน้อยกว่า 1 kilobyte
+
+## โมเดล Stack VM
+
+Wasm รันบน **stack machine** เชิงแนวคิด คำสั่งต่างๆ push ค่าไปที่ implicit operand stack และ pop ออกมา ไม่มี general-purpose register ที่คุณอ้างถึงด้วยชื่อ VM จัดการให้คุณ โมเดลนี้ตรวจสอบได้ง่าย (type checker สามารถ walk stack แบบ static ได้) และคอมไพล์เป็น native code แบบ register-based ที่มีประสิทธิภาพได้ง่าย
+
+คุณจะได้สำรวจสิ่งนี้อย่างลึกซึ้งใน Module 2 เมื่อคุณเขียน WAT ด้วยมือ ตอนนี้ขอสังเกตว่า `i32.const 42` push integer 32-bit 42 ลงบน stack และฟังก์ชันที่มี `(result i32)` คาดว่าจะมี i32 หนึ่งตัวบน stack เมื่อ return
+
+## Deterministic Execution
+
+เมื่อได้รับ bytes `.wasm` เดิมและ input เดิม Wasm module จะให้ **ผลลัพธ์เหมือนกันทุกแพลตฟอร์ม** ไม่ว่าจะเป็น x86, ARM, RISC-V, browser, server, edge พฤติกรรม floating-point ถูกระบุอย่างแม่นยำ (IEEE 754 โดยไม่มี rounding mode ที่ implementation กำหนดเอง) และไม่มี undefined behaviour ในแบบ C สิ่งนี้ทำให้ Wasm เหมาะมากสำหรับ reproducible build, cryptography, simulation และทุกโดเมนที่ความแม่นยำระดับ byte มีความสำคัญ
+
+## Sandboxed โดยค่าเริ่มต้น
+
+Wasm module ถูก **แยกอย่างสมบูรณ์** module ใหม่ไม่มีสิทธิ์เข้าถึง filesystem, network, DOM, clock หรือ OS resource ใดๆ มันอยู่ในพื้นที่ linear memory ที่เฉพาะมันและ host เท่านั้นที่สามารถ address ได้ มันสามารถ interact กับโลกภายนอกได้เฉพาะผ่านฟังก์ชันที่ host **import อย่างชัดเจน** เข้ามาเท่านั้น ถ้า host ไม่ provide ฟังก์ชัน module ก็ไม่สามารถเรียกมันได้ ไม่มีข้อยกเว้น
+
+สิ่งนี้ทำให้การรัน Wasm ของ third-party ที่ไม่น่าไว้ใจนั้นปลอดภัยในแบบที่การรัน native code โดยอิสระไม่ปลอดภัย
+
+## ความสัมพันธ์ .wasm / .wat
+
+ไฟล์ `.wasm` ทุกไฟล์มีรูปแบบข้อความที่เทียบเท่าอย่างแน่นอนที่เรียกว่า **WAT** (WebAssembly Text format) ทั้งสองรูปแบบเป็น 1:1: `.wasm` ใดๆ สามารถถอดรหัสเป็น `.wat` ได้ และ `.wat` ที่ถูกต้องสามารถ assemble กลับเป็น `.wasm` ที่เหมือนกันได้ คุณจะเขียน WAT ตลอดทั้งคอร์สนี้ในฐานะวิธีที่ชัดเจนที่สุดในการทำความเข้าใจสิ่งที่ไบนารีมีอยู่จริง
+
+ต่อไปนี้คือ WAT module ที่ง่ายที่สุดเท่าที่จะเป็นไปได้ ฟังก์ชัน export เดียวที่คืนค่า integer 42:
+
+```wasm
+(module
+  (func (export "answer") (result i32)
+    i32.const 42))
+```
+
+อ่านจากซ้ายไปขวา: `module` คือ top-level container; `func` กำหนดฟังก์ชัน; `(export "answer")` ทำให้เรียกได้จาก JavaScript ในรูป `instance.exports.answer()`; `(result i32)` ประกาศว่า return 32-bit integer หนึ่งตัว; และ `i32.const 42` push 42 ลงบน stack ซึ่งกลายเป็น return value
+
+runner ด้านล่างคอมไพล์ WAT string นั้นแบบ runtime โดยใช้ WABT, instantiate module และเรียก `answer()` คุณควรเห็น `answer() = 42` ใน output
+
+export const whatIsWasmCode = `const wat = \`(module (func (export "answer") (result i32) i32.const 42))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('answer() =', instance.exports.answer());`;
+
+<WasmRunner client:visible code={whatIsWasmCode} />
+
+<Callout title="Wasm รันใน sandbox">
+  โค้ด Wasm ไม่มีสิทธิ์เข้าถึง filesystem, network หรือ DOM โดยค่าเริ่มต้น มันทำได้เฉพาะสิ่งที่ host import เข้ามาอย่างชัดเจนเท่านั้น สิ่งนี้ทำให้การรัน Wasm module ที่ไม่น่าไว้ใจนั้นปลอดภัย
+</Callout>
+
+export const quizWhatIsWasm = [
+  {
+    q: "'deterministic execution' หมายความว่าอะไรสำหรับ WebAssembly?",
+    options: [
+      'มันรันเร็วกว่า JavaScript เสมอ',
+      'bytecode เดิมให้ผลลัพธ์เดิมบนทุกแพลตฟอร์ม',
+      'มันป้องกัน infinite loop',
+      'มันใช้ random seed เดิมทุกครั้งที่รัน',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ความสัมพันธ์ระหว่าง .wasm และ .wat คืออะไร?',
+    options: [
+      'เป็นรูปแบบที่แตกต่างกันอย่างสิ้นเชิง',
+      '.wat ถูกคอมไพล์เป็น .wasm และทั้งสองเทียบเท่ากันแบบ 1:1',
+      '.wasm คือ source; .wat คือรูปแบบที่ปรับแต่งแล้ว',
+      'WAT รันโดยตรงใน browser โดยไม่ต้องคอมไพล์',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'โดยค่าเริ่มต้น โค้ด Wasm สามารถเข้าถึง...',
+    options: [
+      'DOM และ network โดยตรง',
+      'filesystem และ OS API',
+      'เฉพาะสิ่งที่ host import เข้ามาอย่างชัดเจนเท่านั้น',
+      'browser API ทั้งหมดผ่าน window',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/what-is-wasm" questions={quizWhatIsWasm} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/what-is-wasm" />

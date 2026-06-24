@@ -1,0 +1,121 @@
+---
+title: 'wasmtime & wasmer'
+description: 'Run Wasm binaries from the command line with wasmtime and wasmer, pass capability flags, and embed runtimes in applications to power plugin systems.'
+sidebar:
+  order: 3
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Two production-grade standalone runtimes dominate the WASI ecosystem: **wasmtime** (maintained by the Bytecode Alliance, written in Rust) and **wasmer** (written in Rust, cross-platform). Both implement the WASI spec, support ahead-of-time (AOT) compilation, and expose embedding APIs for Rust, Python, Go, and other languages.
+
+## Installing the runtimes
+
+```bash
+# wasmtime — via installer script
+curl https://wasmtime.dev/install.sh -sSf | bash
+
+# wasmer — via installer script
+curl https://get.wasmer.io -sSfL | sh
+
+# Verify
+wasmtime --version
+wasmer --version
+```
+
+## Running a WASI module with wasmtime
+
+```bash
+# Basic execution
+wasmtime my_app.wasm
+
+# Pass command-line arguments (-- separates runtime flags from module args)
+wasmtime my_app.wasm -- hello world
+
+# Grant access to a directory
+wasmtime --dir /tmp my_app.wasm
+
+# Grant access with a path alias (host path::guest path)
+wasmtime --dir /host/data::/data my_app.wasm
+
+# Pass environment variables
+wasmtime --env DATABASE_URL=postgres://localhost/db my_app.wasm
+
+# Combine: dir + env + args
+wasmtime --dir /data --env LOG_LEVEL=info my_app.wasm -- --config /data/cfg.toml
+```
+
+## Running a WASI module with wasmer
+
+```bash
+# Basic execution
+wasmer my_app.wasm
+
+# Mount a directory
+wasmer --dir /tmp my_app.wasm
+
+# Pass environment variables
+wasmer --env KEY=value my_app.wasm
+
+# Run from the Wasmer registry (wapm packages)
+wasmer run python/python -- --version
+```
+
+## Embedding wasmtime in a Rust application
+
+The real power of standalone runtimes is embedding — loading `.wasm` plugins at runtime without recompiling the host application.
+
+```rust
+use wasmtime::{Engine, Linker, Module, Store};
+use wasmtime_wasi::WasiCtxBuilder;
+
+fn run_plugin(wasm_bytes: &[u8]) -> anyhow::Result<()> {
+    let engine = Engine::default();
+    let module = Module::new(&engine, wasm_bytes)?;
+
+    // Build a minimal WASI context — no filesystem, no env vars
+    let wasi = WasiCtxBuilder::new().inherit_stdio().build();
+    let mut store = Store::new(&engine, wasi);
+
+    let mut linker = Linker::new(&engine);
+    wasmtime_wasi::add_to_linker_sync(&mut linker, |s| s)?;
+
+    let instance = linker.instantiate(&mut store, &module)?;
+    let start = instance.get_typed_func::<(), ()>(&mut store, "_start")?;
+    start.call(&mut store, ())?;
+    Ok(())
+}
+```
+
+This pattern is how plugin systems work: the host application loads arbitrary `.wasm` files at runtime and calls exported functions while the sandbox enforces strict isolation.
+
+export const embedDiagram = `sequenceDiagram
+  participant Host as Host App (Rust)
+  participant WT as wasmtime Engine
+  participant M as Plugin (.wasm)
+  Host->>WT: Engine::default()
+  Host->>WT: Module::new(wasm_bytes)
+  Host->>WT: Linker + WasiCtxBuilder
+  Host->>WT: linker.instantiate()
+  WT->>M: instantiate + link imports
+  Host->>M: typed_func("process").call(args)
+  M-->>Host: return value`;
+
+<Mermaid code={embedDiagram} title="Embedding wasmtime to run a plugin module" />
+
+<Callout title="AOT compilation for latency-sensitive paths">
+Both wasmtime and wasmer support ahead-of-time (AOT) compilation: `wasmtime compile app.wasm -o app.cwasm` produces a pre-compiled artifact. Load the `.cwasm` at startup to skip JIT latency on the hot path.
+</Callout>
+
+export const quizWasmtimeWasmer = [
+  { q: "Which flag grants a WASI module access to a host directory in wasmtime?", options: ["--allow-dir", "--dir", "--fs", "--mount"], answer: 1 },
+  { q: "What is the purpose of WasiCtxBuilder when embedding wasmtime in Rust?", options: ["It compiles WAT to binary", "It configures the capability grants available to the module", "It provides a JavaScript bridge", "It enables multi-threading"], answer: 1 },
+  { q: "What does ahead-of-time (AOT) compilation achieve in wasmtime?", options: ["Smaller .wasm file sizes", "Eliminates JIT compilation at load time for lower startup latency", "Enables cross-language type sharing", "Replaces the need for WASI"], answer: 1 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/wasmtime-wasmer" questions={quizWasmtimeWasmer} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/wasmtime-wasmer" />

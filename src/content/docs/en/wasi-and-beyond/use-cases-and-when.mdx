@@ -1,0 +1,105 @@
+---
+title: 'Use Cases & When to Use Wasm'
+description: 'Explore real-world Wasm use cases — plugins, edge/serverless, sandboxing, portable CLIs — and learn when Wasm is and is not the right choice.'
+sidebar:
+  order: 5
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly is not a hammer looking for nails. It shines in specific scenarios and adds unnecessary complexity in others. This lesson maps the real-world use cases and gives you a decision framework.
+
+## Use case 1: Plugin systems
+
+Many applications need user-extensible behaviour — think IDE extensions, game mods, data-pipeline transforms, or CI/CD step executors. Traditionally this means embedding a scripting language (Lua, Python, JavaScript) with all of its security and versioning headaches.
+
+With Wasm + WASI you can:
+
+- Accept plugins written in **any language** (Rust, Go, C, AssemblyScript).
+- Run them in a **strict sandbox** — no filesystem, no network unless you grant it.
+- Load, unload, and version them **at runtime** without restarting the host.
+
+Projects using this pattern: **Envoy** (filter plugins), **Zellij** (terminal multiplexer plugins), **Shopify** (checkout extensions), **Extism** (plugin SDK).
+
+## Use case 2: Edge and serverless
+
+Edge platforms like Cloudflare Workers, Fastly Compute, and Fermyon Spin run Wasm modules on their global PoP networks. The key advantage over containers:
+
+- **Cold start in microseconds** — no OS process, no container runtime, no JVM.
+- **Strong isolation** — each request gets its own Wasm instance.
+- **Tiny footprint** — a Wasm module is kilobytes, not megabytes.
+
+```bash
+# Deploy a Rust function to Fermyon Spin
+spin new --template http-rust my-api
+cd my-api
+spin build
+spin deploy
+```
+
+## Use case 3: Sandboxed execution of untrusted code
+
+Online code judges, notebook runners (like this course's own WasmRunner), CI step isolation, and customer-defined logic in SaaS all need to run arbitrary code safely.
+
+Wasm's sandboxed memory model guarantees:
+
+- A module cannot access host memory outside its own linear memory.
+- A module cannot make arbitrary syscalls — only the WASI imports the runtime exposes.
+- A module cannot spin up threads or processes on its own.
+
+This makes Wasm the **most lightweight safe sandbox available** — lighter than Docker, lighter than gVisor, lighter than eBPF sandboxes.
+
+## Use case 4: Portable CLI tools
+
+A `.wasm` binary compiled against WASI is a portable executable that runs on any OS with a WASI runtime — no cross-compilation matrix required.
+
+```bash
+# Distribute a CLI tool as a .wasm binary
+wasmtime my-tool.wasm -- --input file.csv --output result.json
+
+# Or package it with wasmer for one-liner install
+wasmer publish && wasmer run yourname/my-tool -- --help
+```
+
+## Decision framework
+
+export const decisionDiagram = `flowchart TD
+  Q1{"Need to run\\nuntrusted code?"}
+  Q1 -->|Yes| Wasm1["Use Wasm sandbox\\n(WASI + wasmtime/wasmer)"]
+  Q1 -->|No| Q2{"Performance-critical\\ncompute in the browser?"}
+  Q2 -->|Yes| Wasm2["Compile C/Rust/Go\\nto wasm32-unknown-unknown"]
+  Q2 -->|No| Q3{"Need edge cold-start\\n< 1 ms?"}
+  Q3 -->|Yes| Wasm3["Use Wasm on\\nedge platform"]
+  Q3 -->|No| Q4{"Plugin system\\nacross languages?"}
+  Q4 -->|Yes| Wasm4["Component Model\\n+ WASI"]
+  Q4 -->|No| Native["Stick with\\nnative code / containers"]`;
+
+<Mermaid code={decisionDiagram} title="When to reach for WebAssembly" />
+
+## When Wasm is NOT the right choice
+
+| Scenario | Better alternative |
+|----------|-------------------|
+| Simple CRUD web APIs | Node.js / Go / Python — less toolchain complexity |
+| Long-running stateful services | Docker containers — better observability tooling |
+| GPU-accelerated ML inference | CUDA / WebGPU — Wasm has no GPU access |
+| Native desktop apps | Tauri / Electron / native — OS integration is easier |
+| Scripts and glue code | Bash / Python — Wasm startup overhead not worth it |
+
+<Callout title="Wasm wins on safety + portability, not on raw throughput">
+Do not use Wasm because it is "fast." Use it because you need a safe sandbox, a portable binary, or a language-agnostic plugin interface. Raw throughput on the server is often better served by native binaries.
+</Callout>
+
+export const quizUseCasesAndWhen = [
+  { q: "Which property makes Wasm especially attractive for edge/serverless platforms?", options: ["Large memory footprint", "Microsecond cold starts with strong per-request isolation", "Native GPU access", "Built-in HTTP server"], answer: 1 },
+  { q: "Which real-world project uses Wasm for extensible filter plugins?", options: ["Nginx", "Envoy", "HAProxy", "Caddy"], answer: 1 },
+  { q: "Why is Wasm NOT a good fit for GPU-accelerated ML inference?", options: ["Wasm modules are too large", "Wasm has no GPU access", "WASI does not support floating-point math", "Wasm cannot load binary data"], answer: 1 },
+  { q: "What makes Wasm the most lightweight safe sandbox compared to Docker?", options: ["Wasm uses kernel namespaces like Docker", "Wasm modules share memory across instances", "Wasm has no OS process, no container runtime, and enforces memory isolation in software", "Wasm runs on a hypervisor"], answer: 2 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/use-cases-and-when" questions={quizUseCasesAndWhen} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/use-cases-and-when" />

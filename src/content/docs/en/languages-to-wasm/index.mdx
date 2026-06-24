@@ -1,0 +1,75 @@
+---
+title: 'Languages to Wasm'
+description: 'Compile from a real language instead of hand-writing WAT. Compare Rust, C/Emscripten, AssemblyScript, and TinyGo.'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Writing WAT by hand is a great way to learn the Wasm execution model, but in practice you compile from a **real programming language**. The compiler takes care of register allocation, memory layout, and binary encoding — you write idiomatic code and get a `.wasm` file.
+
+This module covers the four toolchains most commonly used today, compares their tradeoffs, and gives you real build commands for each.
+
+## The four toolchains at a glance
+
+| Language | Toolchain | Output size | Best for |
+|----------|-----------|-------------|----------|
+| **Rust** | `wasm-pack` / `wasm-bindgen` | Small (no GC, no runtime) | New Wasm-first code, npm packages |
+| **C / C++** | Emscripten (`emcc`) | Medium–large (libc emulation) | Porting existing C/C++ libraries |
+| **AssemblyScript** | `asc` | Very small | TypeScript developers, simple modules |
+| **TinyGo** | `tinygo build` | Small | Go developers, microcontrollers |
+
+## How each toolchain maps to Wasm
+
+export const overviewDiagram = `flowchart LR
+  subgraph Sources
+    R["Rust<br/>.rs files"]
+    C["C / C++<br/>.c .cpp files"]
+    AS["AssemblyScript<br/>.ts files"]
+    TG["TinyGo<br/>.go files"]
+  end
+  subgraph Toolchain
+    WP["wasm-pack<br/>(wasm-bindgen)"]
+    EM["Emscripten<br/>(emcc)"]
+    ASC["asc<br/>(AssemblyScript compiler)"]
+    TIGO["tinygo build"]
+  end
+  subgraph Output
+    WASM[".wasm binary"]
+    GLUE["JS glue (optional)"]
+  end
+  R --> WP --> WASM
+  C --> EM --> WASM
+  C --> EM --> GLUE
+  AS --> ASC --> WASM
+  TG --> TIGO --> WASM`;
+
+<Mermaid code={overviewDiagram} title="Language → toolchain → .wasm" />
+
+## Key differences
+
+**Rust with wasm-bindgen** generates rich JS/Wasm bindings automatically. You can pass strings, JS objects, and callbacks across the boundary without writing any glue code by hand. Binary size is small because Rust has no garbage collector or runtime heap.
+
+**Emscripten** emulates a POSIX-like environment inside Wasm. This means C code that uses `printf`, `malloc`, or file I/O often compiles with zero changes. The tradeoff is a larger output that includes libc emulation and an optional JS loader.
+
+**AssemblyScript** compiles a strict subset of TypeScript directly to Wasm. There is no need to learn a new language — if you know TypeScript you can be productive immediately. The compiler is fast and produces very compact binaries.
+
+**TinyGo** compiles a subset of Go to Wasm (and to microcontrollers). It is a good fit for teams that already write Go and want to share logic with a web frontend. Not all standard library packages are supported.
+
+<Callout title="Pick the toolchain that fits your team">
+The best toolchain is the one your team already knows. Rust gives the most control; Emscripten ports the most existing code; AssemblyScript has the gentlest learning curve for JS/TS developers; TinyGo suits Go shops.
+</Callout>
+
+export const quizLangsIndex = [
+  { q: "Which toolchain is best suited for porting an existing C library to Wasm?", options: ["wasm-pack", "Emscripten (emcc)", "asc (AssemblyScript)", "tinygo"], answer: 1 },
+  { q: "Why does Rust produce smaller Wasm binaries than Emscripten by default?", options: ["Rust uses a garbage collector that compresses output", "Rust has no garbage collector or runtime heap", "Rust compiles to a different binary format", "Rust strips debug symbols automatically"], answer: 1 },
+  { q: "AssemblyScript is designed for developers who already know which language?", options: ["Rust", "Go", "TypeScript", "C++"], answer: 2 },
+];
+
+<Quiz client:visible id="languages-to-wasm/index" questions={quizLangsIndex} />
+
+<ProgressTracker client:visible id="languages-to-wasm/index" />

@@ -1,0 +1,145 @@
+---
+title: 'Calls และ Recursion'
+description: 'ใช้ call เพื่อเรียกฟังก์ชันโดยตรงใน WAT และเขียน recursive algorithm เช่น factorial และ Fibonacci'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+ฟังก์ชันใน WebAssembly เรียกกันด้วยคำสั่ง `call` argument จะถูก push ขึ้น stack ก่อนเรียก และค่าที่คืนกลับ (ถ้ามี) จะถูกฝากไว้บน stack เมื่อ callee return Wasm รองรับ direct recursion อย่างสมบูรณ์ — ฟังก์ชันสามารถเรียกตัวเองได้ — และ mutual recursion ระหว่างฟังก์ชันที่กำหนดใน module เดียวกัน
+
+## คำสั่ง call
+
+`call $funcname` เรียกฟังก์ชันที่มีชื่อนั้น สามารถเรียกด้วย index ได้ด้วย (`call 0`) แต่ named reference อ่านง่ายกว่ามาก ก่อนรัน `call` ให้ push argument ทั้งหมดตามลำดับจากซ้ายไปขวา:
+
+```wasm
+(module
+  (func $double (param $n i32) (result i32)
+    local.get $n
+    i32.const 2
+    i32.mul)
+  (func (export "quadruple") (param $x i32) (result i32)
+    local.get $x
+    call $double    ;; passes $x; result replaces it on stack
+    call $double))  ;; doubles again
+```
+
+`quadruple(3)` เรียก `$double` สองครั้ง ได้ผลลัพธ์ `3 → 6 → 12`
+
+## Recursive functions
+
+WAT อนุญาตให้ฟังก์ชันเรียกตัวเองได้ รูปแบบเหมือนทุกภาษา: push argument, call self, รวม result base case ใช้ `if` เพื่อ return ตรงๆ โดยไม่มี recursive call
+
+```wasm
+(module
+  (func $factorial (export "factorial") (param $n i32) (result i32)
+    local.get $n
+    i32.const 1
+    i32.le_s          ;; n <= 1?
+    if (result i32)
+      i32.const 1     ;; base case: 0! = 1! = 1
+    else
+      local.get $n
+      local.get $n
+      i32.const 1
+      i32.sub
+      call $factorial ;; factorial(n-1)
+      i32.mul         ;; n * factorial(n-1)
+    end))
+```
+
+ฟังก์ชันนี้มีทั้ง internal name (`$factorial`) เพื่อเรียกตัวเองได้ และ export name เพื่อให้ JavaScript เรียกได้
+
+## ตัวอย่าง Fibonacci
+
+การมี recursive call สองครั้งใน `else` arm ทำงานในลักษณะเดียวกัน — push argument, call, แล้วรวมผลลัพธ์ทั้งสอง:
+
+```wasm
+(module
+  (func $fib (export "fib") (param $n i32) (result i32)
+    local.get $n
+    i32.const 1
+    i32.le_s          ;; n <= 1?
+    if (result i32)
+      local.get $n    ;; fib(0)=0, fib(1)=1
+    else
+      local.get $n
+      i32.const 1
+      i32.sub
+      call $fib       ;; fib(n-1)
+      local.get $n
+      i32.const 2
+      i32.sub
+      call $fib       ;; fib(n-2)
+      i32.add
+    end))
+```
+
+## ทดลองรัน
+
+export const callsRecursionCode = `const wat = \`(module
+  (func $factorial (export "factorial") (param $n i32) (result i32)
+    local.get $n
+    i32.const 1
+    i32.le_s
+    if (result i32)
+      i32.const 1
+    else
+      local.get $n
+      local.get $n
+      i32.const 1
+      i32.sub
+      call $factorial
+      i32.mul
+    end))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('factorial(5)  =', instance.exports.factorial(5),  '(expected 120)');
+console.log('factorial(10) =', instance.exports.factorial(10), '(expected 3628800)');`;
+
+<WasmRunner client:visible code={callsRecursionCode} />
+
+<Callout title="call: argument บน stack, result บน stack">
+ก่อน `call $fn` ให้ push argument ของฟังก์ชันจากซ้ายไปขวา หลังจาก call return ผลลัพธ์จะอยู่บน stack ทันที — พร้อมสำหรับคำสั่งถัดไป Wasm ไม่มี named argument syntax ตำแหน่งบน stack คือทุกอย่าง
+</Callout>
+
+export const quizCallsRecursion = [
+  {
+    q: "วิธีเรียกฟังก์ชันชื่อ `$add` ใน WAT คืออะไร?",
+    options: [
+      "`call $add`",
+      "`invoke $add`",
+      "`$add()`",
+      "`call_direct $add`"
+    ],
+    answer: 0
+  },
+  {
+    q: "สิ่งที่ต้องอยู่บน stack ก่อน `call $fn` ที่รับ parameter i32 สองตัวคืออะไร?",
+    options: [
+      "ไม่มี — parameter ส่งผ่านชื่อ",
+      "ค่า i32 สองตัว (the arguments)",
+      "function reference ไปที่ $fn",
+      "return address"
+    ],
+    answer: 1
+  },
+  {
+    q: "WebAssembly พื้นฐานปรับแต่ง tail call โดยอัตโนมัติหรือไม่?",
+    options: [
+      "ใช่ — tail call ทั้งหมดถูก optimize โดย engine",
+      "ไม่ — แต่ละ call เพิ่ม frame เข้า call stack",
+      "เฉพาะเมื่อฟังก์ชัน export เท่านั้น",
+      "เฉพาะ mutual recursion เท่านั้น"
+    ],
+    answer: 1
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/calls-recursion" questions={quizCallsRecursion} />
+
+<ProgressTracker client:visible id="control-flow-functions/calls-recursion" />

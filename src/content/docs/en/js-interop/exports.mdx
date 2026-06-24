@@ -1,0 +1,113 @@
+---
+title: 'Reading Exports'
+description: 'Access Wasm exported functions, memory, and globals from JavaScript — including number marshalling and the i64 ↔ BigInt conversion.'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+After instantiation, `instance.exports` is a plain JavaScript object. Every symbol the WAT module explicitly exports appears as a property on it — exported functions are callable, exported memory is a `WebAssembly.Memory`, and exported globals are `WebAssembly.Global` objects.
+
+## Exported functions
+
+Exported Wasm functions behave like ordinary JavaScript functions. You call them, pass JavaScript numbers as arguments, and receive JavaScript values back. The mapping for most numeric types is straightforward: `i32`, `f32`, and `f64` all arrive in JavaScript as `number`.
+
+```wasm
+(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add))
+```
+
+```js
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log(instance.exports.add(10, 32)); // 42
+```
+
+## Number marshalling — i64 and BigInt
+
+JavaScript's `number` type is IEEE-754 double precision, which can represent integers exactly only up to 2^53 − 1 (`Number.MAX_SAFE_INTEGER`). The Wasm `i64` type is a full 64-bit integer and can hold values far beyond that range.
+
+To avoid silent precision loss, the WebAssembly JS API converts `i64` return values to JavaScript `BigInt` rather than `number`. The result of calling a function that returns `i64` will have `typeof result === 'bigint'`, not `'number'`.
+
+```wasm
+(module
+  (func (export "bignum") (result i64)
+    i64.const 9007199254740993))
+```
+
+```js
+const result = instance.exports.bignum();
+console.log(result);         // 9007199254740993n
+console.log(typeof result);  // "bigint"
+```
+
+Note that arithmetic between `BigInt` and `number` requires explicit casting — you cannot mix them with operators like `+` or `*` without converting first.
+
+## Exported globals
+
+A Wasm module can export globals alongside functions. An exported global is accessed in JavaScript as a `WebAssembly.Global` object; its current numeric value lives at the `.value` property.
+
+```wasm
+(module
+  (global (export "PI") f64 (f64.const 3.14159)))
+```
+
+```js
+console.log(instance.exports.PI.value); // 3.14159
+```
+
+## Exported memory
+
+When a module exports its linear memory, JavaScript receives a `WebAssembly.Memory` object. The raw bytes are accessible through its `.buffer` property as an `ArrayBuffer`, which you can wrap in typed array views to read or write individual bytes.
+
+```wasm
+(module
+  (memory (export "mem") 1))
+```
+
+```js
+const mem = instance.exports.mem; // WebAssembly.Memory
+const view = new Uint8Array(mem.buffer);
+console.log(view.length); // 65536 (1 page = 64 KiB)
+```
+
+## Run it
+
+The module below exports an `add` function, a `bignum` function that returns an `i64` beyond `Number.MAX_SAFE_INTEGER`, and a `VERSION` global. The runner reads all three and logs their values and types.
+
+export const exportsCode = `const wat = \`(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add)
+  (func (export "bignum") (result i64)
+    i64.const 9007199254740993)
+  (global (export "VERSION") i32 (i32.const 1)))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('add(10, 32) =', instance.exports.add(10, 32));
+console.log('bignum() =', instance.exports.bignum());
+console.log('typeof bignum():', typeof instance.exports.bignum());
+console.log('VERSION =', instance.exports.VERSION.value);`;
+
+<WasmRunner client:visible code={exportsCode} />
+
+<Callout title="i64 returns JavaScript BigInt">
+When a Wasm function returns `i64`, JavaScript receives a `BigInt` — not a regular `number`. Check with `typeof result === 'bigint'`. Arithmetic between `BigInt` and `number` requires explicit casting.
+</Callout>
+
+export const quizExports = [
+  { q: "What JavaScript type does an exported Wasm i64 value become?", options: ["number", "BigInt", "string", "Int64"], answer: 1 },
+  { q: "How do you read the value of an exported Wasm global in JavaScript?", options: ["`exports.NAME`", "`exports.NAME.value`", "`exports.global(NAME)`", "`exports[NAME].get()`"], answer: 1 },
+  { q: "Why does Wasm use BigInt for i64 instead of number?", options: ["BigInt is faster", "JavaScript number cannot represent all i64 values exactly", "Browsers require it for security", "BigInt is the default integer type"], answer: 1 },
+];
+
+<Quiz client:visible id="js-interop/exports" questions={quizExports} />
+
+<ProgressTracker client:visible id="js-interop/exports" />

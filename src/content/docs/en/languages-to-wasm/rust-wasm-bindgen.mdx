@@ -1,0 +1,146 @@
+---
+title: 'Rust and wasm-bindgen'
+description: 'Use wasm-pack and wasm-bindgen to compile Rust to WebAssembly and call it from JavaScript.'
+sidebar:
+  order: 2
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Rust is the most popular language for writing new WebAssembly modules. Its zero-cost abstractions, no garbage collector, and excellent tooling make it a natural fit. The **wasm-bindgen** crate generates the JavaScript glue code automatically, and **wasm-pack** wraps the whole build pipeline into a single command.
+
+## Install the toolchain
+
+```bash
+# Install Rust (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Add the WebAssembly target to the Rust toolchain
+rustup target add wasm32-unknown-unknown
+
+# Install wasm-pack — the all-in-one Rust → Wasm build tool
+cargo install wasm-pack
+```
+
+## Create a new project
+
+```bash
+# Create a library crate (not a binary)
+cargo new --lib hello-wasm
+cd hello-wasm
+```
+
+Add `wasm-bindgen` to `Cargo.toml`:
+
+```toml
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+```
+
+## Write the Rust function
+
+Open `src/lib.rs` and write a simple exported function:
+
+```rust
+use wasm_bindgen::prelude::*;
+
+/// Returns a greeting string.
+#[wasm_bindgen]
+pub fn greet(name: &str) -> String {
+    format!("Hello, {}! from WebAssembly", name)
+}
+
+/// Adds two 32-bit integers.
+#[wasm_bindgen]
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+```
+
+The `#[wasm_bindgen]` attribute tells the code generator to create matching JavaScript bindings. Without it, the function is compiled into the `.wasm` binary but is not accessible from JS.
+
+## Build with wasm-pack
+
+```bash
+# Build for use in a bundler (webpack, Vite, Rollup)
+wasm-pack build --target bundler
+
+# Build for direct use in a browser via <script type="module">
+wasm-pack build --target web
+
+# Build for Node.js
+wasm-pack build --target nodejs
+```
+
+The `pkg/` directory is created with:
+
+```
+pkg/
+  hello_wasm_bg.wasm   ← the compiled Wasm binary
+  hello_wasm.js        ← generated JS glue
+  hello_wasm.d.ts      ← TypeScript types
+  package.json         ← ready to publish on npm
+```
+
+## Call from JavaScript
+
+```js
+// When using --target web (no bundler required)
+import init, { greet, add } from './pkg/hello_wasm.js';
+
+async function main() {
+  // init() downloads and instantiates the .wasm file
+  await init();
+
+  console.log(greet('world'));   // Hello, world! from WebAssembly
+  console.log(add(3, 4));        // 7
+}
+
+main();
+```
+
+When using a bundler such as Vite, the import is identical but `init()` is handled automatically:
+
+```js
+// Vite / webpack — bundler handles instantiation
+import { greet, add } from 'hello-wasm';
+
+console.log(greet('WebAssembly'));
+```
+
+## Passing complex types
+
+`wasm-bindgen` handles more than just numbers. You can pass:
+
+- `&str` / `String` — UTF-8 strings are copied through a shared memory buffer
+- `JsValue` — an opaque handle to any JavaScript value
+- `Vec<u8>` — byte arrays mapped to `Uint8Array`
+
+```rust
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub fn reverse_string(s: &str) -> String {
+    s.chars().rev().collect()
+}
+```
+
+<Callout title="wasm-pack manages the entire pipeline">
+`wasm-pack build` compiles Rust, runs `wasm-bindgen` code generation, and produces a ready-to-publish npm package in `pkg/`. You rarely need to invoke `cargo` or `wasm-bindgen-cli` directly.
+</Callout>
+
+export const quizRustWasm = [
+  { q: "What does the #[wasm_bindgen] attribute do in Rust?", options: ["Marks a function as unsafe", "Generates JavaScript bindings for the annotated function", "Inlines the function at the call site", "Disables the Rust borrow checker"], answer: 1 },
+  { q: "Which wasm-pack target flag should you use to call a module directly from a browser <script type=\"module\"> without a bundler?", options: ["--target bundler", "--target nodejs", "--target web", "--target deno"], answer: 2 },
+  { q: "What type does wasm-bindgen use to represent an opaque JavaScript value in Rust?", options: ["JsObject", "JsValue", "DynVal", "WasmRef"], answer: 1 },
+  { q: "Which crate-type is required in Cargo.toml for a Wasm library?", options: ["bin", "rlib", "cdylib", "proc-macro"], answer: 2 },
+];
+
+<Quiz client:visible id="languages-to-wasm/rust-wasm-bindgen" questions={quizRustWasm} />
+
+<ProgressTracker client:visible id="languages-to-wasm/rust-wasm-bindgen" />

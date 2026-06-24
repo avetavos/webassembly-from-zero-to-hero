@@ -1,0 +1,129 @@
+---
+title: 'Branches: block, br, br_if, br_table'
+description: 'เรียนรู้ว่า br ออกจาก block ไปข้างหน้าได้อย่างไร br_if กระโดดแบบมีเงื่อนไข และ br_table นำ jump table มาใช้ใน WAT'
+sidebar:
+  order: 2
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+การ branch ใน WebAssembly เกิดขึ้นเทียบกับ labeled construct เสมอ — ไม่ใช่กับ raw memory address กลุ่มคำสั่ง `br` จะชี้ไปที่ *nesting level* ไม่ใช่หมายเลขบรรทัด ดังนั้นพฤติกรรมของ `br` จึงขึ้นอยู่กับชนิด construct ที่มันชี้ถึงอย่างสิ้นเชิง
+
+## block และ br
+
+`block` คือกลุ่มคำสั่งที่เดินไปข้างหน้าเท่านั้น เมื่อ `br $label` ชี้ที่ `block` execution จะกระโดดไปยังคำสั่งที่อยู่ **หลัง** `end` ของ block ทันที ให้คิดว่าเป็น labeled `break`
+
+```wasm
+(module
+  (func (export "earlyExit") (result i32)
+    (block $b (result i32)
+      i32.const 42
+      br $b          ;; exits the block; 42 is the block result
+      i32.const 99)  ;; never reached
+  ))
+```
+
+Annotation `(result i32)` บน block ระบุว่า block จะฝากค่า `i32` หนึ่งตัวบน stack เมื่อออก — ไม่ว่าจะ fall through ถึง `end` หรือกระโดดออกด้วย `br`
+
+## ทิศทางของ br
+
+คำสั่ง `br` เดียวกันจะทำงานต่างกันขึ้นอยู่กับสิ่งที่มันชี้:
+
+export const branchDiagram = `flowchart LR
+  A["block \$b\\n  ...body...\\n  br \$b"] --> B["jumps to END\\nof block (forward)"]
+  C["loop \$l\\n  ...body...\\n  br \$l"] --> D["jumps to START\\nof loop (backward)"]`;
+
+<Mermaid code={branchDiagram} title="br ใน block ออกไปข้างหน้า; br ใน loop วนซ้ำไปข้างหลัง" />
+
+## br_if: conditional branch
+
+`br_if $label` pop ค่า `i32` condition จาก stack ถ้าไม่ใช่ศูนย์จะ branch ถ้าเป็นศูนย์จะ execute คำสั่งถัดไปต่อไป นี่คือวิธีมาตรฐานในการเขียน conditional early exit
+
+```wasm
+(module
+  (func (export "relu") (param $x i32) (result i32)
+    (block $done (result i32)
+      i32.const 0       ;; block result if we exit early
+      local.get $x
+      i32.const 0
+      i32.lt_s          ;; x < 0?
+      br_if $done       ;; if yes, exit block — 0 is already on stack
+      drop              ;; discard the 0; x >= 0
+      local.get $x)))   ;; return x
+```
+
+## br_table: jump table
+
+`br_table` รับรายการ label และค่า default มันจะ pop ค่า `i32` index แล้วกระโดดไปที่ label ที่ตำแหน่ง index นั้น หรือไปที่ default ถ้า index เกินขอบเขต เทียบได้กับ `switch` statement ใน WAT
+
+```wasm
+(module
+  (func (export "describe") (param $n i32) (result i32)
+    (block $two
+      (block $one
+        (block $zero
+          local.get $n
+          br_table $zero $one $two $two)  ;; index 0→$zero, 1→$one, ≥2→$two
+        i32.const 0)  ;; $zero case: return 0
+      i32.const 1)    ;; $one case: return 1
+    i32.const 2))     ;; $two case: return 2
+```
+
+## ทดลองรัน
+
+export const branchesCode = `const wat = \`(module
+  (func (export "relu") (param $x i32) (result i32)
+    (block $done (result i32)
+      i32.const 0
+      local.get $x
+      i32.const 0
+      i32.lt_s
+      br_if $done
+      drop
+      local.get $x)))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('relu(-5) =', instance.exports.relu(-5), '(expected 0)');
+console.log('relu(7)  =', instance.exports.relu(7),  '(expected 7)');`;
+
+<WasmRunner client:visible code={branchesCode} />
+
+<Callout title="br ใน block ออก; br ใน loop วนซ้ำ">
+เมื่อ `br $label` ชี้ที่ `block` มันจะกระโดดไปข้างหน้าถึงคำสั่งหลัง `end` — เป็น early exit เมื่อชี้ที่ `loop` มันจะกระโดดไปข้างหลังถึงจุดเริ่มต้นของ loop — เป็นการวนซ้ำ คำสั่งเดียวกัน แต่คนละทิศทาง
+</Callout>
+
+export const quizBranches = [
+  {
+    q: "`br $b` กระโดดไปที่ไหนเมื่อ `$b` เป็น `block` label?",
+    options: [
+      "ไปที่คำสั่งแรกภายใน block",
+      "ไปที่คำสั่งที่อยู่หลัง `end` ของ block ทันที",
+      "ไปที่จุดเริ่มต้นของฟังก์ชันที่ครอบอยู่",
+      "ไปที่ memory address ที่เก็บใน $b"
+    ],
+    answer: 1
+  },
+  {
+    q: "`br_if $l` pop อะไรออกจาก stack?",
+    options: [
+      "ค่า i32 condition",
+      "function reference",
+      "memory address",
+      "ไม่มีอะไร — มันตรวจสอบ global flag"
+    ],
+    answer: 0
+  },
+  {
+    q: "คำสั่งใดใน WAT ที่นำ jump table มาใช้?",
+    options: ["br", "br_if", "br_table", "select"],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/branches" questions={quizBranches} />
+
+<ProgressTracker client:visible id="control-flow-functions/branches" />

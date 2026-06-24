@@ -1,0 +1,97 @@
+---
+title: 'ชนิดของค่า (Value Types)'
+description: 'ชนิดตัวเลขหลักสี่ชนิดใน WebAssembly: i32, i64, f32 และ f64 — และวิธีที่ i64 แมปไปยัง BigInt ของ JavaScript'
+sidebar:
+  order: 3
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly เป็น stack machine แบบมีชนิด (typed) ค่าทุกตัวบน stack มีชนิดที่ชัดเจน และฟังก์ชันทุกตัวประกาศอย่างแน่ชัดว่ามันรับและผลิตชนิดใดบ้าง แต่ต่างจากภาษาส่วนใหญ่ Wasm มีชุดของชนิดให้เลือกที่เล็กมาก
+
+## ชนิดของค่าทั้งสี่
+
+WebAssembly มีชนิดของค่าทั้งหมดสี่ชนิดพอดี:
+
+| Type | Width | Kind |
+|------|-------|------|
+| `i32` | 32-bit | Integer |
+| `i64` | 64-bit | Integer |
+| `f32` | 32-bit | Float |
+| `f64` | 64-bit | Float |
+
+ในระดับ Wasm ไม่มีสตริง บูลีน อาเรย์ หรืออ็อบเจกต์ ทุกอย่างเป็นตัวเลข ตรรกะแบบบูลีนถูกแทนด้วยค่า `i32` โดยที่ `0` หมายถึง false และค่าใด ๆ ที่ไม่ใช่ศูนย์หมายถึง true
+
+## การ push ค่าคงที่ขึ้นไปบน stack
+
+แต่ละชนิดมีคำสั่ง `const` ที่ push ค่าลิเทอรัล:
+
+```wasm
+(module
+  (func (export "answer") (result i32)
+    i32.const 42))
+```
+
+สำหรับ float 64 บิต:
+
+```wasm
+(module
+  (func (export "pi") (result f64)
+    f64.const 3.14159265358979))
+```
+
+และสำหรับจำนวนเต็ม 64 บิต — สังเกตว่า `i64` มีความพิเศษเมื่อข้ามไปยัง JavaScript:
+
+```wasm
+(module
+  (func (export "bignum") (result i64)
+    i64.const 1000000000000))
+```
+
+## i64 กับ BigInt ของ JavaScript
+
+ชนิด `number` ของ JavaScript เป็น float 64 บิต ซึ่งสามารถแทนจำนวนเต็มได้อย่างแม่นยำถึง 2^53 เท่านั้น แต่ `i64` สามารถเก็บค่าที่เกินกว่านั้นไปไกลมาก เพื่อรักษาความแม่นยำเต็มที่ WebAssembly JavaScript API จะแปลงค่าที่คืนกลับชนิด `i64` ให้เป็น `BigInt` แทนที่จะเป็น `number` นั่นหมายความว่า `typeof result === 'bigint'` — ไม่ใช่ `'number'`
+
+คุณสามารถตรวจสอบสิ่งนี้ได้ใน runner ด้านล่าง
+
+export const valueTypesCode = `const wat = \`(module
+  (func (export "pi") (result f64)
+    f64.const 3.14159265358979)
+  (func (export "bignum") (result i64)
+    i64.const 1000000000000))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('pi() =', instance.exports.pi());
+console.log('bignum() =', instance.exports.bignum());
+console.log('bignum is BigInt:', typeof instance.exports.bignum() === 'bigint');`;
+
+<WasmRunner client:visible code={valueTypesCode} />
+
+<Callout title="Wasm มีเฉพาะชนิดตัวเลขเท่านั้น">
+  WebAssembly มีชนิดของค่าทั้งหมดสี่ชนิดพอดี: `i32`, `i64`, `f32` และ `f64` ไม่มีสตริง บูลีน หรืออ็อบเจกต์ เมื่อฟังก์ชันคืนค่า `i64` JavaScript จะได้รับ `BigInt` — ไม่ใช่ number ปกติ
+</Callout>
+
+export const quizValueTypes = [
+  {
+    q: "WebAssembly มีชนิดของค่าหลักกี่ชนิด?",
+    options: ["2 (integer และ float)", "3 (i32, f64 และ string)", "4 (i32, i64, f32, f64)", "8 (จำนวนเต็มหลายความกว้าง)"],
+    answer: 2
+  },
+  {
+    q: "ค่าที่คืนกลับชนิด `i64` ของ Wasm กลายเป็นชนิดใดใน JavaScript?",
+    options: ["number", "BigInt", "string", "undefined"],
+    answer: 1
+  },
+  {
+    q: "คำสั่งใดที่ push ค่าคงที่แบบทศนิยม (floating-point) ขึ้นไปบน stack?",
+    options: ["f64.push 3.14", "f64.const 3.14", "push f64 3.14", "float.const 3.14"],
+    answer: 1
+  }
+];
+
+<Quiz client:visible id="wat-text-format/value-types" questions={quizValueTypes} />
+
+<ProgressTracker client:visible id="wat-text-format/value-types" />

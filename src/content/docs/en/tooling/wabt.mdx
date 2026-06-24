@@ -1,0 +1,122 @@
+---
+title: 'wabt — The Binary Toolkit'
+description: 'Use wat2wasm, wasm2wat, wasm-objdump, and wasm-validate to convert, inspect, and validate WebAssembly modules.'
+sidebar:
+  order: 2
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+**wabt** — the WebAssembly Binary Toolkit — is the reference implementation for the WAT text format. Every conversion, inspection, or validation task that touches the text ↔ binary boundary goes through one of its four main programs.
+
+## wat2wasm
+
+`wat2wasm` is the primary compiler. It parses `.wat` source, type-checks it, and emits a conforming `.wasm` binary. Useful flags include `--debug-names` (preserve `$name` annotations in the binary's name section) and `--output` / `-o` to control the output file.
+
+```bash
+# Basic compilation
+wat2wasm add.wat -o add.wasm
+
+# Keep debug names in the binary
+wat2wasm add.wat --debug-names -o add.debug.wasm
+
+# Validate only, don't write output
+wat2wasm add.wat --no-check=false --output=/dev/null
+```
+
+## wasm2wat
+
+`wasm2wat` reverses the process: it reads a `.wasm` binary and emits readable WAT text. This is invaluable when you want to inspect what a higher-level compiler (Emscripten, wasm-pack, etc.) actually produced.
+
+```bash
+# Disassemble to stdout
+wasm2wat add.wasm
+
+# Disassemble to a file
+wasm2wat add.wasm -o add.wat
+
+# Include source locations from the DWARF section
+wasm2wat add.wasm --generate-names
+```
+
+## wasm-objdump
+
+`wasm-objdump` prints structured metadata about a `.wasm` file — its section layout, imports, exports, and function signatures — without producing a WAT disassembly. Use `-x` for a full summary or `-d` to disassemble only the code section.
+
+```bash
+# Full section summary
+wasm-objdump -x add.wasm
+
+# Disassemble code section only
+wasm-objdump -d add.wasm
+
+# Show only the export section
+wasm-objdump -j export add.wasm
+```
+
+A typical `-x` output looks like this:
+
+```bash
+add.wasm:	file format wasm 0x1
+
+Section Details:
+
+Type[1]:
+ - type[0] (i32, i32) -> i32
+Function[1]:
+ - func[0] sig=0
+Export[1]:
+ - func[0] <add> -> "add"
+Code[1]:
+ - func[0] size=7
+```
+
+## wasm-validate
+
+`wasm-validate` checks that a binary conforms to the WebAssembly specification. It exits with code 0 on success and prints a diagnostic on failure. Use it in CI to catch corrupted or invalid modules before they reach production.
+
+```bash
+# Validate a module
+wasm-validate add.wasm
+# → add.wasm: OK
+
+# Validate a module with a future proposal
+wasm-validate --enable-threads shared.wasm
+```
+
+## Run it — magic bytes and binary length
+
+The four bytes at offset 0 of every valid `.wasm` file are `00 61 73 6d` — the module magic (`\0asm`). The runnable below compiles a minimal WAT module and logs both the binary length and those four magic bytes, making the compilation process concrete.
+
+export const wabtCode = `const wat = \`(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add))\`;
+const bytes = await compileWat(wat);
+console.log('Binary length:', bytes.length, 'bytes');
+const magic = Array.from(bytes.slice(0, 4))
+  .map(b => b.toString(16).padStart(2, '0'))
+  .join(' ');
+console.log('Magic bytes (offset 0):', magic);
+console.log('Decoded magic:', String.fromCharCode(...bytes.slice(1, 4)));`;
+
+<WasmRunner client:visible code={wabtCode} />
+
+<Callout title="The magic number identifies every .wasm file">
+All WebAssembly binaries begin with the four-byte magic number `00 61 73 6d` followed by the version `01 00 00 00`. Any tool or loader that reads a `.wasm` file checks for these bytes first.
+</Callout>
+
+export const quizWabt = [
+  { q: "Which flag tells wat2wasm to keep $name annotations in the output binary?", options: ["--keep-names", "--debug-names", "--names=true", "--preserve-symbols"], answer: 1 },
+  { q: "What are the first four bytes of every valid .wasm file?", options: ["ff fe 00 00", "00 61 73 6d", "77 61 73 6d", "01 00 00 00"], answer: 1 },
+  { q: "Which wabt tool prints section headers and exports without a full disassembly?", options: ["wasm2wat", "wasm-validate", "wasm-objdump -x", "wat2wasm --inspect"], answer: 2 },
+  { q: "What exit code does wasm-validate return on a valid module?", options: ["1", "0", "2", "It depends on the OS"], answer: 1 },
+];
+
+<Quiz client:visible id="tooling/wabt" questions={quizWabt} />
+
+<ProgressTracker client:visible id="tooling/wabt" />

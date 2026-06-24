@@ -1,0 +1,105 @@
+---
+title: 'Use Cases & When to Use Wasm'
+description: 'สำรวจ use case จริงของ Wasm — plugin, edge/serverless, sandboxing, portable CLI — และเรียนรู้เมื่อใดที่ Wasm เหมาะสมและไม่เหมาะสม'
+sidebar:
+  order: 5
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly ไม่ใช่ค้อนที่มองหาตะปู มันโดดเด่นในสถานการณ์เฉพาะและเพิ่มความซับซ้อนโดยไม่จำเป็นในสถานการณ์อื่น บทเรียนนี้ map use case จริงและให้ decision framework แก่คุณ
+
+## Use case 1: ระบบ Plugin
+
+แอปพลิเคชันจำนวนมากต้องการพฤติกรรมที่ผู้ใช้ขยายได้ — เช่น IDE extension, game mod, data-pipeline transform หรือ CI/CD step executor โดยทั่วไปหมายถึงการฝัง scripting language (Lua, Python, JavaScript) พร้อมปัญหาด้านความปลอดภัยและ versioning
+
+ด้วย Wasm + WASI คุณสามารถ:
+
+- รับ plugin ที่เขียนด้วย **ภาษาใดก็ได้** (Rust, Go, C, AssemblyScript)
+- รันใน **sandbox ที่เข้มงวด** — ไม่มี filesystem, ไม่มี network เว้นแต่คุณจะ grant
+- โหลด, unload และ version **ขณะ runtime** โดยไม่ต้อง restart host
+
+Projects ที่ใช้ pattern นี้: **Envoy** (filter plugin), **Zellij** (terminal multiplexer plugin), **Shopify** (checkout extension), **Extism** (plugin SDK)
+
+## Use case 2: Edge และ Serverless
+
+แพลตฟอร์ม edge เช่น Cloudflare Workers, Fastly Compute และ Fermyon Spin รัน Wasm module บนเครือข่าย PoP ทั่วโลก ข้อได้เปรียบหลักเทียบกับ container:
+
+- **Cold start เป็น microsecond** — ไม่มี OS process, container runtime หรือ JVM
+- **Isolation ที่แข็งแกร่ง** — แต่ละ request ได้ Wasm instance ของตัวเอง
+- **Footprint เล็ก** — Wasm module มีขนาด kilobyte ไม่ใช่ megabyte
+
+```bash
+# Deploy Rust function ไปยัง Fermyon Spin
+spin new --template http-rust my-api
+cd my-api
+spin build
+spin deploy
+```
+
+## Use case 3: การรัน code ที่ไม่น่าเชื่อถือแบบ sandbox
+
+Online code judge, notebook runner (เช่น WasmRunner ในคอร์สนี้เอง), CI step isolation และ customer-defined logic ใน SaaS ล้วนต้องการรัน arbitrary code อย่างปลอดภัย
+
+Sandboxed memory model ของ Wasm รับประกัน:
+
+- โมดูลไม่สามารถเข้าถึง host memory นอก linear memory ของตัวเอง
+- โมดูลไม่สามารถทำ arbitrary syscall — เฉพาะ WASI import ที่รันไทม์เปิดเผย
+- โมดูลไม่สามารถสร้าง thread หรือ process ด้วยตัวเอง
+
+ทำให้ Wasm เป็น **sandbox ที่ปลอดภัยและเบาที่สุดที่มีอยู่** — เบากว่า Docker, เบากว่า gVisor, เบากว่า eBPF sandbox
+
+## Use case 4: Portable CLI tools
+
+Binary `.wasm` ที่คอมไพล์สำหรับ WASI คือ portable executable ที่รันบน OS ใดก็ได้ที่มี WASI runtime — ไม่ต้องใช้ cross-compilation matrix
+
+```bash
+# แจกจ่าย CLI tool เป็น .wasm binary
+wasmtime my-tool.wasm -- --input file.csv --output result.json
+
+# หรือ package ด้วย wasmer สำหรับ one-liner install
+wasmer publish && wasmer run yourname/my-tool -- --help
+```
+
+## Decision framework
+
+export const decisionDiagram = `flowchart TD
+  Q1{"Need to run\\nuntrusted code?"}
+  Q1 -->|Yes| Wasm1["Use Wasm sandbox\\n(WASI + wasmtime/wasmer)"]
+  Q1 -->|No| Q2{"Performance-critical\\ncompute in the browser?"}
+  Q2 -->|Yes| Wasm2["Compile C/Rust/Go\\nto wasm32-unknown-unknown"]
+  Q2 -->|No| Q3{"Need edge cold-start\\n< 1 ms?"}
+  Q3 -->|Yes| Wasm3["Use Wasm on\\nedge platform"]
+  Q3 -->|No| Q4{"Plugin system\\nacross languages?"}
+  Q4 -->|Yes| Wasm4["Component Model\\n+ WASI"]
+  Q4 -->|No| Native["Stick with\\nnative code / containers"]`;
+
+<Mermaid code={decisionDiagram} title="เมื่อใดควรเลือกใช้ WebAssembly" />
+
+## เมื่อใด Wasm ไม่ใช่ทางเลือกที่ถูกต้อง
+
+| สถานการณ์ | ทางเลือกที่ดีกว่า |
+|-----------|-----------------|
+| CRUD web API ทั่วไป | Node.js / Go / Python — ความซับซ้อน toolchain น้อยกว่า |
+| Stateful service ที่รันนาน | Docker container — observability tooling ดีกว่า |
+| ML inference แบบ GPU-accelerated | CUDA / WebGPU — Wasm ไม่มี GPU access |
+| Desktop app แบบ native | Tauri / Electron / native — OS integration ง่ายกว่า |
+| Script และ glue code | Bash / Python — startup overhead ของ Wasm ไม่คุ้มค่า |
+
+<Callout title="Wasm ชนะด้านความปลอดภัย + portability ไม่ใช่ throughput ล้วน ๆ">
+อย่าใช้ Wasm เพราะมัน "เร็ว" ใช้มันเพราะคุณต้องการ sandbox ที่ปลอดภัย, binary ที่พกพาได้ หรือ plugin interface ที่ไม่ขึ้นกับภาษา Throughput ล้วน ๆ บนเซิร์ฟเวอร์มักได้ประโยชน์จาก native binary มากกว่า
+</Callout>
+
+export const quizUseCasesAndWhen = [
+  { q: "คุณสมบัติใดที่ทำให้ Wasm น่าสนใจเป็นพิเศษสำหรับแพลตฟอร์ม edge/serverless?", options: ["Memory footprint ขนาดใหญ่", "Cold start เป็น microsecond พร้อม isolation ที่แข็งแกร่งต่อ request", "GPU access แบบ native", "HTTP server ในตัว"], answer: 1 },
+  { q: "โปรเจกต์จริงใดที่ใช้ Wasm สำหรับ extensible filter plugin?", options: ["Nginx", "Envoy", "HAProxy", "Caddy"], answer: 1 },
+  { q: "ทำไม Wasm จึงไม่เหมาะสำหรับ ML inference แบบ GPU-accelerated?", options: ["Wasm module มีขนาดใหญ่เกินไป", "Wasm ไม่มี GPU access", "WASI ไม่รองรับ floating-point math", "Wasm ไม่สามารถโหลด binary data ได้"], answer: 1 },
+  { q: "อะไรทำให้ Wasm เป็น sandbox ที่ปลอดภัยและเบาที่สุดเทียบกับ Docker?", options: ["Wasm ใช้ kernel namespace เหมือน Docker", "Wasm module แชร์ memory ข้าม instance", "Wasm ไม่มี OS process, container runtime และบังคับ memory isolation ในซอฟต์แวร์", "Wasm รันบน hypervisor"], answer: 2 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/use-cases-and-when" questions={quizUseCasesAndWhen} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/use-cases-and-when" />

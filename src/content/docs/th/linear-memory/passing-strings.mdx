@@ -1,0 +1,94 @@
+---
+title: 'การส่ง String'
+description: 'ส่ง JavaScript string ผ่าน WebAssembly linear memory โดยใช้ TextEncoder เขียน UTF-8 bytes และ TextDecoder อ่านกลับมา'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+ฟังก์ชัน WebAssembly รับและส่งกลับได้เฉพาะ numeric type เท่านั้น — integer และ float ไม่มี string type วิธีแก้ไขมาตรฐานคือ encode ข้อมูล string เป็น byte ใน linear memory แล้วส่ง integer coordinate (pointer และ length) เพื่อระบุตำแหน่งของ byte เหล่านั้น
+
+## รูปแบบการทำงาน
+
+การส่งกลับ JavaScript string ไปยัง Wasm และกลับมามี 5 ขั้นตอน:
+
+1. **Encode** string เป็น `Uint8Array` ของ UTF-8 byte โดยใช้ `TextEncoder`
+2. **Write** byte เหล่านั้นลงในพื้นที่ที่กำหนดของ Wasm memory
+3. **Call** ฟังก์ชัน Wasm พร้อม byte offset (pointer) และจำนวน byte (length)
+4. **Wasm** ทำงานและส่งกลับ pointer และ length ของ byte ผลลัพธ์
+5. **Decode** byte ผลลัพธ์กลับเป็น JavaScript string โดยใช้ `TextDecoder`
+
+export const stringFlowDiagram = `flowchart LR
+  A["JS string\\n'Hello'"] --> B["TextEncoder\\n-> Uint8Array"]
+  B --> C["mem.buffer\\n(write at ptr)"]
+  C --> D["Wasm function\\n(ptr, len)"]
+  D --> C
+  C --> E["TextDecoder\\n-> JS string"]`;
+
+<Mermaid code={stringFlowDiagram} title="การส่ง string ผ่าน linear memory" />
+
+## การ Encode ด้วย TextEncoder
+
+`TextEncoder.encode(str)` แปลง JavaScript string เป็น `Uint8Array` ของ UTF-8 byte อักขระหลาย byte (emoji, ตัวอักษรที่มีเครื่องหมายกำกับ, ตัวอักษร CJK) ให้ byte มากกว่าจำนวน character เสมอ ดังนั้นการดำเนินการ memory ควรใช้ byte length เสมอ ไม่ใช่ string length
+
+## การเขียน byte ลง Wasm memory
+
+เลือก address ใน Wasm memory ที่คุณควบคุม (เช่น พื้นที่ static เริ่มต้นที่ byte 256) และเขียน byte ที่ encode ไว้:
+
+```js
+const encoded = new TextEncoder().encode(str);
+const ptr = 256;
+new Uint8Array(mem.buffer).set(encoded, ptr);
+```
+
+## การอ่าน byte กลับด้วย TextDecoder
+
+หลังจากเรียกฟังก์ชัน Wasm คุณจะได้ `(ptr, len)` กลับมา แล้ว slice memory view และ decode:
+
+```js
+const decoded = new TextDecoder().decode(
+  new Uint8Array(mem.buffer, outPtr, outLen)
+);
+```
+
+Constructor `Uint8Array` แบบ 3 argument สร้าง view เริ่มต้นที่ `outPtr` มีจำนวน element `outLen` — ไม่มี copy, ไม่มีการ allocate
+
+## ลองรัน
+
+โมดูล Wasm ด้านล่าง expose ฟังก์ชัน `echo` ที่ส่งคืน `(ptr, len)` เดิมที่รับมา ฝั่ง JavaScript encode `"Hello Wasm"` เขียนที่ offset 256 เรียก `echo` แล้ว decode ผลลัพธ์
+
+export const passingStringsCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (func (export "echo") (param \$ptr i32) (param \$len i32) (result i32 i32)
+    local.get \$ptr
+    local.get \$len))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+const mem = instance.exports.mem;
+const str = 'Hello Wasm';
+const encoded = new TextEncoder().encode(str);
+const ptr = 256;
+new Uint8Array(mem.buffer).set(encoded, ptr);
+const [outPtr, outLen] = instance.exports.echo(ptr, encoded.length);
+const decoded = new TextDecoder().decode(new Uint8Array(mem.buffer, outPtr, outLen));
+console.log('round-trip:', decoded);`;
+
+<WasmRunner client:visible code={passingStringsCode} />
+
+<Callout title="ส่ง (ptr, len) ไม่ใช่ string">
+ฟังก์ชัน WebAssembly ไม่สามารถรับ JavaScript string โดยตรงได้ รูปแบบมาตรฐานคือเขียน UTF-8 byte ลง memory แล้วส่ง integer pointer และ integer length ไปยังฟังก์ชัน Wasm
+</Callout>
+
+export const quizPassingStrings = [
+  { q: "วิธีส่ง JavaScript string ไปยังฟังก์ชัน WebAssembly คือ?", options: ["ส่งโดยตรงเป็น parameter", "เขียน UTF-8 bytes ลง memory แล้วส่ง (ptr, len)", "แปลงเป็นตัวเลขก่อน", "ใช้ postMessage"], answer: 1 },
+  { q: "TextEncoder.encode(str) คืนค่าอะไร?", options: ["base64 string", "UTF-16 ArrayBuffer", "Uint8Array ของ UTF-8 bytes", "number array"], answer: 2 },
+  { q: "รูปแบบมาตรฐานของ Wasm ในการแทน string คือ?", options: ["byte sequence ที่จบด้วย null เท่านั้น", "string ที่ขึ้นต้นด้วยความยาว", "pointer (integer) และความยาว byte (integer)", "JavaScript Symbol"], answer: 2 },
+];
+
+<Quiz client:visible id="linear-memory/passing-strings" questions={quizPassingStrings} />
+
+<ProgressTracker client:visible id="linear-memory/passing-strings" />

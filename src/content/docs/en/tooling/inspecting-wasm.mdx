@@ -1,0 +1,111 @@
+---
+title: 'Inspecting WebAssembly Binaries'
+description: 'Read the section layout of any .wasm file using wasm2wat, wasm-objdump, twiggy, and browser DevTools to understand size and structure.'
+sidebar:
+  order: 4
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Every `.wasm` file is a sequence of numbered **sections**. Understanding which section contributes what makes it possible to target your optimisation efforts precisely. This lesson shows the tools that surface that information.
+
+## The .wasm section layout
+
+A WebAssembly binary is divided into up to thirteen standard sections, each with a unique ID. The diagram below shows the most common ones and how they relate to each other.
+
+export const sectionsDiagram = `flowchart TD
+  A[".wasm binary"] --> B["Type section\\nfunction signatures"]
+  A --> C["Import section\\nJS / host imports"]
+  A --> D["Function section\\ntype index per function"]
+  A --> E["Export section\\npublic API names"]
+  A --> F["Code section\\nactual instructions"]
+  A --> G["Data section\\nmemory initialisers"]
+  A --> H["Custom sections\\nname debug DWARF producers"]`;
+
+<Mermaid code={sectionsDiagram} title=".wasm section layout" />
+
+## wasm2wat — human-readable disassembly
+
+The quickest way to read any binary is `wasm2wat`. It reconstructs the WAT text representation, including function names if a name section is present.
+
+```bash
+# Dump the full WAT to stdout
+wasm2wat add.wasm
+
+# Save to a file for editing or diffing
+wasm2wat add.wasm -o add.wat
+
+# Generate synthetic names when none are present
+wasm2wat add.wasm --generate-names
+```
+
+## wasm-objdump — section-by-section inspection
+
+`wasm-objdump -x` prints a structured summary of every section: type signatures, imports, exports, and function indices. It is faster than a full disassembly when you only need the module's public API.
+
+```bash
+# Full section summary
+wasm-objdump -x my.wasm
+
+# Disassemble code section only (shows raw instructions)
+wasm-objdump -d my.wasm
+
+# Show a single section
+wasm-objdump -j export my.wasm
+wasm-objdump -j import my.wasm
+```
+
+## twiggy — size profiling
+
+`twiggy` is a code-size profiler that attributes every byte in a `.wasm` binary to a function or section. It is the fastest way to answer "which function is making my binary large?"
+
+```bash
+# Install
+cargo install twiggy
+
+# Print the top contributors to binary size
+twiggy top my.wasm
+
+# Show the retaining paths for a specific function
+twiggy paths my.wasm --function "some_large_function"
+
+# Output as JSON for further processing
+twiggy top my.wasm --output-format json
+```
+
+A `twiggy top` report looks roughly like:
+
+```bash
+ Shallow Bytes  | Shallow % | Item
+----------------+-----------+------------------------------
+          14512 ┊    42.38% ┊ "function names" subsection
+           8032 ┊    23.46% ┊ code[42]: some_large_function
+           3200 ┊     9.35% ┊ code[17]: decode_utf8
+```
+
+## Browser DevTools
+
+Modern browsers ship WebAssembly debugging support directly in DevTools. In Chrome and Firefox you can open **Sources → wasm** to see a disassembly of every instantiated module, set breakpoints on individual instructions, and inspect local variables and the value stack at each breakpoint.
+
+To get readable function names in DevTools you need either:
+
+- A **name section** in the binary (produced by `wat2wasm --debug-names` or `wasm-opt --debuginfo`), or
+- A **DWARF section** emitted by Emscripten or clang with `-g`.
+
+<Callout title="Start with wasm-objdump, finish with twiggy">
+Use `wasm-objdump -x` for a fast overview of section layout and exports. Use `twiggy top` when you need to pinpoint which function is bloating the binary. Use `wasm2wat` when you need to read the actual instructions.
+</Callout>
+
+export const quizInspecting = [
+  { q: "Which tool attributes each byte of a .wasm file to a specific function?", options: ["wasm-objdump", "wasm2wat", "twiggy", "wasm-validate"], answer: 2 },
+  { q: "What does wasm-objdump -x print?", options: ["Optimised binary output", "A full WAT disassembly", "Section headers, types, imports, and exports", "Only the code section"], answer: 2 },
+  { q: "Which section holds the actual instructions of each function?", options: ["Type section", "Export section", "Function section", "Code section"], answer: 3 },
+  { q: "What do you need in the binary to see readable function names in DevTools?", options: ["A data section", "A name section or DWARF section", "An import section", "A memory section"], answer: 1 },
+];
+
+<Quiz client:visible id="tooling/inspecting-wasm" questions={quizInspecting} />
+
+<ProgressTracker client:visible id="tooling/inspecting-wasm" />

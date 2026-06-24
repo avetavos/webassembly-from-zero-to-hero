@@ -1,0 +1,105 @@
+---
+title: 'Control Flow — ภาพรวม'
+description: 'WebAssembly ใช้ structured control flow ได้แก่ block, loop และ if พร้อม labeled branch targets — ไม่มี arbitrary jumps'
+sidebar:
+  order: 1
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly ไม่มี `goto` ไม่มี raw jump address และไม่มี unstructured branch ทุกการถ่ายโอน control จะเกิดขึ้นภายใน labeled construct โดยที่ `br` ชี้ไปที่ label นั้น — ไม่ใช่ memory address หรือหมายเลขบรรทัด การออกแบบนี้ทำให้ Wasm program ตรวจสอบความถูกต้องได้ในการอ่านเดียว และคอมไพล์ได้อย่างมีประสิทธิภาพบนเบราว์เซอร์
+
+## Structured constructs
+
+Wasm มี control-flow construct ทั้งหมดสามตัว:
+
+- **`block`** — กลุ่มที่เดินไปข้างหน้าเท่านั้น `br $label` จะออกจาก block โดยกระโดดไปยังคำสั่งที่อยู่ *หลัง* `end` ที่ปิด ให้คิดว่าเป็น labeled break
+- **`loop`** — backward-branch target `br $label` กระโดดไปยัง *จุดเริ่มต้น* ของ loop ทำให้วนซ้ำ การออกจาก loop ต้องกระโดดไปที่ outer label หรือตกออกจากส่วนท้าย
+- **`if`** — conditional branch pop `i32` จาก stack ถ้าไม่ใช่ศูนย์จะรัน `then` arm ถ้าไม่ก็รัน `else` arm ที่เป็น optional
+
+Construct ทั้งสามสามารถมี result type ได้ ทำให้เป็น expression ที่ฝากค่าไว้บน stack
+
+## Branch targets และทิศทาง
+
+ประเด็นสำคัญคือ `br` ใน Wasm ไม่ใช่การกระโดดไปที่ address แต่เป็นการกระโดด *เทียบกับ nesting structure* `br $b` ภายใน `block $b` จะออกจาก block นั้น แต่ `br $l` เดียวกันภายใน `loop $l` จะวนซ้ำ loop นั้น
+
+export const cfOverviewDiagram = `flowchart LR
+  A["block \$b\\n  ...body...\\n  br \$b"] --> B["jumps to END\\nof block"]
+  C["loop \$l\\n  ...body...\\n  br_if \$l"] --> D["jumps to START\\nof loop"]`;
+
+<Mermaid code={cfOverviewDiagram} title="Branch targets ใน block เทียบกับ loop" />
+
+`br_if` คือ conditional variant — pop `i32` condition และกระโดดเฉพาะเมื่อค่าไม่ใช่ศูนย์
+
+## สิ่งที่ module นี้ครอบคลุม
+
+Module นี้จะอธิบาย construct แต่ละตัวอย่างละเอียด:
+
+1. **`block` และ `br`** — ใช้ labeled break เพื่อออกจากลำดับคำสั่งก่อนกำหนด
+2. **`loop` และ `br_if`** — การเขียน counted และ conditional loop
+3. **`if / else`** — conditional execution พร้อม optional result values
+
+## Early exit ด้วย block และ br
+
+การใช้ `block` ที่ง่ายที่สุดคือ early-exit pattern ฟังก์ชันด้านล่าง push `42` แล้วกระโดดออกจาก block ทันที และ `i32.const 99` หลัง branch จะไม่ถูกเรียกใช้งานเลย
+
+```wasm
+(module
+  (func (export "earlyExit") (result i32)
+    (block $b (result i32)
+      i32.const 42
+      br $b
+      i32.const 99)  ;; never reached
+  ))
+```
+
+`block` มี result type เป็น `i32` เมื่อ `br $b` ทำงาน ค่า `42` อยู่บน stack แล้วและกลายเป็น result ของ block expression — และด้วยเหตุนี้จึงเป็นค่าที่ฟังก์ชันคืนกลับ
+
+## ทดลองรัน
+
+export const indexCode = `const wat = \`(module
+  (func (export "earlyExit") (result i32)
+    (block $b (result i32)
+      i32.const 42
+      br $b
+      i32.const 99)))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('earlyExit() =', instance.exports.earlyExit(), '(should be 42, not 99)');`;
+
+<WasmRunner client:visible code={indexCode} />
+
+<Callout title="br ชี้ที่ label ไม่ใช่ address">
+Wasm control flow เป็น structured — `br` ชี้ที่ `block` หรือ `loop` ที่มี label ไม่ใช่ address ที่กำหนดเอง ทำให้การตรวจสอบและคอมไพล์ง่ายขึ้น และเป็นเหตุผลที่ Wasm ไม่มีสิ่งเทียบเท่ากับ `goto`
+</Callout>
+
+export const quizCfIndex = [
+  {
+    q: "`br` ใน WebAssembly ชี้ไปที่อะไร?",
+    options: [
+      "absolute memory address",
+      "labeled block หรือ loop construct",
+      "คำสั่งถัดไปในฟังก์ชัน",
+      "JavaScript callback"
+    ],
+    answer: 1
+  },
+  {
+    q: "Wasm construct ใดที่อนุญาตให้วนซ้ำลำดับคำสั่ง?",
+    options: ["block", "loop", "if", "repeat"],
+    answer: 1
+  },
+  {
+    q: "คำสั่งใดที่กระโดดแบบมีเงื่อนไข โดยอ้างอิงค่า i32 บน stack?",
+    options: ["br", "br_table", "br_if", "if"],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/index" questions={quizCfIndex} />
+
+<ProgressTracker client:visible id="control-flow-functions/index" />

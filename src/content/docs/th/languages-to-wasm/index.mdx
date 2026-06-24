@@ -1,0 +1,75 @@
+---
+title: 'Languages to Wasm'
+description: 'คอมไพล์จากภาษาจริงแทนการเขียน WAT ด้วยมือ เปรียบเทียบ Rust, C/Emscripten, AssemblyScript และ TinyGo'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+การเขียน WAT ด้วยมือเป็นวิธีที่ดีในการเรียนรู้ Execution Model ของ Wasm แต่ในทางปฏิบัติคุณจะคอมไพล์จาก **ภาษาโปรแกรมจริง** คอมไพเลอร์จะจัดการ Register Allocation, Memory Layout และ Binary Encoding ให้ — คุณเพียงแค่เขียนโค้ดตามสไตล์ของภาษานั้น แล้วได้ไฟล์ `.wasm` ออกมา
+
+โมดูลนี้ครอบคลุม Toolchain สี่ตัวที่ใช้บ่อยที่สุดในปัจจุบัน เปรียบเทียบข้อดีข้อเสีย และให้คำสั่ง Build จริงของแต่ละตัว
+
+## ภาพรวม Toolchain ทั้งสี่ตัว
+
+| ภาษา | Toolchain | ขนาด Output | เหมาะกับ |
+|------|-----------|-------------|----------|
+| **Rust** | `wasm-pack` / `wasm-bindgen` | เล็ก (ไม่มี GC, ไม่มี Runtime) | โค้ด Wasm ใหม่, แพ็กเกจ npm |
+| **C / C++** | Emscripten (`emcc`) | กลาง–ใหญ่ (มี libc emulation) | Port ไลบรารี C/C++ ที่มีอยู่ |
+| **AssemblyScript** | `asc` | เล็กมาก | นักพัฒนา TypeScript, โมดูลเรียบง่าย |
+| **TinyGo** | `tinygo build` | เล็ก | นักพัฒนา Go, ไมโครคอนโทรลเลอร์ |
+
+## แผนผัง Toolchain แต่ละตัว
+
+export const overviewDiagram = `flowchart LR
+  subgraph Sources
+    R["Rust<br/>.rs files"]
+    C["C / C++<br/>.c .cpp files"]
+    AS["AssemblyScript<br/>.ts files"]
+    TG["TinyGo<br/>.go files"]
+  end
+  subgraph Toolchain
+    WP["wasm-pack<br/>(wasm-bindgen)"]
+    EM["Emscripten<br/>(emcc)"]
+    ASC["asc<br/>(AssemblyScript compiler)"]
+    TIGO["tinygo build"]
+  end
+  subgraph Output
+    WASM[".wasm binary"]
+    GLUE["JS glue (optional)"]
+  end
+  R --> WP --> WASM
+  C --> EM --> WASM
+  C --> EM --> GLUE
+  AS --> ASC --> WASM
+  TG --> TIGO --> WASM`;
+
+<Mermaid code={overviewDiagram} title="ภาษา → Toolchain → .wasm" />
+
+## ความแตกต่างหลัก
+
+**Rust กับ wasm-bindgen** สร้าง JS/Wasm Binding อย่างละเอียดอัตโนมัติ คุณสามารถส่ง String, JS Object และ Callback ข้ามขอบเขตได้โดยไม่ต้องเขียน Glue Code เอง ขนาด Binary เล็กเพราะ Rust ไม่มี Garbage Collector หรือ Runtime Heap
+
+**Emscripten** จำลองสภาพแวดล้อม POSIX-like ไว้ใน Wasm ซึ่งหมายความว่าโค้ด C ที่ใช้ `printf`, `malloc` หรือ File I/O มักคอมไพล์ได้โดยไม่ต้องแก้ไข ข้อแลกเปลี่ยนคือ Output มีขนาดใหญ่กว่าเพราะรวม libc emulation และ JS Loader ที่อาจซับซ้อน
+
+**AssemblyScript** คอมไพล์ TypeScript Subset ลงสู่ Wasm โดยตรง ไม่จำเป็นต้องเรียนภาษาใหม่ — หากรู้จัก TypeScript แล้วก็เริ่มได้ทันที คอมไพเลอร์เร็วและผลิต Binary ขนาดเล็กมาก
+
+**TinyGo** คอมไพล์ Go Subset ลงสู่ Wasm (และไมโครคอนโทรลเลอร์) เหมาะกับทีมที่เขียน Go อยู่แล้วและต้องการแชร์โลจิกกับ Web Frontend ทว่าไม่รองรับ Standard Library บางแพ็กเกจ
+
+<Callout title="เลือก Toolchain ที่ทีมคุณรู้จักดี">
+Toolchain ที่ดีที่สุดคือตัวที่ทีมคุณถนัดที่สุด Rust ให้การควบคุมมากที่สุด Emscripten Port โค้ดที่มีอยู่ได้มากที่สุด AssemblyScript มี Learning Curve ต่ำที่สุดสำหรับนักพัฒนา JS/TS และ TinyGo เหมาะกับทีม Go
+</Callout>
+
+export const quizLangsIndex = [
+  { q: "Toolchain ใดเหมาะที่สุดสำหรับการ Port ไลบรารี C ที่มีอยู่แล้วลงสู่ Wasm?", options: ["wasm-pack", "Emscripten (emcc)", "asc (AssemblyScript)", "tinygo"], answer: 1 },
+  { q: "เหตุใด Rust จึงผลิต Wasm Binary ขนาดเล็กกว่า Emscripten โดยค่าเริ่มต้น?", options: ["Rust ใช้ Garbage Collector ที่บีบอัด Output", "Rust ไม่มี Garbage Collector หรือ Runtime Heap", "Rust คอมไพล์เป็น Binary Format ต่างออกไป", "Rust ลบ Debug Symbol อัตโนมัติ"], answer: 1 },
+  { q: "AssemblyScript ออกแบบมาสำหรับนักพัฒนาที่รู้จักภาษาใดเป็นอย่างดี?", options: ["Rust", "Go", "TypeScript", "C++"], answer: 2 },
+];
+
+<Quiz client:visible id="languages-to-wasm/index" questions={quizLangsIndex} />
+
+<ProgressTracker client:visible id="languages-to-wasm/index" />

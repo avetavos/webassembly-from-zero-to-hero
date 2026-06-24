@@ -1,0 +1,130 @@
+---
+title: 'Wasm Module แรกของคุณ'
+description: 'เขียน WAT module ตั้งแต่ต้น, คอมไพล์ด้วย compileWat, instantiate และเรียกฟังก์ชันที่ export จาก JavaScript'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+ทุกการเดินทาง Wasm เริ่มต้นด้วย loop เดียวกัน: **เขียน** module ใน WebAssembly Text format (WAT), **คอมไพล์** เป็น bytes, **instantiate** และ **เรียก** ฟังก์ชันที่ export บทเรียนนี้พาคุณเดิน loop นั้นตั้งแต่ต้นจนจบด้วยตัวอย่างที่เล็กที่สุดเท่าที่จะเป็นไปได้ ฟังก์ชัน `double` ที่คูณ argument ด้วยสอง
+
+เมื่อจบบทเรียนนี้ คุณจะได้เขียน WAT จริง, คอมไพล์มัน live ใน browser และเรียกมันจาก JavaScript
+
+## การเขียน WAT Module
+
+WAT คือการแสดงข้อความที่มนุษย์อ่านได้ของ `.wasm` ไบนารี ต่อไปนี้คือ module ที่สมบูรณ์:
+
+```wasm
+(module
+  (func (export "double") (param $n i32) (result i32)
+    local.get $n
+    i32.const 2
+    i32.mul))
+```
+
+มาแยกทุกบรรทัด:
+
+- **`(module ...)`** — wrapper ระดับบนสุด ทุกไฟล์ `.wasm` มี module เดียว
+- **`(func (export "double") ...)`** — ประกาศฟังก์ชันและทำให้ host มองเห็นได้ในชื่อ `"double"` ทันที ชื่อ export คือสิ่งที่ JavaScript เห็นบน `instance.exports`
+- **`(param $n i32)`** — ประกาศ parameter หนึ่งตัวชื่อ `$n` ประเภท `i32` (32-bit signed integer) label `$n` เป็นความสะดวกของ WAT ที่ระดับไบนารีมันเป็นแค่ index
+- **`(result i32)`** — ประกาศว่าฟังก์ชันนี้ return `i32` หนึ่งตัว
+- **`local.get $n`** — push ค่าปัจจุบันของ `$n` ลงบน operand stack
+- **`i32.const 2`** — push ค่าคงที่ `2` ลงบน stack
+- **`i32.mul`** — pop ค่าบนสุดสองตัวของ stack, คูณเข้าด้วยกัน และ push ผลลัพธ์ เนื่องจากนี่คือคำสั่งสุดท้ายและ type ตรงกับ `(result i32)` ผลลัพธ์จึงกลายเป็น return value
+
+การออกแบบ stack-based ของ Wasm หมายความว่าไม่มี `return` อย่างชัดเจน ค่าที่อยู่บนสุดของ stack เมื่อสิ้นสุด function body คือ return value
+
+## คอมไพล์: WAT Bytes ด้วย `compileWat`
+
+sandbox เปิดเผยฟังก์ชัน global `compileWat(watString)` ที่ขับเคลื่อนด้วย WABT library มันรับ WAT source string ของคุณและคืน `Promise<Uint8Array>` ซึ่งคือ `.wasm` bytes ดิบที่ปกติคุณจะได้จากไฟล์บน disk หรือ network fetch
+
+```js
+const bytes = await compileWat(wat);
+```
+
+## Instantiate: `WebAssembly.instantiate`
+
+`WebAssembly.instantiate(bytes, importObject)` คือ standard browser API สำหรับสร้าง Wasm instance ที่รันได้ มันคืน `Promise` ที่ resolve เป็นคู่ `{ instance, module }`:
+
+- **`instance`** — object ที่ live และรันได้ property `.exports` ของมันมีฟังก์ชันและ memory ทั้งหมดที่ module export ออกมา
+- **`module`** — `WebAssembly.Module` ที่คอมไพล์แล้วแต่ไม่มีชีวิต คุณสามารถแชร์และ instantiate ซ้ำได้โดยไม่ต้องคอมไพล์ใหม่
+
+argument ที่สองคือ **import object** ซึ่งเป็น nested object ของฟังก์ชัน, memory และ global ที่คุณ provide ให้ module จาก JavaScript เนื่องจากฟังก์ชัน `double` ของเราไม่ import อะไรจาก host เราจึงส่ง `{}`
+
+```js
+const { instance } = await WebAssembly.instantiate(bytes, {});
+```
+
+## เรียก: `instance.exports.double`
+
+เมื่อ instantiate แล้ว ทุกฟังก์ชันที่ export ออกมาจะใช้งานได้เป็น JavaScript function ธรรมดาบน `instance.exports`:
+
+```js
+instance.exports.double(21); // → 42
+```
+
+JavaScript number ถูกแปลงอัตโนมัติไปเป็น/มาจาก `i32` การเรียกเป็น synchronous ไม่ต้อง `await`
+
+## ลองรัน Live
+
+runner ด้านล่างคอมไพล์ WAT, instantiate และเรียก `double` ด้วย input ที่แตกต่างกันสามค่า รันมันและดูผลลัพธ์ใน console
+
+export const firstModuleCode = `const wat = \`(module
+  (func (export "double") (param $n i32) (result i32)
+    local.get $n
+    i32.const 2
+    i32.mul))\`;
+
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+
+console.log('double(5)   =', instance.exports.double(5));
+console.log('double(21)  =', instance.exports.double(21));
+console.log('double(100) =', instance.exports.double(100));`;
+
+<WasmRunner client:visible code={firstModuleCode} />
+
+<Callout title="Loop คอมไพล์–instantiate–เรียก">
+  ทุก Wasm module ทำตาม pattern เดิม: คอมไพล์เป็น bytes, instantiate ด้วย `WebAssembly.instantiate` แล้วเรียก export argument ที่สองของ `instantiate` คือ import object ซึ่งเป็นฟังก์ชันและ memory ที่คุณ provide ให้ module จาก JavaScript ตอนนี้มันว่าง แต่บทเรียนหลังๆ จะเพิ่มเติม
+</Callout>
+
+export const quizYourFirstModule = [
+  {
+    q: '`WebAssembly.instantiate(bytes, {})` คืนค่าอะไร?',
+    options: [
+      'string ของ WAT source code',
+      'คู่ { instance, module }',
+      'Promise<void>',
+      'ฟังก์ชันที่ export โดยตรง',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'object ว่าง `{}` ใน `WebAssembly.instantiate(bytes, {})` หมายถึงอะไร?',
+    options: [
+      'result buffer ว่าง',
+      'import object ซึ่งเป็นฟังก์ชัน/memory ที่ host provide ให้ module',
+      'debug options bag',
+      'Wasm globals table',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ในฟังก์ชัน WAT `double` คำสั่งใดที่สร้าง return value สุดท้าย?',
+    options: [
+      'local.get $n',
+      'i32.const 2',
+      'i32.mul',
+      '(result i32)',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/your-first-module" questions={quizYourFirstModule} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/your-first-module" />

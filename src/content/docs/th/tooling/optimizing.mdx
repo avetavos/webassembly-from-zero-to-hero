@@ -1,0 +1,125 @@
+---
+title: 'การ Optimise สำหรับ Production'
+description: 'รวม -Oz, การลบ debug section, wee_alloc/no-std และ streaming instantiation เพื่อส่ง WebAssembly module ที่เล็กและเร็วที่สุดเท่าที่เป็นไปได้'
+sidebar:
+  order: 5
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+การเขียน WebAssembly ที่ถูกต้องเป็นแค่ครึ่งหนึ่งของงาน ใน production คุณต้องการให้ binary เล็กที่สุดเท่าที่เป็นไปได้ (download เร็วขึ้น cache อุ่นขึ้น) และเริ่มทำงานได้เร็วที่สุดเท่าที่เป็นไปได้ (time-to-interactive ที่ต่ำลง) บทเรียนนี้รวบรวม playbook ที่สมบูรณ์
+
+## ขั้นตอนที่ 1 — คอมไพล์ด้วยการ optimise ขนาดสูงสุด
+
+ไม่ว่าจะใช้ toolchain ใด ให้เปิดใช้ flag การ optimise ขนาดสูงสุด:
+
+```bash
+# wasm-opt (standalone หรือ post-compile)
+wasm-opt -Oz input.wasm -o output.wasm
+
+# Rust ผ่าน wasm-pack
+wasm-pack build --release   # wasm-opt -Oz ทำงานโดยอัตโนมัติ
+
+# Emscripten
+emcc -Oz source.c -o output.wasm
+
+# TinyGo
+tinygo build -opt=z -target wasm -o output.wasm ./main.go
+```
+
+## ขั้นตอนที่ 2 — ลบ debug sections
+
+ข้อมูล debug (DWARF, name sections, producer metadata) อาจเพิ่มขนาด binary ได้ถึงสองเท่า ลบออกสำหรับ production
+
+```bash
+# ลบ custom sections ทั้งหมดด้วย wasm-opt
+wasm-opt -Oz --strip-debug --strip-producers output.wasm -o output.stripped.wasm
+
+# หรือด้วย wasm-tools
+wasm-tools strip output.wasm -o output.stripped.wasm
+
+# วัดผล
+wc -c output.wasm output.stripped.wasm
+```
+
+เก็บสำเนาที่ไม่ได้ strip ไว้บน build server เพื่อให้สามารถ symbolicate crash reports ได้
+
+## ขั้นตอนที่ 3 — ลด allocator (Rust)
+
+สำหรับ Rust targets `std` allocator เริ่มต้น (`dlmalloc` ผ่าน `wasm-bindgen`) เพิ่มประมาณ 10 KB การเปลี่ยนเป็น `wee_alloc` หรือ `lol_alloc` ที่ใหม่กว่าสามารถประหยัดได้หลาย kilobytes:
+
+```bash
+# Cargo.toml
+[dependencies]
+wee_alloc = "0.4"
+
+# lib.rs — แทนที่ global allocator
+```
+
+```bash
+# Build (wasm-pack จัดการส่วนที่เหลือ)
+wasm-pack build --release --target web
+```
+
+สำหรับโมดูลที่ไม่มี dynamic allocation เลย ให้คอมไพล์ด้วย `#![no_std]` และลบ allocator ออกทั้งหมด
+
+## ขั้นตอนที่ 4 — lazy และ streaming instantiation
+
+เบราว์เซอร์สามารถเริ่มคอมไพล์ไฟล์ `.wasm` ขณะที่ยังดาวน์โหลดอยู่ถ้าคุณใช้ `WebAssembly.instantiateStreaming` ซึ่งเร็วกว่าการ fetch ก่อนแล้วค่อยคอมไพล์เสมอ
+
+```bash
+# Serve ด้วย MIME type ที่ถูกต้อง
+# Content-Type: application/wasm
+```
+
+ใน JavaScript:
+
+```bash
+// Streaming (แนะนำ)
+const { instance } = await WebAssembly.instantiateStreaming(
+  fetch('/module.wasm'),
+  importObject
+);
+
+// Non-streaming (fallback สำหรับ server ที่ไม่มี MIME type ที่ถูกต้อง)
+const bytes = await fetch('/module.wasm').then(r => r.arrayBuffer());
+const { instance } = await WebAssembly.instantiate(bytes, importObject);
+```
+
+สำหรับโมดูลขนาดใหญ่ที่มีการเข้าชมซ้ำ ให้ cache `WebAssembly.Module` ที่คอมไพล์แล้วใน IndexedDB เพื่อข้ามการคอมไพล์ทั้งหมดในการโหลดครั้งถัดไป
+
+## ขั้นตอนที่ 5 — วัดผลทุกอย่าง
+
+การ optimise โดยไม่มีการวัดผลคือการเดาสุ่ม เก็บ metrics สามอย่างนี้ใน CI pipeline ของคุณ:
+
+```bash
+# 1. ขนาด binary (raw และ gzip)
+wc -c output.wasm
+gzip -c output.wasm | wc -c
+
+# 2. การแจกแจงขนาดตามฟังก์ชัน
+twiggy top output.wasm | head -20
+
+# 3. Validate binary ที่ optimise แล้วว่าไม่เสียหาย
+wasm-validate output.wasm
+wasm-tools validate output.wasm
+```
+
+การถดถอยใน metrics ทั้งสามอย่างใดอย่างหนึ่งหลังจาก dependency update เป็นสัญญาณให้ตรวจสอบก่อน ship
+
+<Callout title="วัดผล แล้ว optimise แล้วจึงวัดผลอีกครั้ง">
+การประหยัดที่ใหญ่ที่สุดมักมาจากฟังก์ชันที่ขนาดใหญ่เกินไปเพียงตัวเดียวหรือ import ที่ไม่ได้ใช้ที่ dependency ดึงเข้ามา `twiggy top` หาฟังก์ชันนั้นได้ในไม่กี่วินาที แก้ไข root cause แทนที่จะเอื้อมหา `-Oz` อย่างสุ่มสี่สุ่มห้า
+</Callout>
+
+export const quizOptimizing = [
+  { q: "Which wasm-opt flag minimises binary size most aggressively?", options: ["-O3", "-Os", "-O2", "-Oz"], answer: 3 },
+  { q: "What is the benefit of WebAssembly.instantiateStreaming over instantiate?", options: ["It supports SIMD instructions", "It avoids the need for a MIME type", "The browser compiles while downloading, reducing startup time", "It works without a server"], answer: 2 },
+  { q: "What does --strip-debug remove from a binary?", options: ["Exported functions", "The code section", "DWARF debug information", "The type section"], answer: 2 },
+  { q: "Which technique eliminates the allocator entirely for Rust modules?", options: ["Using wee_alloc", "Using #![no_std] with no dynamic allocation", "Compiling with -O3", "Stripping producer sections"], answer: 1 },
+];
+
+<Quiz client:visible id="tooling/optimizing" questions={quizOptimizing} />
+
+<ProgressTracker client:visible id="tooling/optimizing" />

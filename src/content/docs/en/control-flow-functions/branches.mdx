@@ -1,0 +1,129 @@
+---
+title: 'Branches: block, br, br_if, br_table'
+description: 'Learn how br exits a block forward, br_if branches conditionally, and br_table implements a jump table in WAT.'
+sidebar:
+  order: 2
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Branching in WebAssembly is always relative to a labeled construct — never to a raw memory address. The `br` family of instructions targets the *nesting level*, not a line number. This makes the behaviour of `br` depend entirely on what kind of construct it targets.
+
+## block and br
+
+A `block` is a forward-only group of instructions. When `br $label` targets a `block`, execution jumps to the instruction immediately **after** the block's closing `end`. Think of it as a labeled `break`.
+
+```wasm
+(module
+  (func (export "earlyExit") (result i32)
+    (block $b (result i32)
+      i32.const 42
+      br $b          ;; exits the block; 42 is the block result
+      i32.const 99)  ;; never reached
+  ))
+```
+
+The `(result i32)` annotation on the block declares that the block leaves one `i32` on the stack when it exits — either by falling through to `end` or by branching out with `br`.
+
+## br targets direction
+
+The same `br` instruction behaves differently depending on what it targets:
+
+export const branchDiagram = `flowchart LR
+  A["block \$b\\n  ...body...\\n  br \$b"] --> B["jumps to END\\nof block (forward)"]
+  C["loop \$l\\n  ...body...\\n  br \$l"] --> D["jumps to START\\nof loop (backward)"]`;
+
+<Mermaid code={branchDiagram} title="br in a block exits forward; br in a loop repeats backward" />
+
+## br_if: conditional branch
+
+`br_if $label` pops an `i32` condition from the stack. If it is non-zero the branch fires; otherwise execution continues with the next instruction. This is the idiomatic way to write a conditional early exit.
+
+```wasm
+(module
+  (func (export "relu") (param $x i32) (result i32)
+    (block $done (result i32)
+      i32.const 0       ;; block result if we exit early
+      local.get $x
+      i32.const 0
+      i32.lt_s          ;; x < 0?
+      br_if $done       ;; if yes, exit block — 0 is already on stack
+      drop              ;; discard the 0; x >= 0
+      local.get $x)))   ;; return x
+```
+
+## br_table: jump table
+
+`br_table` takes a list of labels and a default. It pops an `i32` index and jumps to the label at that index, or to the default if the index is out of range. It is the WAT equivalent of a `switch` statement.
+
+```wasm
+(module
+  (func (export "describe") (param $n i32) (result i32)
+    (block $two
+      (block $one
+        (block $zero
+          local.get $n
+          br_table $zero $one $two $two)  ;; index 0→$zero, 1→$one, ≥2→$two
+        i32.const 0)  ;; $zero case: return 0
+      i32.const 1)    ;; $one case: return 1
+    i32.const 2))     ;; $two case: return 2
+```
+
+## Run it
+
+export const branchesCode = `const wat = \`(module
+  (func (export "relu") (param $x i32) (result i32)
+    (block $done (result i32)
+      i32.const 0
+      local.get $x
+      i32.const 0
+      i32.lt_s
+      br_if $done
+      drop
+      local.get $x)))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('relu(-5) =', instance.exports.relu(-5), '(expected 0)');
+console.log('relu(7)  =', instance.exports.relu(7),  '(expected 7)');`;
+
+<WasmRunner client:visible code={branchesCode} />
+
+<Callout title="br in a block exits; br in a loop repeats">
+When `br $label` targets a `block`, it jumps forward to the instruction after `end` — an early exit. When it targets a `loop`, it jumps backward to the loop's beginning — a repeat. The same instruction, opposite directions.
+</Callout>
+
+export const quizBranches = [
+  {
+    q: "Where does `br $b` jump when `$b` is a `block` label?",
+    options: [
+      "To the first instruction inside the block",
+      "To the instruction immediately after the block's `end`",
+      "To the start of the enclosing function",
+      "To a memory address stored in $b"
+    ],
+    answer: 1
+  },
+  {
+    q: "What does `br_if $l` pop from the stack?",
+    options: [
+      "An i32 condition value",
+      "A function reference",
+      "A memory address",
+      "Nothing — it checks a global flag"
+    ],
+    answer: 0
+  },
+  {
+    q: "Which instruction implements a jump table in WAT?",
+    options: ["br", "br_if", "br_table", "select"],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/branches" questions={quizBranches} />
+
+<ProgressTracker client:visible id="control-flow-functions/branches" />

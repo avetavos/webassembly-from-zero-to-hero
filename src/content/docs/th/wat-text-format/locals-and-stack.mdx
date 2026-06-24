@@ -1,0 +1,117 @@
+---
+title: 'ตัวแปร Local และ Stack'
+description: 'ตัวแปร local, local.get/local.set/local.tee และวิธีที่ value stack ของ WebAssembly ทำงาน'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly เป็น stack machine ไม่มี register file เหมือนใน x86 หรือ ARM — แทนที่จะเป็นแบบนั้น คำสั่งสื่อสารกันด้วยการ push และ pop ค่าบน value stack แบบโดยปริยาย การเข้าใจแบบจำลองนี้คือกุญแจสำคัญในการอ่าน WAT ได้อย่างคล่องแคล่ว
+
+## Value stack
+
+ทุกคำสั่งทำงานบนยอดสุดของ stack คำสั่งหนึ่งจะ pop อินพุตของมันและ push เอาต์พุตของมัน ตัวอย่างเช่น `i32.add` จะ pop ค่า `i32` สองค่าและ push ผลลัพธ์ `i32` หนึ่งค่า
+
+export const stackDiagram = `flowchart LR
+  A["Stack: []\\ni32.const 10"] --> B["Stack: [10]\\ni32.const 3"]
+  B --> C["Stack: [10, 3]\\ni32.add"]
+  C --> D["Stack: [13]"]`;
+
+<Mermaid code={stackDiagram} title="Value stack ระหว่าง i32.const 10 / i32.const 3 / i32.add" />
+
+เมื่อสิ้นสุดฟังก์ชัน สิ่งที่เหลืออยู่บน stack ต้องตรงกับชนิด `result` ที่ประกาศไว้อย่างแน่ชัด หากเหลือมากเกินไปหรือน้อยเกินไป โมดูลจะ validation ไม่ผ่าน
+
+## ตัวแปร local
+
+นอกจาก stack แล้ว ฟังก์ชันสามารถประกาศตัวแปร local ได้โดยใช้ `(local $name type)` สิ่งเหล่านี้เป็นช่องเก็บค่าที่เปลี่ยนแปลงได้ ซึ่งมีชีวิตอยู่ตลอดระยะเวลาที่เรียกฟังก์ชัน
+
+```wasm
+(module
+  (func (export "example") (param $x i32) (result i32)
+    (local $tmp i32)
+    local.get $x     ;; push $x
+    i32.const 1
+    i32.add          ;; pop two, push sum
+    local.set $tmp   ;; pop and store in $tmp
+    local.get $tmp)) ;; push $tmp back
+```
+
+พารามิเตอร์ก็เป็น local เช่นกัน — คุณสามารถอ่านมันด้วย `local.get` ได้เหมือน local ที่ประกาศไว้ แต่มันถูกกำหนดค่าเริ่มต้นด้วยอาร์กิวเมนต์ที่ถูกเรียก
+
+## local.tee: เก็บค่าแล้วเก็บไว้บน stack
+
+`local.tee` คล้ายกับ `local.set` แต่มันทิ้งสำเนาของค่าไว้บน stack หลังจากเก็บแล้ว มันมีประโยชน์เมื่อคุณต้องการทั้งบันทึกค่าและใช้มันทันที:
+
+```wasm
+(module
+  (func (export "storeAndDouble") (param $n i32) (result i32)
+    (local $saved i32)
+    local.get $n
+    local.tee $saved  ;; stores $n in $saved AND leaves the value on stack
+    i32.const 2
+    i32.mul))         ;; doubles the value that tee left behind
+```
+
+หากไม่มี `local.tee` คุณจะต้องใช้ `local.set` ตามด้วย `local.get` ซึ่งเป็นสองคำสั่งแทนที่จะเป็นหนึ่ง
+
+export const localsCode = `const wat = \`(module
+  (func (export "doubleSum") (param $a i32) (param $b i32) (result i32)
+    (local $sum i32)
+    local.get $a
+    local.get $b
+    i32.add
+    local.set $sum
+    local.get $sum
+    i32.const 2
+    i32.mul))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('doubleSum(3, 4) =', instance.exports.doubleSum(3, 4));`;
+
+<WasmRunner client:visible code={localsCode} />
+
+<Callout title="Wasm เป็น stack machine">
+  แต่ละคำสั่งจะ pop ตัวถูกดำเนินการ (operand) ของมันออกจาก value stack และ push ผลลัพธ์ของมัน `local.get` จะ push ค่าของตัวแปร local; `local.set` จะ pop แล้วเก็บมัน; `local.tee` จะ pop เก็บ แล้ว push ค่ากลับไป — มีประโยชน์เมื่อคุณต้องการทั้งบันทึกและใช้ค่า
+</Callout>
+
+export const quizLocalsAndStack = [
+  {
+    q: "`local.tee $x` ทำอะไร?",
+    options: [
+      "Pop ค่าหนึ่งและเก็บไว้ใน $x โดยทิ้งมันไป",
+      "Push ค่าปัจจุบันของ $x โดยไม่บริโภคมัน",
+      "Pop ค่าหนึ่ง เก็บไว้ใน $x และ push มันกลับขึ้นไปบน stack",
+      "สลับค่าสองค่าบนยอดสุดของ stack"
+    ],
+    answer: 2
+  },
+  {
+    q: "ใน stack machine จะเกิดอะไรขึ้นเมื่อ `i32.add` ทำงาน?",
+    options: [
+      "มันอ่าน global สองตัวและ push ผลรวมของมัน",
+      "มัน pop ค่า i32 สองค่าและ push ผลรวมของมัน",
+      "มัน push ค่า i32 สองค่าและรอการ pop",
+      "มันบวกค่าบนยอดสุดเข้ากับตัวแปร local"
+    ],
+    answer: 1
+  },
+  {
+    q: "`(local $x i32)` ต้องปรากฏที่ใดในฟังก์ชัน?",
+    options: [
+      "หลังคำสั่งแรก",
+      "ที่ตอนท้ายสุดของตัวบอดี้ฟังก์ชัน",
+      "ก่อนคำสั่งใด ๆ หลังการประกาศ param/result",
+      "ที่ใดก็ได้ในตัวบอดี้ฟังก์ชัน"
+    ],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="wat-text-format/locals-and-stack" questions={quizLocalsAndStack} />
+
+<ProgressTracker client:visible id="wat-text-format/locals-and-stack" />

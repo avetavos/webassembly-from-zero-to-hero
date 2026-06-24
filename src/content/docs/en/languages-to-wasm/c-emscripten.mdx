@@ -1,0 +1,161 @@
+---
+title: 'C and Emscripten'
+description: 'Use emcc to compile C and C++ code to WebAssembly, and call the exported functions from JavaScript with ccall and cwrap.'
+sidebar:
+  order: 3
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Emscripten is the classic toolchain for bringing C and C++ code to the web. It compiles to WebAssembly (or the older asm.js fallback), emulates POSIX APIs, and can generate a JavaScript loader that handles instantiation for you.
+
+## Install Emscripten
+
+```bash
+# Clone the Emscripten SDK
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+
+# Install and activate the latest release
+./emsdk install latest
+./emsdk activate latest
+
+# Add emcc to PATH (run this in every new shell, or add to your profile)
+source ./emsdk_env.sh
+
+# Verify
+emcc --version
+```
+
+## Write a C function
+
+Create `math.c`:
+
+```c
+#include <math.h>
+
+// Compute the hypotenuse: sqrt(a*a + b*b)
+double hypotenuse(double a, double b) {
+    return sqrt(a * a + b * b);
+}
+
+// Fibonacci (iterative)
+int fibonacci(int n) {
+    if (n <= 1) return n;
+    int a = 0, b = 1;
+    for (int i = 2; i <= n; i++) {
+        int tmp = a + b;
+        a = b;
+        b = tmp;
+    }
+    return b;
+}
+```
+
+## Compile with emcc
+
+```bash
+emcc math.c \
+  -o math.js \
+  -sEXPORTED_FUNCTIONS='["_hypotenuse","_fibonacci"]' \
+  -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+  -sASSERTIONS=1 \
+  -O2
+```
+
+This produces two files:
+
+- `math.wasm` — the compiled binary
+- `math.js` — the JS loader and runtime glue
+
+The `EXPORTED_FUNCTIONS` list uses a leading underscore because C symbol names are prefixed with `_` by convention in Emscripten.
+
+## Call from JavaScript with ccall / cwrap
+
+```js
+// In a browser: load the Emscripten-generated JS loader first
+// <script src="math.js"></script>
+
+Module.onRuntimeInitialized = function () {
+  // ccall — one-shot call: (name, returnType, argTypes, args)
+  const h = Module.ccall(
+    'hypotenuse',    // C function name (without leading _)
+    'number',        // return type
+    ['number', 'number'],  // argument types
+    [3.0, 4.0]       // argument values
+  );
+  console.log('hypotenuse(3, 4) =', h);  // 5
+
+  // cwrap — create a reusable JS function
+  const fib = Module.cwrap('fibonacci', 'number', ['number']);
+  console.log('fibonacci(10) =', fib(10));  // 55
+  console.log('fibonacci(20) =', fib(20));  // 6765
+};
+```
+
+## Output a standalone HTML page
+
+Emscripten can generate a self-contained HTML shell that embeds the loader and a terminal-style output canvas:
+
+```bash
+emcc math.c \
+  -o math.html \
+  -sEXPORTED_FUNCTIONS='["_hypotenuse","_fibonacci"]' \
+  -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+  -O2
+```
+
+Open `math.html` in a browser and the Emscripten terminal canvas appears. Any C `printf` calls output there automatically.
+
+## Using malloc and strings
+
+When passing strings across the Wasm boundary you must manually allocate and free memory:
+
+```c
+#include <string.h>
+#include <stdlib.h>
+
+// Returns a heap-allocated copy of the input in upper-case
+char* to_upper(const char* s) {
+    int len = strlen(s);
+    char* out = malloc(len + 1);
+    for (int i = 0; i <= len; i++)
+        out[i] = (s[i] >= 'a' && s[i] <= 'z') ? s[i] - 32 : s[i];
+    return out;
+}
+```
+
+```bash
+emcc strings.c \
+  -o strings.js \
+  -sEXPORTED_FUNCTIONS='["_to_upper","_malloc","_free"]' \
+  -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","allocateUTF8","UTF8ToString"]' \
+  -O2
+```
+
+```js
+Module.onRuntimeInitialized = function () {
+  const ptr = Module.allocateUTF8('hello wasm');
+  const resultPtr = Module.ccall('to_upper', 'number', ['number'], [ptr]);
+  console.log(Module.UTF8ToString(resultPtr));  // HELLO WASM
+  Module._free(ptr);
+  Module._free(resultPtr);
+};
+```
+
+<Callout title="Emscripten is the port-anything tool">
+If you have C or C++ code that already works on the desktop, Emscripten can often compile it to Wasm with minimal changes. It emulates `printf`, `malloc`, file I/O, and even OpenGL (via WebGL). For brand-new code, prefer Rust or AssemblyScript for a leaner output.
+</Callout>
+
+export const quizCEmscripten = [
+  { q: "Why do EXPORTED_FUNCTIONS entries start with an underscore (e.g. '_hypotenuse')?", options: ["It marks the function as private", "C symbol names are prefixed with _ by Emscripten convention", "The underscore enables SIMD optimisations", "It prevents name mangling in C++"], answer: 1 },
+  { q: "What does Module.cwrap return?", options: ["A promise that resolves to the function result", "A reusable JavaScript wrapper function for a C function", "A pointer to the C function in linear memory", "A WebAssembly.Function object"], answer: 1 },
+  { q: "Which emcc flag lists functions that should be accessible from JavaScript?", options: ["-sEXPORTED_RUNTIME_METHODS", "-sEXPORTED_FUNCTIONS", "-sALLOW_MEMORY_GROWTH", "-sENVIRONMENT"], answer: 1 },
+  { q: "What must you do after allocating a string pointer with allocateUTF8?", options: ["Call Module.sync()", "Call Module._free() on the pointer when done", "Convert it with encodeURIComponent", "Nothing — Emscripten frees it automatically"], answer: 1 },
+];
+
+<Quiz client:visible id="languages-to-wasm/c-emscripten" questions={quizCEmscripten} />
+
+<ProgressTracker client:visible id="languages-to-wasm/c-emscripten" />

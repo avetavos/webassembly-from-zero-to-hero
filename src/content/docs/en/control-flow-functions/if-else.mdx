@@ -1,0 +1,134 @@
+---
+title: 'Conditionals: if, else, and select'
+description: 'Use if/else for conditional execution with optional result values, and select for a branchless ternary in WAT.'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly's `if` construct is both a control-flow branch and an expression. It pops an `i32` condition from the stack, executes one of two arms, and — if given a result type — leaves a value on the stack. This makes `if` feel more like a ternary operator than a traditional `if` statement.
+
+## The if construct
+
+`if` pops the top `i32`. A non-zero value executes the `then` arm; zero executes the optional `else` arm. The construct ends with `end`.
+
+```wasm
+(module
+  (func (export "sign") (param $x i32) (result i32)
+    local.get $x
+    i32.const 0
+    i32.gt_s          ;; x > 0?
+    if (result i32)
+      i32.const 1     ;; then: return 1
+    else
+      i32.const -1    ;; else: return -1
+    end))
+```
+
+The `(result i32)` annotation declares that the `if` expression leaves one `i32` on the stack regardless of which arm executes. Both arms must leave the same number and types of values.
+
+## if without a result
+
+When the condition is purely for side effects — for example calling an imported function — you can omit the result type:
+
+```wasm
+(module
+  (func (export "clampNeg") (param $x i32) (result i32)
+    local.get $x
+    i32.const 0
+    i32.lt_s
+    if
+      i32.const 0
+      local.set $x    ;; clamp $x to 0 if negative
+    end
+    local.get $x))
+```
+
+Here the `if` has no result; it just conditionally updates a local.
+
+## select: branchless ternary
+
+`select` is a compact alternative to `if` for simple value choices. It pops three values: `condition`, `val_if_false`, `val_if_true` (in push order: push true-val, push false-val, push condition). It pushes the chosen value. No branch is taken — the CPU evaluates both values before the select.
+
+```wasm
+(module
+  (func (export "minVal") (param $a i32) (param $b i32) (result i32)
+    local.get $a   ;; val if condition is true ($a <= $b)
+    local.get $b   ;; val if condition is false
+    local.get $a
+    local.get $b
+    i32.le_s       ;; condition: a <= b?
+    select))       ;; choose $a if true, $b if false
+```
+
+## Run it
+
+export const ifElseCode = `const wat = \`(module
+  (func (export "max") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.gt_s
+    if (result i32)
+      local.get $a
+    else
+      local.get $b
+    end)
+  (func (export "abs") (param $x i32) (result i32)
+    local.get $x
+    i32.const 0
+    i32.lt_s
+    if (result i32)
+      i32.const 0
+      local.get $x
+      i32.sub
+    else
+      local.get $x
+    end))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('max(3, 7)  =', instance.exports.max(3, 7),  '(expected 7)');
+console.log('max(10, 2) =', instance.exports.max(10, 2), '(expected 10)');
+console.log('abs(-5)    =', instance.exports.abs(-5),    '(expected 5)');
+console.log('abs(3)     =', instance.exports.abs(3),     '(expected 3)');`;
+
+<WasmRunner client:visible code={ifElseCode} />
+
+<Callout title="if in WAT is an expression">
+An `if (result i32)` construct leaves a value on the stack — it behaves like a ternary operator, not a statement. Both the `then` and `else` arms must produce the same stack shape. `select` is a cheaper branchless alternative when both values can be computed upfront.
+</Callout>
+
+export const quizIfElse = [
+  {
+    q: "What does `if` pop to decide which branch to take?",
+    options: [
+      "A boolean from a flag register",
+      "An i32 from the stack",
+      "A memory address",
+      "A local variable by name"
+    ],
+    answer: 1
+  },
+  {
+    q: "What is `select` in WAT?",
+    options: [
+      "A branchless ternary that picks one of two stack values based on a condition",
+      "A multi-way branch like a switch statement",
+      "An instruction that selects a local variable",
+      "An alternative name for br_table"
+    ],
+    answer: 0
+  },
+  {
+    q: "What keyword closes an `if` block in WAT?",
+    options: ["close", "}", "end", "fi"],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/if-else" questions={quizIfElse} />
+
+<ProgressTracker client:visible id="control-flow-functions/if-else" />

@@ -1,0 +1,144 @@
+---
+title: 'Loops: loop and br_if'
+description: 'Write counted and conditional loops in WAT using the loop construct and br_if to create the back-edge.'
+sidebar:
+  order: 3
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+A `loop` in WebAssembly does **not** iterate automatically. It is simply a labeled construct whose beginning is a branch target. You create iteration by placing a `br_if` at the bottom of the body that branches back to the loop label when the condition is still true.
+
+## The loop construct
+
+`(loop $label ...)` marks the beginning of a loop. A `br $label` inside the body jumps back to the start — the opposite direction from `br` in a `block`. To exit the loop you either let execution reach the closing `end` (fall-through) or branch to an outer label.
+
+```wasm
+(module
+  (func (export "countDown") (param $n i32)
+    (loop $again
+      ;; body here
+      local.get $n
+      i32.const 1
+      i32.sub
+      local.tee $n     ;; decrement $n and keep value on stack
+      i32.const 0
+      i32.gt_s
+      br_if $again)))  ;; repeat while $n > 0
+```
+
+## Loop flow
+
+export const loopDiagram = `flowchart LR
+  A["init locals"] --> B["loop \$again (start)"]
+  B --> C["body: update acc, increment i"]
+  C --> D["i <= n?"]
+  D -->|yes| B
+  D -->|no| E["exit: return acc"]`;
+
+<Mermaid code={loopDiagram} title="Counted loop flow: br_if creates the back-edge" />
+
+## Counted loop example: sumTo
+
+The function below sums the integers from 1 to `n` using a `loop`. Local `$i` is the counter; local `$acc` accumulates the total.
+
+```wasm
+(module
+  (func (export "sumTo") (param $n i32) (result i32)
+    (local $i i32)
+    (local $acc i32)
+    i32.const 1
+    local.set $i      ;; i = 1
+    i32.const 0
+    local.set $acc    ;; acc = 0
+    (loop $again
+      local.get $i
+      local.get $acc
+      i32.add
+      local.set $acc  ;; acc += i
+      local.get $i
+      i32.const 1
+      i32.add
+      local.set $i    ;; i++
+      local.get $i
+      local.get $n
+      i32.le_s
+      br_if $again)   ;; repeat while i <= n
+    local.get $acc))  ;; return acc
+```
+
+## Run it
+
+export const loopsCode = `const wat = \`(module
+  (func (export "sumTo") (param $n i32) (result i32)
+    (local $i i32)
+    (local $acc i32)
+    i32.const 1
+    local.set $i
+    i32.const 0
+    local.set $acc
+    (loop $again
+      local.get $i
+      local.get $acc
+      i32.add
+      local.set $acc
+      local.get $i
+      i32.const 1
+      i32.add
+      local.set $i
+      local.get $i
+      local.get $n
+      i32.le_s
+      br_if $again)
+    local.get $acc))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('sumTo(5)  =', instance.exports.sumTo(5),  '(expected 15)');
+console.log('sumTo(10) =', instance.exports.sumTo(10), '(expected 55)');`;
+
+<WasmRunner client:visible code={loopsCode} />
+
+<Callout title="A loop does not iterate automatically">
+A `loop` construct only marks the start of a potential back-edge. Without a `br_if` (or `br`) pointing back to the loop label, the body executes exactly once and falls through. The programmer is fully responsible for creating — and terminating — the iteration.
+</Callout>
+
+export const quizLoops = [
+  {
+    q: "In WAT, what does `br $l` do when `$l` is a `loop` label?",
+    options: [
+      "Exits the loop immediately",
+      "Jumps to the start of the loop",
+      "Causes a runtime trap",
+      "Calls the next function in the module"
+    ],
+    answer: 1
+  },
+  {
+    q: "How do you EXIT a WAT loop?",
+    options: [
+      "With the `break` instruction",
+      "With `return`",
+      "By falling off the end or branching to an outer label",
+      "WAT loops exit automatically after a fixed count"
+    ],
+    answer: 2
+  },
+  {
+    q: "What is the initial value of a local variable declared with `(local $x i32)`?",
+    options: [
+      "0",
+      "Undefined",
+      "-1",
+      "The value of the previous local"
+    ],
+    answer: 0
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/loops" questions={quizLoops} />
+
+<ProgressTracker client:visible id="control-flow-functions/loops" />

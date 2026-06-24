@@ -1,0 +1,113 @@
+---
+title: 'การอ่าน Exports'
+description: 'เข้าถึง exported functions, memory และ globals จาก JavaScript — รวมถึงการแปลงค่า number และ i64 ↔ BigInt'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+หลังจาก instantiation แล้ว `instance.exports` คือ JavaScript object ธรรมดา ทุก symbol ที่ WAT module ประกาศ export ไว้จะปรากฏเป็น property บน object นั้น — exported functions สามารถเรียกใช้ได้เหมือนฟังก์ชันปกติ, exported memory จะเป็น `WebAssembly.Memory`, และ exported globals จะเป็น `WebAssembly.Global` objects
+
+## Exported Functions
+
+Exported Wasm functions ทำงานเหมือน JavaScript functions ทั่วไป คุณเรียกใช้ได้โดยตรง ส่ง JavaScript numbers เป็น arguments และรับค่า JavaScript กลับมา การแมปสำหรับ numeric types ส่วนใหญ่นั้นตรงไปตรงมา: `i32`, `f32` และ `f64` ทั้งหมดจะกลายเป็น `number` ใน JavaScript
+
+```wasm
+(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add))
+```
+
+```js
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log(instance.exports.add(10, 32)); // 42
+```
+
+## การแปลงค่า Number — i64 และ BigInt
+
+ประเภท `number` ของ JavaScript ใช้มาตรฐาน IEEE-754 double precision ซึ่งสามารถแทนค่าจำนวนเต็มได้แม่นยำเพียงถึง 2^53 − 1 เท่านั้น (`Number.MAX_SAFE_INTEGER`) ส่วน Wasm `i64` คือจำนวนเต็มขนาด 64 บิตเต็ม ซึ่งรองรับค่าที่เกินช่วงนั้นมาก
+
+เพื่อป้องกันการสูญเสียความแม่นยำโดยไม่ตั้งใจ WebAssembly JS API จะแปลงค่า return ประเภท `i64` ให้เป็น JavaScript `BigInt` แทนที่จะเป็น `number` ผลลัพธ์จากการเรียกฟังก์ชันที่คืนค่า `i64` จะมี `typeof result === 'bigint'` ไม่ใช่ `'number'`
+
+```wasm
+(module
+  (func (export "bignum") (result i64)
+    i64.const 9007199254740993))
+```
+
+```js
+const result = instance.exports.bignum();
+console.log(result);         // 9007199254740993n
+console.log(typeof result);  // "bigint"
+```
+
+โปรดทราบว่าการคำนวณระหว่าง `BigInt` กับ `number` ต้องแปลงชนิดข้อมูลก่อนอย่างชัดเจน — ไม่สามารถใช้ตัวดำเนินการอย่าง `+` หรือ `*` ร่วมกันได้โดยตรงหากไม่แปลงชนิดก่อน
+
+## Exported Globals
+
+Wasm module สามารถ export globals ร่วมกับ functions ได้ ค่า global ที่ถูก export จะถูกเข้าถึงใน JavaScript ในรูปแบบ `WebAssembly.Global` object โดยค่าตัวเลขปัจจุบันจะอยู่ที่ property `.value`
+
+```wasm
+(module
+  (global (export "PI") f64 (f64.const 3.14159)))
+```
+
+```js
+console.log(instance.exports.PI.value); // 3.14159
+```
+
+## Exported Memory
+
+เมื่อ module export linear memory ออกมา JavaScript จะได้รับ `WebAssembly.Memory` object bytes ดิบสามารถเข้าถึงได้ผ่าน property `.buffer` ในรูปแบบ `ArrayBuffer` ซึ่งคุณสามารถห่อด้วย typed array view เพื่ออ่านหรือเขียนข้อมูลแต่ละ byte ได้
+
+```wasm
+(module
+  (memory (export "mem") 1))
+```
+
+```js
+const mem = instance.exports.mem; // WebAssembly.Memory
+const view = new Uint8Array(mem.buffer);
+console.log(view.length); // 65536 (1 page = 64 KiB)
+```
+
+## ลองรันดู
+
+Module ด้านล่างนี้ export ฟังก์ชัน `add`, ฟังก์ชัน `bignum` ที่คืนค่า `i64` ซึ่งเกิน `Number.MAX_SAFE_INTEGER`, และ global `VERSION` ตัวรันจะอ่านค่าทั้งสามและแสดงค่าพร้อมชนิดข้อมูล
+
+export const exportsCode = `const wat = \`(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add)
+  (func (export "bignum") (result i64)
+    i64.const 9007199254740993)
+  (global (export "VERSION") i32 (i32.const 1)))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('add(10, 32) =', instance.exports.add(10, 32));
+console.log('bignum() =', instance.exports.bignum());
+console.log('typeof bignum():', typeof instance.exports.bignum());
+console.log('VERSION =', instance.exports.VERSION.value);`;
+
+<WasmRunner client:visible code={exportsCode} />
+
+<Callout title="i64 คืนค่าเป็น JavaScript BigInt">
+เมื่อ Wasm function คืนค่า `i64` JavaScript จะได้รับเป็น `BigInt` — ไม่ใช่ `number` ธรรมดา ตรวจสอบด้วย `typeof result === 'bigint'` การคำนวณระหว่าง `BigInt` กับ `number` ต้องแปลงชนิดข้อมูลก่อนอย่างชัดเจน
+</Callout>
+
+export const quizExports = [
+  { q: "ค่า Wasm i64 ที่ถูก export จะกลายเป็น JavaScript type ใด?", options: ["number", "BigInt", "string", "Int64"], answer: 1 },
+  { q: "จะอ่านค่าของ Wasm global ที่ถูก export ใน JavaScript ได้อย่างไร?", options: ["`exports.NAME`", "`exports.NAME.value`", "`exports.global(NAME)`", "`exports[NAME].get()`"], answer: 1 },
+  { q: "เหตุใด Wasm จึงใช้ BigInt สำหรับ i64 แทนที่จะเป็น number?", options: ["BigInt ทำงานเร็วกว่า", "JavaScript number ไม่สามารถแทนค่า i64 ทั้งหมดได้อย่างแม่นยำ", "เบราว์เซอร์กำหนดให้ใช้เพื่อความปลอดภัย", "BigInt คือชนิดจำนวนเต็มเริ่มต้น"], answer: 1 },
+];
+
+<Quiz client:visible id="js-interop/exports" questions={quizExports} />
+
+<ProgressTracker client:visible id="js-interop/exports" />

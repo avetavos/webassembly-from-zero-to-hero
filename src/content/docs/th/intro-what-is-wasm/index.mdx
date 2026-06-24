@@ -1,0 +1,82 @@
+---
+title: 'บทนำ: WebAssembly คืออะไร?'
+description: 'ค้นพบว่า WebAssembly คืออะไร คอร์สนี้ครอบคลุมอะไรบ้าง และภาษาต้นทางถูกคอมไพล์เป็นไฟล์ .wasm ไบนารีได้อย่างไร'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly (Wasm) คือ **รูปแบบคำสั่งไบนารีแบบพกพา** ที่ออกแบบมาสำหรับ virtual machine แบบ stack-based มันไม่ใช่ภาษาโปรแกรมที่คุณเขียนด้วยมือในการใช้งานจริง แต่เป็น **compilation target**: ไบนารีที่กะทัดรัดและผ่านการตรวจสอบแล้ว ซึ่ง browser, server และ edge runtime สามารถโหลดและรันได้ด้วยความเร็วใกล้เคียง native
+
+ลองนึกถึงมันในแบบเดียวกับ bytecode ใน JVM หรือ CLR แต่มันถูกออกแบบให้เป็น vendor-neutral และรันได้ทุกที่ ไม่ว่าจะเป็น Chrome, Firefox, Safari, Node.js, Deno, Cloudflare Workers และอื่นๆ อีกมาก
+
+## คอร์สนี้ครอบคลุมอะไรบ้าง
+
+คอร์สนี้พาคุณจากผู้ไม่มีความรู้เลยไปสู่การเป็น Wasm practitioner ที่มั่นใจ ต่อไปนี้คือสิ่งที่แต่ละ module ครอบคลุม:
+
+| Module | หัวข้อ |
+|---|---|
+| 1 — บทนำ | Wasm คืออะไร, ความสัมพันธ์ binary/text, โมเดล stack VM |
+| 2 — WAT Text Format | การเขียน WebAssembly Text format ด้วยมือเพื่อทำความเข้าใจพื้นฐาน |
+| 3 — JS Interop | การเรียก Wasm จาก JavaScript และการรับส่งข้อมูลระหว่างกัน |
+| 4 — Linear Memory | หลักการทำงานของ flat memory model ของ Wasm และการแชร์กับ JS |
+| 5 — Languages to Wasm | การคอมไพล์ Rust, C/C++ และ AssemblyScript เป็น `.wasm` |
+| 6 — Tooling | `wasm-pack`, `wasm-bindgen`, `emcc`, การปรับแต่ง, การ debug |
+| 7 — WASI | WebAssembly System Interface — การรัน Wasm นอก browser |
+
+## ซอร์สโค้ดกลายเป็นไฟล์ `.wasm` ไบนารีได้อย่างไร
+
+ไฟล์ `.wasm` ทุกไฟล์เริ่มต้นจากซอร์สโค้ดในภาษาระดับสูง คอมไพเลอร์อ่านซอร์สนั้นและสร้างไบนารีกะทัดรัดที่ runtime โหลดโดยตรง
+
+export const sourceDiagram = `flowchart LR
+  A["Rust / C / C++ / AssemblyScript"] --> B["Compiler\n(rustc / emcc / asc)"]
+  B --> C[".wasm binary"]
+  C --> D["Browser\n(JS + Wasm API)"]
+  C --> E["Server / Edge\n(Node.js / WASI)"]`;
+
+<Mermaid code={sourceDiagram} title="ภาษาต้นทาง → คอมไพเลอร์ → ไฟล์ .wasm ไบนารี → runtime" />
+
+<Callout title="Wasm คือ compilation target">
+  คุณแทบไม่เคยเขียน Wasm ด้วยมือในการใช้งานจริง แต่คุณเขียน Rust, C, C++, AssemblyScript (หรือ WAT เพื่อการเรียนรู้) แล้วคอมไพล์เป็นไฟล์ `.wasm` ไบนารีกะทัดรัด browser หรือ server โหลดไบนารีนั้นโดยตรง
+</Callout>
+
+export const quizIntroIndex = [
+  {
+    q: 'WebAssembly คืออะไร?',
+    options: [
+      'ภาษาโปรแกรมใหม่ที่จะมาแทน JavaScript',
+      'รูปแบบคำสั่งไบนารีแบบพกพาสำหรับ virtual machine แบบ stack-based',
+      'JavaScript framework สำหรับ web app',
+      'scripting language เฉพาะสำหรับ browser',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'ในการใช้งานจริง ไฟล์ .wasm ไบนารีมักถูกสร้างโดย...',
+    options: [
+      'การเขียน WAT ด้วยมือ',
+      'การคอมไพล์จากภาษาระดับสูงเช่น Rust หรือ C',
+      'การ transpile JavaScript',
+      'การดาวน์โหลดจาก npm',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'WebAssembly รันได้ที่ไหนบ้าง?',
+    options: [
+      'เฉพาะใน Chrome เท่านั้น',
+      'เฉพาะใน browser เท่านั้น',
+      'ใน browser และ server/edge runtime',
+      'เฉพาะบน Linux server เท่านั้น',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/index" questions={quizIntroIndex} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/index" />

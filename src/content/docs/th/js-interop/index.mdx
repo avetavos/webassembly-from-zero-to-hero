@@ -1,0 +1,73 @@
+---
+title: 'JS Interop & การโหลด'
+description: 'ทำความเข้าใจขอบเขตระหว่าง JavaScript กับ WebAssembly — JS โหลด คอมไพล์ และ instantiate โมดูล จัดหา imports และเรียกใช้ exports'
+sidebar:
+  order: 1
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly ไม่สามารถทำงานได้โดยลำพัง มันทำงานอยู่ภายใน **host environment** เสมอ และบนเว็บนั้น host ก็คือ JavaScript ฝั่ง JS มีหน้าที่ดึงข้อมูล bytes จากไฟล์ `.wasm` คอมไพล์ให้กลายเป็น `WebAssembly.Module` สร้าง instance ของโมดูลนั้นพร้อมกับ imports ที่จำเป็น และในที่สุดก็เรียกฟังก์ชันที่โมดูลเปิดเผยออกมา ส่วน Wasm นั้นอาศัยอยู่ในสภาพแวดล้อมหน่วยความจำที่ถูก sandbox อย่างเข้มงวด — มันไม่สามารถเข้าถึง DOM, เครือข่าย หรือ browser API ใด ๆ ได้เลย เว้นแต่ JavaScript จะส่งฟังก์ชันที่ทำสิ่งนั้นมาให้
+
+## ขอบเขตระหว่าง host กับ module
+
+ความสัมพันธ์ระหว่าง JS และ Wasm นั้นมีเจตนาและชัดเจน ก่อนที่โค้ด Wasm ใด ๆ จะทำงาน JavaScript ต้องจัดเตรียม **imports object** ซึ่งเป็น JS object ธรรมดาที่มี keys ตรงกับการประกาศ import ภายในโมดูล WAT imports เหล่านั้นอาจเป็นฟังก์ชัน JS, instance ของ `WebAssembly.Memory`, instance ของ `WebAssembly.Global` หรือ instance ของ `WebAssembly.Table` ก็ได้ ในทางกลับกัน เมื่อโมดูลถูก instantiate แล้ว JS จะได้รับ object `instance.exports` กลับมา ซึ่งประกอบด้วยทุก symbol ที่โมดูลเลือกจะ export ออกมา
+
+export const boundaryDiagram = `flowchart LR
+  JS["JavaScript (host)"]
+  COMPILE["WebAssembly.instantiate(bytes, imports)"]
+  IMPORTS["imports object\n(functions, memory, globals)"]
+  MODULE["WebAssembly Module"]
+  EXPORTS["instance.exports\n(functions, memory, globals)"]
+
+  JS -->|"fetch .wasm bytes"| COMPILE
+  JS -->|"provides"| IMPORTS
+  IMPORTS --> COMPILE
+  COMPILE --> MODULE
+  MODULE -->|"exposes"| EXPORTS
+  EXPORTS -->|"JS calls exports"| JS`;
+
+<Mermaid code={boundaryDiagram} title="The JS ↔ Wasm boundary" />
+
+## ตัวอย่างที่รันได้แบบเรียบง่ายที่สุด
+
+โมดูล WAT ด้านล่าง export ฟังก์ชันเดียวชื่อ `greet` ที่ไม่รับอาร์กิวเมนต์และคืนค่าจำนวนเต็ม `42` ฝั่ง JavaScript คอมไพล์ bytes สร้าง instance ของโมดูลด้วย imports object ว่าง `{}` และเรียก `instance.exports.greet()`
+
+```wasm
+(module
+  (func (export "greet") (result i32)
+    i32.const 42))
+```
+
+```js
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('greet() =', instance.exports.greet()); // 42
+```
+
+export const interopIndexCode = `const wat = \`(module
+  (func (export "greet") (result i32)
+    i32.const 42))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('greet() =', instance.exports.greet());`;
+
+<WasmRunner client:visible code={interopIndexCode} />
+
+<Callout title="Wasm ถูก sandbox โดยการออกแบบ">
+Wasm ไม่สามารถแตะต้อง DOM หรือเครือข่ายได้โดยตรง — JS จะส่ง imports มาให้และอ่าน exports จากมัน
+</Callout>
+
+export const quizJsInteropIndex = [
+  { q: "JavaScript ให้อะไรแก่โมดูล Wasm ในขณะที่ทำการ instantiate?", options: ["เฉพาะ memory เท่านั้น", "imports object ที่มีฟังก์ชัน, memory และ globals", "การอ้างอิง DOM", "Compiled bytecode"], answer: 1 },
+  { q: "JS API ใดที่ใช้ instantiate โมดูล Wasm ที่คอมไพล์แล้ว?", options: ["WebAssembly.compile()", "WebAssembly.run()", "WebAssembly.instantiate()", "WebAssembly.load()"], answer: 2 },
+  { q: "Wasm สามารถเรียก DOM APIs โดยตรงได้หรือไม่?", options: ["ได้ ผ่าน global object", "ได้ โดยใช้ memory pointers", "ไม่ได้ — ต้อง import ฟังก์ชัน JS ที่ทำสิ่งนั้นแทน", "ไม่ได้ แต่สามารถเข้าถึง navigator ได้"], answer: 2 },
+];
+
+<Quiz client:visible id="js-interop/index" questions={quizJsInteropIndex} />
+
+<ProgressTracker client:visible id="js-interop/index" />

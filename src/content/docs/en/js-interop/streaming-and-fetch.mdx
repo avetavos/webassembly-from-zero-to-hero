@@ -1,0 +1,111 @@
+---
+title: 'Streaming Instantiation and Fetch'
+description: 'Use WebAssembly.instantiateStreaming() with fetch() for optimal loading — and why the server must serve .wasm with the correct MIME type.'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+In a real application you do not have WAT source at runtime — you fetch a compiled `.wasm` binary from a server. The preferred API for this is `WebAssembly.instantiateStreaming()`, which starts compiling bytes as they arrive over the network rather than waiting for the full download to complete.
+
+## instantiateStreaming vs instantiate
+
+`WebAssembly.instantiate` requires the complete byte buffer to be in memory before compilation can begin. For large modules this means the browser sits idle during the download, then pays the full compilation cost in one blocking burst.
+
+`WebAssembly.instantiateStreaming` feeds bytes to the compiler as they stream in from the network. Compilation and download overlap, so the module is ready sooner — especially noticeable on slow connections or for modules over a few hundred kilobytes.
+
+```js
+// instantiate — waits for full download before compiling
+const response = await fetch('/module.wasm');
+const bytes = await response.arrayBuffer();
+const { instance } = await WebAssembly.instantiate(bytes, {});
+
+// instantiateStreaming — compiles while bytes arrive
+const { instance } = await WebAssembly.instantiateStreaming(
+  fetch('/module.wasm'),
+  {}
+);
+```
+
+Note that `instantiateStreaming` accepts the `Promise<Response>` returned by `fetch` directly — you do not need to `await` the fetch first.
+
+## The MIME type requirement
+
+`WebAssembly.instantiateStreaming` validates the response's `Content-Type` header before it begins streaming bytes to the compiler. The server **must** serve `.wasm` files with `Content-Type: application/wasm`. If it sends any other type — such as `application/octet-stream` — the API rejects with a `TypeError` immediately, before any bytes are compiled.
+
+When you cannot control the server's MIME type configuration, fall back to the two-step pattern:
+
+```js
+async function loadWasm(url, imports) {
+  try {
+    return await WebAssembly.instantiateStreaming(fetch(url), imports);
+  } catch (e) {
+    if (e instanceof TypeError) {
+      // MIME type wrong — fall back to arrayBuffer
+      const response = await fetch(url);
+      const bytes = await response.arrayBuffer();
+      return WebAssembly.instantiate(bytes, imports);
+    }
+    throw e;
+  }
+}
+```
+
+## Passing imports
+
+The imports object works identically to `WebAssembly.instantiate` — it is the second argument, and its shape must match the module's import section exactly.
+
+```js
+const result = await WebAssembly.instantiateStreaming(
+  fetch('/module.wasm'),
+  { env: { log: n => console.log(n) } }
+);
+```
+
+## Caching compiled modules
+
+The `WebAssembly.Module` returned inside `result.module` is a serialisable compiled artifact. You can store it in IndexedDB so repeat visits skip the compilation step entirely and jump straight to instantiation:
+
+```js
+const { module, instance } = await WebAssembly.instantiateStreaming(
+  fetch('/module.wasm'),
+  {}
+);
+// Store `module` in IndexedDB for next visit
+// Later: const instance = await WebAssembly.instantiate(cachedModule, {});
+```
+
+## Run it
+
+The sandbox has no server to fetch from, so `fetch()` cannot be used here. The runner below uses `compileWat()` to produce compiled bytes and then calls `WebAssembly.instantiate` directly — the same path a streaming fallback would follow once it has the bytes.
+
+export const streamingCode = `const wat = \`(module
+  (func (export "greet") (result i32)
+    i32.const 99))\`;
+// In production you would use:
+// const result = await WebAssembly.instantiateStreaming(fetch('/module.wasm'), {});
+// Here we use compileWat() to simulate the compiled bytes:
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('greet() =', instance.exports.greet());
+console.log('(In production: replace compileWat with instantiateStreaming + fetch)');`;
+
+<WasmRunner client:visible code={streamingCode} />
+
+<Callout title="Always serve .wasm as application/wasm">
+`WebAssembly.instantiateStreaming` rejects with a `TypeError` if the response MIME type is not `application/wasm`. Configure your web server (nginx, Express, etc.) to map `.wasm` → `application/wasm`.
+</Callout>
+
+export const quizStreamingAndFetch = [
+  { q: "Why is instantiateStreaming preferred over instantiate for production?", options: ["It skips validation", "It compiles while bytes stream in, reducing latency", "It works without a server", "It supports more Wasm features"], answer: 1 },
+  { q: "What MIME type must a server use when serving .wasm files for instantiateStreaming?", options: ["`application/octet-stream`", "`text/wasm`", "`application/wasm`", "`binary/wasm`"], answer: 2 },
+  { q: "What error does instantiateStreaming throw if the MIME type is wrong?", options: ["LinkError", "SyntaxError", "TypeError", "RangeError"], answer: 2 },
+];
+
+<Quiz client:visible id="js-interop/streaming-and-fetch" questions={quizStreamingAndFetch} />
+
+<ProgressTracker client:visible id="js-interop/streaming-and-fetch" />

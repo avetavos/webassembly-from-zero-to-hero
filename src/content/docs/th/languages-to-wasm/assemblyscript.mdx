@@ -1,0 +1,132 @@
+---
+title: 'AssemblyScript'
+description: 'คอมไพล์ภาษาที่คล้าย TypeScript ไปยัง WebAssembly โดยตรงด้วยคอมไพเลอร์ asc'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+AssemblyScript คือคอมไพเลอร์ที่แปลง **TypeScript Subset ที่เข้มงวด** ให้เป็น WebAssembly ถ้าคุณรู้จัก TypeScript อยู่แล้ว คุณสามารถเริ่มใช้ AssemblyScript ได้ในไม่กี่นาที ไม่มี Borrow Checker ของ Rust ไม่มีการจัดการ Memory แบบ C — เพียงแค่ TypeScript ที่มี Type และ Annotation เฉพาะของ Wasm
+
+## ติดตั้ง AssemblyScript
+
+```bash
+# สร้างโปรเจกต์ Node.js ใหม่
+mkdir as-demo && cd as-demo
+npm init -y
+
+# ติดตั้งคอมไพเลอร์ AssemblyScript
+npm install --save-dev assemblyscript
+
+# สร้างโครงสร้างโปรเจกต์ (สร้าง assembly/ และ tsconfig.json)
+npx asinit .
+```
+
+ไดเรกทอรี `assembly/` เก็บไฟล์ Source `.ts` ของคุณ และ `asconfig.json` กำหนดค่าคอมไพเลอร์
+
+## เขียนฟังก์ชัน AssemblyScript
+
+เปิด `assembly/index.ts`:
+
+```ts
+// การบวกเลขจำนวนเต็ม — สังเกตประเภท i32 ที่ระบุชัดเจน
+export function add(a: i32, b: i32): i32 {
+  return a + b;
+}
+
+// Factorial — แบบ Recursive, ใช้ i64 เพื่อป้องกัน Overflow สำหรับ Input ขนาดใหญ่
+export function factorial(n: i64): i64 {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
+}
+
+// Clamp ค่า Float ระหว่าง lo และ hi
+export function clamp(value: f64, lo: f64, hi: f64): f64 {
+  if (value < lo) return lo;
+  if (value > hi) return hi;
+  return value;
+}
+```
+
+ความแตกต่างหลักจาก TypeScript ทั่วไป:
+
+- Type อย่าง `i32`, `i64`, `f32`, `f64` คือ **Numeric Type ของ Wasm** ไม่ใช่ `number` ของ TypeScript
+- ไม่มี `any`, ไม่มี `unknown` และไม่มีการแปลง Type โดยอัตโนมัติ
+- `export` ทำให้ฟังก์ชันเข้าถึงได้จาก JavaScript (เหมือน `(export ...)` ใน WAT)
+
+## คอมไพล์ด้วย asc
+
+```bash
+# Development Build (อ่านได้ง่าย, ไม่ Optimise)
+npx asc assembly/index.ts --outFile build/release.wasm --textFile build/release.wat
+
+# Release Build (Optimise แล้ว, Binary เล็กกว่า)
+npx asc assembly/index.ts --outFile build/release.wasm --optimize
+
+# พร้อม Binding สำหรับใช้เป็น ES Module
+npx asc assembly/index.ts --outFile build/release.wasm --bindings esm
+```
+
+## เรียกใช้จาก JavaScript
+
+```js
+// ใช้ @assemblyscript/loader Helper
+import { instantiateStreaming } from '@assemblyscript/loader';
+
+const { exports } = await instantiateStreaming(fetch('./build/release.wasm'));
+
+console.log(exports.add(10, 32));            // 42
+console.log(exports.factorial(BigInt(10)));  // 3628800n (i64 → BigInt)
+console.log(exports.clamp(1.5, 0.0, 1.0));  // 1
+```
+
+หรือใช้ WebAssembly API โดยตรงโดยไม่ต้องใช้ Loader:
+
+```js
+const response = await fetch('./build/release.wasm');
+const bytes = await response.arrayBuffer();
+const { instance } = await WebAssembly.instantiate(bytes, {});
+
+console.log(instance.exports.add(3, 4));  // 7
+```
+
+## ลองใช้งานในเบราว์เซอร์
+
+Editor ด้านล่างเปิดโปรเจกต์ AssemblyScript ใน StackBlitz ที่คุณสามารถแก้ไข คอมไพล์ และรันโค้ดในเบราว์เซอร์ได้โดยตรง
+
+export const asCode = `// assembly/index.ts
+export function add(a: i32, b: i32): i32 {
+  return a + b;
+}
+
+export function factorial(n: i64): i64 {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
+}
+
+export function clamp(value: f64, lo: f64, hi: f64): f64 {
+  if (value < lo) return lo;
+  if (value > hi) return hi;
+  return value;
+}`;
+
+<WasmRunner stackblitz client:visible code={asCode} />
+
+<Callout title="AssemblyScript คือ TypeScript ที่มี Wasm Types">
+AssemblyScript ใช้ `i32`, `i64`, `f32`, `f64` แทน `number` ของ TypeScript ทำให้ Mapping กับ Wasm Instruction ชัดเจนและผลิต Binary ขนาดเล็กมาก — ไม่มี Runtime หรือ GC Overhead
+</Callout>
+
+export const quizAssemblyScript = [
+  { q: "AssemblyScript ใช้ Numeric Type ใดสำหรับเลขจำนวนเต็ม 32 บิต?", options: ["number", "int", "i32", "Int32"], answer: 2 },
+  { q: "จะทำให้ฟังก์ชัน AssemblyScript เรียกได้จาก JavaScript ได้อย่างไร?", options: ["ใช้ Keyword export", "ใช้ module.exports", "ใส่ Annotation ด้วย @extern", "ประกาศใน asconfig.json"], answer: 0 },
+  { q: "'npx asinit .' ทำอะไรเมื่อสร้าง Scaffolding โปรเจกต์ AssemblyScript?", options: ["ติดตั้ง Wasm Runtime ระดับ Global", "สร้างไดเรกทอรี assembly/ และไฟล์ Config", "คอมไพล์ไฟล์ .ts ทั้งหมดเป็น .wasm", "Publish แพ็กเกจไปยัง npm"], answer: 1 },
+  { q: "ทำไม AssemblyScript จึงผลิต Wasm Binary ขนาดเล็ก?", options: ["ใช้ Brotli Compression อัตโนมัติ", "ไม่มี Garbage Collector หรือ Runtime Heap", "ลบ TypeScript Types ตอนคอมไพล์", "Target เป็น wasm32-wasi แทนเบราว์เซอร์"], answer: 1 },
+];
+
+<Quiz client:visible id="languages-to-wasm/assemblyscript" questions={quizAssemblyScript} />
+
+<ProgressTracker client:visible id="languages-to-wasm/assemblyscript" />

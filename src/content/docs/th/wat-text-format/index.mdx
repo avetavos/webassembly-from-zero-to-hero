@@ -1,5 +1,84 @@
 ---
-title: The WAT Text Format
-description: Write WebAssembly by hand in the WAT text format.
+title: 'รูปแบบข้อความ WAT'
+description: 'เรียนรู้ว่า WAT คืออะไร — รูปแบบข้อความที่มนุษย์อ่านได้ ซึ่งแมปแบบ 1:1 กับไบนารี .wasm'
+sidebar:
+  order: 1
 ---
-Coming soon.
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly มีอยู่สองรูปแบบ: รูปแบบไบนารีที่กระชับ (`.wasm`) ที่เบราว์เซอร์เอ็กซิคิวต์ และรูปแบบข้อความที่มนุษย์อ่านได้เรียกว่า **WAT** — **WebAssembly Text format** ทั้งสองรูปแบบเทียบเท่ากันแบบ 1:1 ทุกโครงสร้างใน WAT มีคู่เทียบในไบนารีที่ตรงกันเป๊ะ
+
+คุณแทบจะไม่เคยเขียน WAT ในงาน production คอมไพเลอร์สำหรับ C, Rust, Go และภาษาอื่น ๆ จะสร้าง `.wasm` ออกมาโดยตรง แต่การอ่านและเขียน WAT ด้วยมือเป็นวิธีที่เร็วที่สุดในการสร้างแบบจำลองทางความคิดที่แม่นยำว่า WebAssembly ทำงานอย่างไรจริง ๆ
+
+## WAT กลายเป็นฟังก์ชันที่รันได้อย่างไร
+
+ไปป์ไลน์จากข้อความต้นฉบับไปสู่ฟังก์ชัน JS ที่เรียกได้มีสี่ขั้นตอน
+
+export const watFlowDiagram = `flowchart LR
+  A["WAT source\\n(text string)"] --> B["compileWat()\\n→ Uint8Array"]
+  B --> C["WebAssembly.instantiate()\\n→ instance"]
+  C --> D["instance.exports\\n(exported functions)"]
+  D --> E["JS call\\nconsole.log(add(2,3))"]`;
+
+<Mermaid code={watFlowDiagram} title="จาก WAT สู่ฟังก์ชันที่รันได้" />
+
+1. **WAT source** — สตริงข้อความที่คุณเขียนเอง (หรือไฟล์ `.wat` บนดิสก์)
+2. **คอมไพล์เป็นไบต์** — ฟังก์ชันช่วย `compileWat()` ในแซนด์บ็อกซ์นี้จะเรียก WebAssembly Binary Toolkit (WABT) และคืนค่าเป็น `Uint8Array` ของไบต์ `.wasm`
+3. **Instantiate** — `WebAssembly.instantiate(bytes, {})` จะแยกวิเคราะห์และ JIT-คอมไพล์ไบต์เหล่านั้น แล้วคืนค่าเป็น `WebAssembly.Instance`
+4. **เรียก** — `instance.exports.add(2, 3)` เรียกฟังก์ชันที่ export มาจาก JavaScript
+
+## โมดูล WAT ที่เล็กที่สุด
+
+นี่คือโปรแกรม WAT ที่เล็กที่สุดที่มีประโยชน์ — ฟังก์ชัน `add` ที่รับจำนวนเต็ม 32 บิตสองตัวและคืนค่าผลรวมของมัน:
+
+```wasm
+(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add))
+```
+
+สิ่งที่ควรสังเกตมีอยู่ไม่กี่อย่าง:
+
+- โปรแกรมทั้งหมดถูกห่อหุ้มไว้ใน `(module ...)`
+- `(func ...)` ประกาศฟังก์ชัน แอตทริบิวต์ `(export "add")` ทำให้เรียกได้จาก JavaScript
+- `(param $a i32)` และ `(param $b i32)` ประกาศพารามิเตอร์ที่มีชื่อสองตัวชนิด `i32` (จำนวนเต็ม 32 บิต)
+- `(result i32)` ประกาศชนิดของค่าที่คืนกลับ
+- ตัวบอดี้เป็นลำดับของคำสั่งแบบ stack `local.get $a` จะ push ค่าของ `$a`, `local.get $b` จะ push `$b`, และ `i32.add` จะ pop ทั้งสองค่าแล้ว push ผลรวมของมัน
+
+WebAssembly ใช้แบบจำลอง **stack machine** คำสั่งจะ pop อินพุตของมันออกจาก stack แล้ว push ผลลัพธ์กลับไป เมื่อสิ้นสุดฟังก์ชัน ค่าตัวเดียวที่เหลืออยู่บน stack คือค่าที่คืนกลับ
+
+## ลองรันดู
+
+เอดิเตอร์ด้านล่างมีตัวอย่าง `add` เดียวกันที่เชื่อมต่อเป็น JavaScript ที่รันได้ คลิก **Run** เพื่อคอมไพล์ WAT แล้วเรียกฟังก์ชัน
+
+export const addCode = `const wat = \`(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('add(2, 3) =', instance.exports.add(2, 3));`;
+
+<WasmRunner client:visible code={addCode} />
+
+<Callout title="WAT คือรูปแบบที่อ่านได้ของไบนารี">
+WAT คือรูปแบบข้อความที่อ่านได้ของรูปแบบไบนารี `.wasm` มันเหมาะมากสำหรับการเรียนรู้แบบจำลองการเอ็กซิคิวต์ของ Wasm ในงาน production คุณแทบจะคอมไพล์จากภาษาระดับสูงกว่าเสมอ
+</Callout>
+
+export const quizWatIndex = [
+  { q: "WAT ย่อมาจากอะไร?", options: ["WebAssembly Text", "Web Application Type", "WebAssembly Transfer", "Web API Token"], answer: 0 },
+  { q: "ฟังก์ชันช่วย compileWat() คืนค่าอะไร?", options: ["สตริง JavaScript", "WebAssembly.Module", "บัฟเฟอร์ไบต์ไบนารี (Uint8Array)", "เอลิเมนต์ HTML"], answer: 2 },
+  { q: "ในโค้ด production โดยทั่วไป WAT มักจะ...", options: ["ถูกเขียนด้วยมือสำหรับทุกโมดูล", "ถูกสร้างโดยคอมไพเลอร์จากภาษาระดับสูงกว่า", "ถูกเอ็กซิคิวต์โดยตรงโดยไม่ต้องคอมไพล์", "ถูกใช้สำหรับดีบักหน่วยความจำเท่านั้น"], answer: 1 },
+];
+
+<Quiz client:visible id="wat-text-format/index" questions={quizWatIndex} />
+
+<ProgressTracker client:visible id="wat-text-format/index" />

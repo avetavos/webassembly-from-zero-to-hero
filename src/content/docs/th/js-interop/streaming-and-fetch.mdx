@@ -1,0 +1,111 @@
+---
+title: 'Streaming Instantiation และ Fetch'
+description: 'ใช้ WebAssembly.instantiateStreaming() กับ fetch() เพื่อโหลดที่เหมาะสมที่สุด — และเหตุใด server ต้องส่ง .wasm ด้วย MIME type ที่ถูกต้อง'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+ในแอปพลิเคชันจริง คุณจะไม่มี WAT source ในขณะ runtime — แต่จะ fetch ไฟล์ไบนารี `.wasm` ที่คอมไพล์แล้วจาก server แทน API ที่แนะนำสำหรับวิธีนี้คือ `WebAssembly.instantiateStreaming()` ซึ่งเริ่มคอมไพล์ bytes ตั้งแต่เริ่มรับข้อมูลผ่านเครือข่าย แทนที่จะรอให้ดาวน์โหลดเสร็จสมบูรณ์ก่อน
+
+## instantiateStreaming เทียบกับ instantiate
+
+`WebAssembly.instantiate` ต้องการให้ byte buffer ทั้งหมดอยู่ในหน่วยความจำก่อนจึงจะเริ่มคอมไพล์ได้ สำหรับ module ขนาดใหญ่ หมายความว่าเบราว์เซอร์จะนั่งรอระหว่างการดาวน์โหลด แล้วค่อยจ่ายต้นทุนการคอมไพล์ทั้งหมดในครั้งเดียว
+
+`WebAssembly.instantiateStreaming` ส่ง bytes ให้คอมไพเลอร์ขณะที่กำลัง stream มาจากเครือข่าย การคอมไพล์และการดาวน์โหลดทับซ้อนกัน ทำให้ module พร้อมใช้งานได้เร็วขึ้น — ซึ่งเห็นได้ชัดโดยเฉพาะเมื่อการเชื่อมต่อช้าหรือสำหรับ module ที่มีขนาดหลายร้อยกิโลไบต์ขึ้นไป
+
+```js
+// instantiate — waits for full download before compiling
+const response = await fetch('/module.wasm');
+const bytes = await response.arrayBuffer();
+const { instance } = await WebAssembly.instantiate(bytes, {});
+
+// instantiateStreaming — compiles while bytes arrive
+const { instance } = await WebAssembly.instantiateStreaming(
+  fetch('/module.wasm'),
+  {}
+);
+```
+
+โปรดสังเกตว่า `instantiateStreaming` รับ `Promise<Response>` ที่ `fetch` คืนมาโดยตรง — ไม่จำเป็นต้อง `await` fetch ก่อน
+
+## ข้อกำหนดด้าน MIME Type
+
+`WebAssembly.instantiateStreaming` จะตรวจสอบ header `Content-Type` ของ response ก่อนเริ่ม stream bytes ไปยังคอมไพเลอร์ Server **ต้อง** ให้บริการไฟล์ `.wasm` ด้วย `Content-Type: application/wasm` หากส่ง type อื่น เช่น `application/octet-stream` API จะ reject ทันทีด้วย `TypeError` ก่อนที่จะคอมไพล์ bytes ใดๆ
+
+เมื่อไม่สามารถควบคุมการตั้งค่า MIME type ของ server ได้ ให้ใช้รูปแบบสองขั้นตอนแทน:
+
+```js
+async function loadWasm(url, imports) {
+  try {
+    return await WebAssembly.instantiateStreaming(fetch(url), imports);
+  } catch (e) {
+    if (e instanceof TypeError) {
+      // MIME type wrong — fall back to arrayBuffer
+      const response = await fetch(url);
+      const bytes = await response.arrayBuffer();
+      return WebAssembly.instantiate(bytes, imports);
+    }
+    throw e;
+  }
+}
+```
+
+## การส่ง Imports
+
+imports object ทำงานเหมือนกับที่ใช้ใน `WebAssembly.instantiate` ทุกประการ — มันคือ argument ที่สอง และโครงสร้างต้องตรงกับ import section ของ module อย่างแม่นยำ
+
+```js
+const result = await WebAssembly.instantiateStreaming(
+  fetch('/module.wasm'),
+  { env: { log: n => console.log(n) } }
+);
+```
+
+## การ Cache Compiled Modules
+
+`WebAssembly.Module` ที่อยู่ใน `result.module` คือ compiled artifact ที่สามารถ serialize ได้ คุณสามารถเก็บไว้ใน IndexedDB เพื่อให้การเข้าชมครั้งถัดไปข้ามขั้นตอนการคอมไพล์ทั้งหมดและข้ามไปยัง instantiation ได้เลย:
+
+```js
+const { module, instance } = await WebAssembly.instantiateStreaming(
+  fetch('/module.wasm'),
+  {}
+);
+// Store `module` in IndexedDB for next visit
+// Later: const instance = await WebAssembly.instantiate(cachedModule, {});
+```
+
+## ลองรันดู
+
+Sandbox นี้ไม่มี server ให้ fetch ดังนั้นจึงไม่สามารถใช้ `fetch()` ได้ ตัวรันด้านล่างใช้ `compileWat()` เพื่อสร้าง compiled bytes แล้วเรียก `WebAssembly.instantiate` โดยตรง — ซึ่งเป็นเส้นทางเดียวกับที่ streaming fallback จะใช้หลังจากได้รับ bytes แล้ว
+
+export const streamingCode = `const wat = \`(module
+  (func (export "greet") (result i32)
+    i32.const 99))\`;
+// In production you would use:
+// const result = await WebAssembly.instantiateStreaming(fetch('/module.wasm'), {});
+// Here we use compileWat() to simulate the compiled bytes:
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('greet() =', instance.exports.greet());
+console.log('(In production: replace compileWat with instantiateStreaming + fetch)');`;
+
+<WasmRunner client:visible code={streamingCode} />
+
+<Callout title="ให้บริการไฟล์ .wasm ด้วย application/wasm เสมอ">
+`WebAssembly.instantiateStreaming` จะ reject ด้วย `TypeError` หาก MIME type ของ response ไม่ใช่ `application/wasm` ตั้งค่า web server ของคุณ (nginx, Express ฯลฯ) ให้แมป `.wasm` → `application/wasm`
+</Callout>
+
+export const quizStreamingAndFetch = [
+  { q: "เหตุใด instantiateStreaming จึงเหมาะสมกว่า instantiate สำหรับ production?", options: ["มันข้ามการตรวจสอบ", "มันคอมไพล์ขณะที่ bytes stream เข้ามา ลด latency", "มันทำงานได้โดยไม่ต้องมี server", "มันรองรับ Wasm features มากกว่า"], answer: 1 },
+  { q: "Server ต้องใช้ MIME type อะไรเมื่อให้บริการไฟล์ .wasm สำหรับ instantiateStreaming?", options: ["`application/octet-stream`", "`text/wasm`", "`application/wasm`", "`binary/wasm`"], answer: 2 },
+  { q: "instantiateStreaming จะ throw error อะไรหาก MIME type ไม่ถูกต้อง?", options: ["LinkError", "SyntaxError", "TypeError", "RangeError"], answer: 2 },
+];
+
+<Quiz client:visible id="js-interop/streaming-and-fetch" questions={quizStreamingAndFetch} />
+
+<ProgressTracker client:visible id="js-interop/streaming-and-fetch" />

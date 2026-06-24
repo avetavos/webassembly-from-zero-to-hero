@@ -1,0 +1,105 @@
+---
+title: 'Compile and Instantiate'
+description: 'Step through WebAssembly.compile(), WebAssembly.instantiate(), the returned {module,instance} object, and how to call exports.'
+sidebar:
+  order: 2
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Loading a WebAssembly module from JavaScript is a two-phase process: **compile** the bytes into a validated module artifact, then **instantiate** that module to get a running instance with callable exports. The browser's `WebAssembly` global exposes dedicated APIs for both phases — and a convenient shortcut that does both at once.
+
+## WebAssembly.compile()
+
+`WebAssembly.compile(bufferSource)` takes any `BufferSource` (a `Uint8Array`, `ArrayBuffer`, or similar) and returns a `Promise<WebAssembly.Module>`. The resulting `Module` is a compiled, validated artifact — the browser has parsed and optimised the bytes, but nothing has been executed yet.
+
+```js
+const response = await fetch('module.wasm');
+const bytes = await response.arrayBuffer();
+const module = await WebAssembly.compile(bytes);
+// `module` can be cached, cloned, or passed to a Worker via postMessage
+```
+
+Because the `Module` object is serialisable, it can be stored in IndexedDB or sent to another thread with `postMessage` — you pay the compilation cost once and reuse the result.
+
+## WebAssembly.instantiate()
+
+`WebAssembly.instantiate()` has two overloads:
+
+```js
+// Overload 1 — pass raw bytes: compiles AND instantiates in one call
+const { module, instance } = await WebAssembly.instantiate(bytes, importObject);
+
+// Overload 2 — pass an already-compiled Module: instantiates only
+const instance = await WebAssembly.instantiate(module, importObject);
+// Note: this overload returns a WebAssembly.Instance directly, not {module, instance}
+```
+
+The first overload is the most common starting point. The second is useful when you want to instantiate the same compiled module multiple times — for example, to create isolated sandboxes that share no state.
+
+## The instance.exports object
+
+After instantiation, `instance.exports` is a plain JavaScript object whose keys are the names declared in the Wasm module's export section. Every exported function, memory, global, or table appears as a property. Exported functions behave like regular JS functions — you call them, pass JS numbers, and receive JS numbers back.
+
+```js
+const { instance } = await WebAssembly.instantiate(bytes, {});
+const { square, cube } = instance.exports;
+
+console.log(square(5)); // 25
+console.log(cube(3));   // 27
+```
+
+The WAT module that defines those exports looks like this:
+
+```wasm
+(module
+  (func (export "square") (param $n i32) (result i32)
+    local.get $n
+    local.get $n
+    i32.mul)
+  (func (export "cube") (param $n i32) (result i32)
+    local.get $n
+    local.get $n
+    i32.mul
+    local.get $n
+    i32.mul))
+```
+
+## Run it
+
+The runner below compiles the module, instantiates it, and calls both exports.
+
+export const instantiateCode = `const wat = \`(module
+  (func (export "square") (param $n i32) (result i32)
+    local.get $n
+    local.get $n
+    i32.mul)
+  (func (export "cube") (param $n i32) (result i32)
+    local.get $n
+    local.get $n
+    i32.mul
+    local.get $n
+    i32.mul))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('square(5) =', instance.exports.square(5));
+console.log('cube(3) =', instance.exports.cube(3));`;
+
+<WasmRunner client:visible code={instantiateCode} />
+
+<Callout title="Compile once, instantiate many times">
+A `WebAssembly.Module` is a compiled artifact that can be stored, transferred via `postMessage`, or re-instantiated multiple times without recompiling. Separate the compile and instantiate steps whenever you need to spin up more than one instance of the same module.
+</Callout>
+
+export const quizInstantiate = [
+  { q: "What does WebAssembly.instantiate(bytes, {}) return?", options: ["A WebAssembly.Module", "A Promise<{module, instance}>", "A Uint8Array", "An ArrayBuffer"], answer: 1 },
+  { q: "Which property of the instantiation result holds callable exported functions?", options: ["result.module", "result.exports", "result.instance.exports", "result.wasm"], answer: 2 },
+  { q: "Can a compiled WebAssembly.Module be re-instantiated multiple times?", options: ["No — each compile produces one instance", "Yes — the Module is reusable", "Only in Node.js", "Only with streaming instantiation"], answer: 1 },
+];
+
+<Quiz client:visible id="js-interop/instantiate" questions={quizInstantiate} />
+
+<ProgressTracker client:visible id="js-interop/instantiate" />

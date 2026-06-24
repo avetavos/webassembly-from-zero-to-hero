@@ -1,0 +1,95 @@
+---
+title: 'พื้นฐาน Memory'
+description: 'ประกาศ WebAssembly memory ด้วย (memory N) จัดสรร page โหลดและจัดเก็บ integer ด้วย i32.load และ i32.store'
+sidebar:
+  order: 2
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+โมดูล WebAssembly สามารถประกาศ byte block ดิบที่เรียกว่า **linear memory** ซึ่งต่างจาก JavaScript heap โดย memory นี้เป็น flat, untyped array ของ byte ที่ทั้งโมดูล Wasm และ JavaScript สามารถอ่านและเขียนได้โดยตรง เป็นกลไกหลักในการส่งข้อมูลที่ซับซ้อน — string, array, struct — ระหว่าง WebAssembly และ host
+
+## การประกาศ memory ด้วย `(memory N)`
+
+การประกาศ `(memory N)` จอง N **หน้า** ของ memory โดยแต่ละหน้ามีขนาดพอดี 64 KiB (65 536 byte) ขนาดขั้นต่ำที่มีประโยชน์คือหนึ่งหน้า:
+
+```wasm
+(memory 1)
+```
+
+นี่จะให้โมดูลของคุณมี byte ที่ addressable ได้ 65 536 byte ทั้งหมดถูก initialise เป็น zero ตอน instantiation
+
+## การโหลดและจัดเก็บ integer
+
+WebAssembly มีคำสั่ง load และ store แบบ typed สำหรับอ่านและเขียนค่าที่ byte address เฉพาะเจาะจง
+
+- `i32.store` — pop address และ 32-bit integer จาก stack เขียน 4 byte ที่ address นั้น
+- `i32.load` — pop address จาก stack อ่าน 4 byte และ push ผลลัพธ์ `i32`
+
+คำสั่งทั้งสองรองรับ attribute `offset` แบบ static ที่ถูกบวกเข้ากับ runtime address ซึ่งมีประโยชน์สำหรับการเข้าถึง field ภายใน struct
+
+## การ Export memory ไปยัง JavaScript
+
+JavaScript ไม่สามารถเข้าถึง Wasm memory ได้จนกว่าโมดูลจะ export มัน ใช้ inline export syntax:
+
+```wasm
+(memory (export "mem") 1)
+```
+
+ฝั่ง JavaScript ยังสามารถสร้าง `WebAssembly.Memory` object และส่งเป็น import ได้:
+
+```js
+const memory = new WebAssembly.Memory({ initial: 1 });
+```
+
+## ตัวอย่างการ Store และ Load
+
+นี่คือโมดูลที่สมบูรณ์ที่เก็บค่า `i32` ที่ byte address 100 และโหลดกลับทันที:
+
+```wasm
+(module
+  (memory (export "mem") 1)
+  (func (export "storeAndLoad") (param $val i32) (result i32)
+    i32.const 100   ;; address
+    local.get $val  ;; value to store
+    i32.store
+    i32.const 100   ;; address
+    i32.load))      ;; load back
+```
+
+## ลองรัน
+
+Runner ด้านล่างเก็บ 999 ที่ offset 100 อ่านกลับมา และอ่าน `mem[0]` ด้วย (ซึ่งควรเป็น 0 เนื่องจากไม่มีอะไรเขียนที่นั่น)
+
+export const memoryBasicsCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (func (export "storeAndLoad") (param \$val i32) (result i32)
+    i32.const 100
+    local.get \$val
+    i32.store
+    i32.const 100
+    i32.load))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+const result = instance.exports.storeAndLoad(999);
+console.log('stored and loaded:', result);
+const view = new Uint8Array(instance.exports.mem.buffer);
+console.log('byte at offset 100:', view[100]);`;
+
+<WasmRunner client:visible code={memoryBasicsCode} />
+
+<Callout title="หน้า 64 KiB">
+แต่ละหน้ามีขนาด 65 536 byte พอดี โมดูลที่มี `(memory 1)` จะมี 65 536 byte และค่าเริ่มต้นทั้งหมดเป็นศูนย์
+</Callout>
+
+export const quizMemoryBasics = [
+  { q: "หนึ่งหน้าของ WebAssembly memory มีกี่ bytes?", options: ["4 096", "65 536", "1 048 576", "512"], answer: 1 },
+  { q: "คำสั่งใดที่ใช้เขียน integer 4 bytes ลง linear memory?", options: ["i32.set", "mem.store", "i32.store", "memory.put"], answer: 2 },
+  { q: "ค่าเริ่มต้นของ bytes ทุกตัวใน WebAssembly memory ที่สร้างใหม่คือเท่าใด?", options: ["0xFF", "undefined", "1", "0"], answer: 3 },
+];
+
+<Quiz client:visible id="linear-memory/memory-basics" questions={quizMemoryBasics} />
+
+<ProgressTracker client:visible id="linear-memory/memory-basics" />

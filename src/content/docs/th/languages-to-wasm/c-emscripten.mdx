@@ -1,0 +1,161 @@
+---
+title: 'C และ Emscripten'
+description: 'ใช้ emcc เพื่อคอมไพล์ C และ C++ ไปเป็น WebAssembly และเรียกใช้ฟังก์ชันที่ Export ด้วย ccall และ cwrap จาก JavaScript'
+sidebar:
+  order: 3
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Emscripten คือ Toolchain คลาสสิกสำหรับนำโค้ด C และ C++ มาใช้บนเว็บ มันคอมไพล์ไปยัง WebAssembly (หรือ asm.js สำหรับ Fallback รุ่นเก่า), จำลอง POSIX API และสามารถสร้าง JavaScript Loader ที่ช่วยจัดการ Instantiation ให้คุณโดยอัตโนมัติ
+
+## ติดตั้ง Emscripten
+
+```bash
+# Clone Emscripten SDK
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+
+# ติดตั้งและ Activate Release ล่าสุด
+./emsdk install latest
+./emsdk activate latest
+
+# เพิ่ม emcc เข้า PATH (รันนี้ทุกครั้งที่เปิด Shell ใหม่ หรือเพิ่มใน Profile)
+source ./emsdk_env.sh
+
+# ตรวจสอบ
+emcc --version
+```
+
+## เขียนฟังก์ชัน C
+
+สร้างไฟล์ `math.c`:
+
+```c
+#include <math.h>
+
+// คำนวณ Hypotenuse: sqrt(a*a + b*b)
+double hypotenuse(double a, double b) {
+    return sqrt(a * a + b * b);
+}
+
+// Fibonacci (แบบ Iterative)
+int fibonacci(int n) {
+    if (n <= 1) return n;
+    int a = 0, b = 1;
+    for (int i = 2; i <= n; i++) {
+        int tmp = a + b;
+        a = b;
+        b = tmp;
+    }
+    return b;
+}
+```
+
+## คอมไพล์ด้วย emcc
+
+```bash
+emcc math.c \
+  -o math.js \
+  -sEXPORTED_FUNCTIONS='["_hypotenuse","_fibonacci"]' \
+  -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+  -sASSERTIONS=1 \
+  -O2
+```
+
+คำสั่งนี้ผลิตไฟล์สองไฟล์:
+
+- `math.wasm` — Binary ที่คอมไพล์แล้ว
+- `math.js` — JS Loader และ Runtime Glue
+
+รายการ `EXPORTED_FUNCTIONS` ใช้ Underscore นำหน้าเพราะชื่อ Symbol ของ C จะถูกเติม `_` ตามธรรมเนียมของ Emscripten
+
+## เรียกใช้จาก JavaScript ด้วย ccall / cwrap
+
+```js
+// ในเบราว์เซอร์: โหลด JS Loader ที่ Emscripten สร้างก่อน
+// <script src="math.js"></script>
+
+Module.onRuntimeInitialized = function () {
+  // ccall — เรียกครั้งเดียว: (ชื่อ, ประเภทคืนค่า, ประเภทอาร์กิวเมนต์, อาร์กิวเมนต์)
+  const h = Module.ccall(
+    'hypotenuse',    // ชื่อฟังก์ชัน C (ไม่มี _ นำหน้า)
+    'number',        // ประเภทคืนค่า
+    ['number', 'number'],  // ประเภทอาร์กิวเมนต์
+    [3.0, 4.0]       // ค่าอาร์กิวเมนต์
+  );
+  console.log('hypotenuse(3, 4) =', h);  // 5
+
+  // cwrap — สร้างฟังก์ชัน JS ที่นำกลับมาใช้ซ้ำได้
+  const fib = Module.cwrap('fibonacci', 'number', ['number']);
+  console.log('fibonacci(10) =', fib(10));  // 55
+  console.log('fibonacci(20) =', fib(20));  // 6765
+};
+```
+
+## Output หน้า HTML แบบ Standalone
+
+Emscripten สามารถสร้าง HTML Shell ที่ฝัง Loader และ Canvas แบบ Terminal ไว้ด้วยกัน:
+
+```bash
+emcc math.c \
+  -o math.html \
+  -sEXPORTED_FUNCTIONS='["_hypotenuse","_fibonacci"]' \
+  -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+  -O2
+```
+
+เปิด `math.html` ในเบราว์เซอร์และ Terminal Canvas ของ Emscripten จะปรากฏขึ้น ทุกการเรียก `printf` ใน C จะแสดงผลที่นั่นโดยอัตโนมัติ
+
+## การใช้ malloc และ String
+
+เมื่อส่ง String ข้ามขอบเขต Wasm คุณต้อง Allocate และ Free Memory ด้วยตัวเอง:
+
+```c
+#include <string.h>
+#include <stdlib.h>
+
+// คืน Copy ของ Input บน Heap ที่เป็น Upper-case
+char* to_upper(const char* s) {
+    int len = strlen(s);
+    char* out = malloc(len + 1);
+    for (int i = 0; i <= len; i++)
+        out[i] = (s[i] >= 'a' && s[i] <= 'z') ? s[i] - 32 : s[i];
+    return out;
+}
+```
+
+```bash
+emcc strings.c \
+  -o strings.js \
+  -sEXPORTED_FUNCTIONS='["_to_upper","_malloc","_free"]' \
+  -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","allocateUTF8","UTF8ToString"]' \
+  -O2
+```
+
+```js
+Module.onRuntimeInitialized = function () {
+  const ptr = Module.allocateUTF8('hello wasm');
+  const resultPtr = Module.ccall('to_upper', 'number', ['number'], [ptr]);
+  console.log(Module.UTF8ToString(resultPtr));  // HELLO WASM
+  Module._free(ptr);
+  Module._free(resultPtr);
+};
+```
+
+<Callout title="Emscripten คือเครื่องมือ Port ทุกอย่าง">
+หากคุณมีโค้ด C หรือ C++ ที่ทำงานได้บน Desktop อยู่แล้ว Emscripten มักจะสามารถคอมไพล์ไปยัง Wasm ได้โดยแก้ไขน้อยมาก มันจำลอง `printf`, `malloc`, File I/O และแม้แต่ OpenGL (ผ่าน WebGL) สำหรับโค้ดใหม่ ควรเลือก Rust หรือ AssemblyScript เพื่อ Output ที่กระชับกว่า
+</Callout>
+
+export const quizCEmscripten = [
+  { q: "ทำไม Entry ใน EXPORTED_FUNCTIONS จึงต้องขึ้นต้นด้วย Underscore (เช่น '_hypotenuse')?", options: ["มันทำเครื่องหมายฟังก์ชันว่าเป็น Private", "ชื่อ Symbol ของ C จะถูกเติม _ ตามธรรมเนียมของ Emscripten", "Underscore เปิดใช้งานการ Optimise SIMD", "มันป้องกัน Name Mangling ใน C++"], answer: 1 },
+  { q: "Module.cwrap คืนค่าอะไร?", options: ["Promise ที่ Resolve เป็นผลลัพธ์ของฟังก์ชัน", "ฟังก์ชัน JavaScript ที่ใช้ Wrapper สำหรับฟังก์ชัน C และนำกลับมาใช้ซ้ำได้", "Pointer ไปยังฟังก์ชัน C ใน Linear Memory", "WebAssembly.Function Object"], answer: 1 },
+  { q: "Flag ของ emcc ใดที่ระบุฟังก์ชันที่ควรเข้าถึงได้จาก JavaScript?", options: ["-sEXPORTED_RUNTIME_METHODS", "-sEXPORTED_FUNCTIONS", "-sALLOW_MEMORY_GROWTH", "-sENVIRONMENT"], answer: 1 },
+  { q: "ต้องทำอะไรหลังจาก Allocate String Pointer ด้วย allocateUTF8?", options: ["เรียก Module.sync()", "เรียก Module._free() บน Pointer เมื่อใช้เสร็จ", "แปลงด้วย encodeURIComponent", "ไม่ต้องทำอะไร — Emscripten Free ให้อัตโนมัติ"], answer: 1 },
+];
+
+<Quiz client:visible id="languages-to-wasm/c-emscripten" questions={quizCEmscripten} />
+
+<ProgressTracker client:visible id="languages-to-wasm/c-emscripten" />

@@ -1,0 +1,91 @@
+---
+title: 'Typed Array Views'
+description: 'Access WebAssembly memory from JavaScript using Uint8Array, Int32Array, Float64Array, and DataView with correct byte offsets and little-endian layout.'
+sidebar:
+  order: 3
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+When a WebAssembly module exports its memory, JavaScript gets a `WebAssembly.Memory` object. Its `.buffer` property is a standard `ArrayBuffer` — the same type used throughout the Web Platform. This means you can overlay any typed-array view on it to read and write memory efficiently.
+
+## The ArrayBuffer and typed views
+
+`instance.exports.mem.buffer` is an `ArrayBuffer`. You can construct typed views over it without copying any data:
+
+- `new Uint8Array(buf)` — each element is one unsigned byte
+- `new Int32Array(buf)` — each element is four bytes interpreted as a signed 32-bit integer
+- `new Float64Array(buf)` — each element is eight bytes interpreted as a 64-bit float
+- `new DataView(buf)` — low-level access with explicit methods and endianness control
+
+All of these views share the same underlying memory. Writing through one view is immediately visible through any other view over the same buffer.
+
+## Byte offsets and element indices
+
+Different typed views have different element sizes. The relationship between a typed-array index and a byte offset is:
+
+```
+byte offset = index × element size in bytes
+```
+
+For example, `Int32Array` has an element size of 4, so `i32[2]` sits at byte offset 8. `Float64Array` has an element size of 8, so `f64[1]` sits at byte offset 8 as well — the same address, different interpretation.
+
+```js
+const buf = instance.exports.mem.buffer;
+const u8  = new Uint8Array(buf);
+const i32 = new Int32Array(buf);
+const f64 = new Float64Array(buf);
+// Write an i32 at byte offset 0 (element index 0 of i32 view)
+i32[0] = 42;
+// Read the same 4 bytes as individual bytes
+console.log(u8[0], u8[1], u8[2], u8[3]); // 42 0 0 0
+```
+
+## Little-endian layout
+
+WebAssembly memory is **little-endian**: the least-significant byte of a multi-byte value is stored at the lowest address. For example, the 32-bit value `0x01020304` stored at offset 0 is laid out in memory as bytes `[04, 03, 02, 01]`.
+
+This is consistent with x86/ARM and with JavaScript's own typed arrays on all current platforms. If you need to handle a specific endianness explicitly, use `DataView` — its methods like `.getInt32(offset, true)` accept an `isLittleEndian` boolean.
+
+## Run it
+
+The runner stores two values from Wasm — `0x41424344` at offset 0 and `100` at offset 8 — then reads them back with multiple typed views to show how the same bytes look through different lenses.
+
+export const typedViewsCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (func (export "storeValues")
+    ;; store i32 value 0x41424344 at byte offset 0
+    i32.const 0
+    i32.const 0x41424344
+    i32.store
+    ;; store i32 value 100 at byte offset 8
+    i32.const 8
+    i32.const 100
+    i32.store))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+instance.exports.storeValues();
+const buf = instance.exports.mem.buffer;
+const u8  = new Uint8Array(buf);
+const i32 = new Int32Array(buf);
+console.log('i32[0] =', i32[0]);          // 0x41424344
+console.log('u8[0..3] =', u8[0], u8[1], u8[2], u8[3]); // little-endian
+console.log('i32[2] =', i32[2]);          // 100 (at byte offset 8)`;
+
+<WasmRunner client:visible code={typedViewsCode} />
+
+<Callout title="Little-endian layout">
+WebAssembly memory is little-endian. When you store an `i32`, the least-significant byte comes first. `DataView` methods like `.getInt32(offset, true)` let you choose endianness explicitly.
+</Callout>
+
+export const quizTypedArrayViews = [
+  { q: "If an Int32Array element is at index 2, what is its byte offset?", options: ["2", "4", "8", "16"], answer: 2 },
+  { q: "How are multi-byte integers laid out in WebAssembly linear memory?", options: ["Big-endian (most significant byte first)", "Little-endian (least significant byte first)", "Platform-dependent", "Packed BCD"], answer: 1 },
+  { q: "Which JavaScript class gives you full control over endianness when reading/writing memory?", options: ["ArrayBuffer", "Int32Array", "DataView", "SharedArrayBuffer"], answer: 2 },
+];
+
+<Quiz client:visible id="linear-memory/typed-array-views" questions={quizTypedArrayViews} />
+
+<ProgressTracker client:visible id="linear-memory/typed-array-views" />

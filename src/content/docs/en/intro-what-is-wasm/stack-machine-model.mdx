@@ -1,0 +1,120 @@
+---
+title: 'The Stack Machine Model'
+description: 'Understand how WebAssembly executes instructions on an implicit operand stack — push, pop, and the type discipline that makes it safe.'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly is a **stack machine**. There are no named general-purpose registers like `eax` or `r0`. Instead, every instruction operates on an implicit **operand stack**: some instructions push values onto it, others pop values off and push a result. The validator can check the entire stack type at compile time, which is why Wasm is both safe and fast to compile to native register-based code.
+
+## Instructions Are Stack Operations
+
+Every Wasm instruction falls into one of three roles:
+
+- **Producers** — push a value onto the stack (e.g. `i32.const 7`, `local.get $x`)
+- **Consumers** — pop one or more values and push a result (e.g. `i32.add`, `i32.mul`)
+- **Side-effectful** — pop values and do something without pushing (e.g. `local.set $x`, `drop`)
+
+At the end of a function body, exactly the values declared in `(result ...)` must remain on the stack. The validator enforces this statically — if the types do not match, the module is rejected before a single byte executes.
+
+## Walking Through `i32.const 3 + i32.const 4 + i32.add`
+
+The simplest demonstration is addition. The WAT for "return 3 + 4" looks like this:
+
+```wasm
+(module
+  (func (export "addThreeAndFour") (result i32)
+    i32.const 3
+    i32.const 4
+    i32.add))
+```
+
+Here is what happens to the operand stack at each step:
+
+export const stackDiagram = `flowchart TD\n  A["Stack: []\\n> i32.const 3"] --> B["Stack: [3]\\n> i32.const 4"]\n  B --> C["Stack: [3, 4]\\n> i32.add"]\n  C --> D["Stack: [7]\\n<- return value"]`;
+
+<Mermaid code={stackDiagram} title="Operand stack state for i32.const 3 · i32.const 4 · i32.add" />
+
+Step by step:
+
+1. **`i32.const 3`** — pushes the 32-bit integer `3`. Stack: `[3]`
+2. **`i32.const 4`** — pushes the 32-bit integer `4`. Stack: `[3, 4]`
+3. **`i32.add`** — pops `4` and `3`, adds them, pushes `7`. Stack: `[7]`
+4. **End of function** — the validator sees one `i32` on the stack, matching `(result i32)`. The value `7` becomes the return value.
+
+## Types on the Stack
+
+Wasm's type system tracks the type of every slot on the stack. The four numeric types are:
+
+| Type | Width | Description |
+|---|---|---|
+| `i32` | 32-bit | Integer — used for booleans, pointers, and most counts |
+| `i64` | 64-bit | Integer — large numbers and 64-bit addresses |
+| `f32` | 32-bit | IEEE 754 single-precision float |
+| `f64` | 64-bit | IEEE 754 double-precision float |
+
+An instruction like `i32.add` requires both operands to be `i32`. Attempting to add an `i32` and an `f64` is a validation error — rejected at load time, not at runtime.
+
+## Try It Live
+
+The runner below executes an `add` function built exactly from the stack operations described above.
+
+export const stackCode = `const wat = \`(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('add(3, 4)   =', instance.exports.add(3, 4));
+console.log('add(10, 32) =', instance.exports.add(10, 32));
+console.log('add(0, 0)   =', instance.exports.add(0, 0));`;
+
+<WasmRunner client:visible code={stackCode} />
+
+<Callout title="No registers — just a stack">
+  Wasm has no named registers. All computation flows through the implicit operand stack. This design makes validation simple (type-check the stack) and makes compilation to native code straightforward (the backend maps stack slots to hardware registers for you).
+</Callout>
+
+export const quizStackMachine = [
+  {
+    q: 'What does `i32.add` do on the Wasm operand stack?',
+    options: [
+      'Pushes two i32 constants onto the stack',
+      'Pops two i32 values, adds them, and pushes the result',
+      'Adds a constant to a local variable in place',
+      'Declares an addition function',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'After executing `i32.const 3` followed by `i32.const 4`, how many values are on the operand stack?',
+    options: [
+      '0',
+      '1',
+      '2',
+      '3',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'What happens if the types on the stack do not match the instruction signature?',
+    options: [
+      'The runtime throws a JavaScript exception',
+      'The instruction silently coerces the types',
+      'The module is rejected at validation time, before execution',
+      'The result is undefined behaviour',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/stack-machine-model" questions={quizStackMachine} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/stack-machine-model" />

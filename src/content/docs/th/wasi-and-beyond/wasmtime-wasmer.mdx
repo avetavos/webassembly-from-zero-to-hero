@@ -1,0 +1,121 @@
+---
+title: 'wasmtime & wasmer'
+description: 'รัน Wasm binary จาก command line ด้วย wasmtime และ wasmer, ส่ง capability flag และ embed runtime ในแอปพลิเคชันเพื่อสร้างระบบ plugin'
+sidebar:
+  order: 3
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+สองรันไทม์อิสระระดับ production ที่ครองระบบนิเวศ WASI: **wasmtime** (ดูแลโดย Bytecode Alliance, เขียนด้วย Rust) และ **wasmer** (เขียนด้วย Rust, ข้ามแพลตฟอร์ม) ทั้งคู่ implement WASI spec, รองรับ ahead-of-time (AOT) compilation และเปิดเผย embedding API สำหรับ Rust, Python, Go และภาษาอื่น ๆ
+
+## การติดตั้งรันไทม์
+
+```bash
+# wasmtime — ผ่าน installer script
+curl https://wasmtime.dev/install.sh -sSf | bash
+
+# wasmer — ผ่าน installer script
+curl https://get.wasmer.io -sSfL | sh
+
+# ตรวจสอบ
+wasmtime --version
+wasmer --version
+```
+
+## รัน WASI module ด้วย wasmtime
+
+```bash
+# รันพื้นฐาน
+wasmtime my_app.wasm
+
+# ส่ง command-line arguments (-- คั่น runtime flag จาก module arg)
+wasmtime my_app.wasm -- hello world
+
+# ให้สิทธิ์เข้าถึง directory
+wasmtime --dir /tmp my_app.wasm
+
+# ให้สิทธิ์ด้วย path alias (host path::guest path)
+wasmtime --dir /host/data::/data my_app.wasm
+
+# ส่ง environment variable
+wasmtime --env DATABASE_URL=postgres://localhost/db my_app.wasm
+
+# รวม: dir + env + args
+wasmtime --dir /data --env LOG_LEVEL=info my_app.wasm -- --config /data/cfg.toml
+```
+
+## รัน WASI module ด้วย wasmer
+
+```bash
+# รันพื้นฐาน
+wasmer my_app.wasm
+
+# mount directory
+wasmer --dir /tmp my_app.wasm
+
+# ส่ง environment variable
+wasmer --env KEY=value my_app.wasm
+
+# รันจาก Wasmer registry (wapm packages)
+wasmer run python/python -- --version
+```
+
+## Embed wasmtime ในแอปพลิเคชัน Rust
+
+พลังที่แท้จริงของรันไทม์อิสระคือการ embed — โหลด plugin `.wasm` ขณะ runtime โดยไม่ต้องคอมไพล์ host application ใหม่
+
+```rust
+use wasmtime::{Engine, Linker, Module, Store};
+use wasmtime_wasi::WasiCtxBuilder;
+
+fn run_plugin(wasm_bytes: &[u8]) -> anyhow::Result<()> {
+    let engine = Engine::default();
+    let module = Module::new(&engine, wasm_bytes)?;
+
+    // สร้าง WASI context ขั้นต่ำ — ไม่มี filesystem, ไม่มี env var
+    let wasi = WasiCtxBuilder::new().inherit_stdio().build();
+    let mut store = Store::new(&engine, wasi);
+
+    let mut linker = Linker::new(&engine);
+    wasmtime_wasi::add_to_linker_sync(&mut linker, |s| s)?;
+
+    let instance = linker.instantiate(&mut store, &module)?;
+    let start = instance.get_typed_func::<(), ()>(&mut store, "_start")?;
+    start.call(&mut store, ())?;
+    Ok(())
+}
+```
+
+pattern นี้คือวิธีที่ระบบ plugin ทำงาน: host application โหลดไฟล์ `.wasm` ตามอำเภอใจขณะ runtime และเรียก exported function ในขณะที่ sandbox บังคับ isolation อย่างเข้มงวด
+
+export const embedDiagram = `sequenceDiagram
+  participant Host as Host App (Rust)
+  participant WT as wasmtime Engine
+  participant M as Plugin (.wasm)
+  Host->>WT: Engine::default()
+  Host->>WT: Module::new(wasm_bytes)
+  Host->>WT: Linker + WasiCtxBuilder
+  Host->>WT: linker.instantiate()
+  WT->>M: instantiate + link imports
+  Host->>M: typed_func("process").call(args)
+  M-->>Host: return value`;
+
+<Mermaid code={embedDiagram} title="Embedding wasmtime เพื่อรัน plugin module" />
+
+<Callout title="AOT compilation สำหรับ path ที่ sensitive ต่อ latency">
+ทั้ง wasmtime และ wasmer รองรับ ahead-of-time (AOT) compilation: `wasmtime compile app.wasm -o app.cwasm` สร้าง artifact ที่ pre-compiled แล้ว โหลด `.cwasm` เมื่อ startup เพื่อข้าม JIT latency บน hot path
+</Callout>
+
+export const quizWasmtimeWasmer = [
+  { q: "flag ใดที่ให้สิทธิ์ WASI module เข้าถึง host directory ใน wasmtime?", options: ["--allow-dir", "--dir", "--fs", "--mount"], answer: 1 },
+  { q: "จุดประสงค์ของ WasiCtxBuilder เมื่อ embed wasmtime ใน Rust คืออะไร?", options: ["คอมไพล์ WAT เป็น binary", "กำหนด capability grant ที่โมดูลจะได้รับ", "ให้ JavaScript bridge", "เปิดใช้ multi-threading"], answer: 1 },
+  { q: "AOT compilation ใน wasmtime ให้ประโยชน์อะไร?", options: ["ลดขนาดไฟล์ .wasm", "ขจัด JIT compilation เมื่อ load เพื่อลด startup latency", "เปิดใช้การแชร์ type ข้ามภาษา", "แทนที่ความจำเป็นของ WASI"], answer: 1 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/wasmtime-wasmer" questions={quizWasmtimeWasmer} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/wasmtime-wasmer" />

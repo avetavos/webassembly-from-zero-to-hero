@@ -1,0 +1,113 @@
+---
+title: 'โมเดล Stack Machine'
+description: 'ทำความเข้าใจวิธีที่ WebAssembly ใช้ operand stack ในการรันคำสั่ง'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly ทำงานบนหลักการที่เรียบง่ายแต่ทรงพลัง: **stack machine** แทนที่จะใช้ register ที่มีชื่อเหมือน CPU ทั่วไป Wasm จะ push และ pop ค่าบน operand stack ที่ implicit เพื่อรันคำสั่งทุกตัว
+
+## Stack Machine คืออะไร
+
+ใน register machine คำสั่งจะระบุ register ต้นทางและปลายทางอย่างชัดเจน เช่น `ADD R1, R2, R3` แต่ใน stack machine คำสั่งจะทำงานกับค่าบนสุดของ stack โดยปริยาย
+
+ลำดับการทำงานสำหรับการบวก 3 + 4 มีดังนี้:
+
+export const stackDiagram = `flowchart TD\n  A["Stack: []\\n> i32.const 3"] --> B["Stack: [3]\\n> i32.const 4"]\n  B --> C["Stack: [3, 4]\\n> i32.add"]\n  C --> D["Stack: [7]\\n<- return value"]`;
+
+<Mermaid code={stackDiagram} title="การทำงานของ Stack Machine" />
+
+1. `i32.const 3` — push ค่า 3 ลงบน stack
+2. `i32.const 4` — push ค่า 4 ลงบน stack
+3. `i32.add` — pop ค่า 2 ตัว (3 และ 4), บวกเข้าด้วยกัน, push ผลลัพธ์ (7) กลับ
+4. ฟังก์ชันจบลง ค่า 7 บนสุดของ stack กลายเป็น return value
+
+## ทำไมต้องใช้ Stack Machine
+
+Stack machine มีข้อได้เปรียบหลายประการสำหรับ portable bytecode:
+
+- **ตรวจสอบได้ง่าย** — type checker สามารถ walk stack statically และตรวจสอบความถูกต้องของ type ได้โดยไม่ต้องทำการวิเคราะห์ที่ซับซ้อน
+- **กะทัดรัด** — คำสั่งไม่ต้องเข้ารหัส register operand ทำให้ binary ขนาดเล็กลง
+- **คอมไพล์เป็น native ได้ง่าย** — compiler สมัยใหม่สามารถแปลง stack operation เป็น register-based native code ได้อย่างมีประสิทธิภาพ
+
+## Stack Machine ใน WAT
+
+เมื่อคุณเขียน WAT คุณเขียนคำสั่งเหล่านั้นเรียงกันในลักษณะ stack:
+
+```wasm
+(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add))
+```
+
+- `local.get $a` — push ค่า parameter `$a` ลง stack
+- `local.get $b` — push ค่า parameter `$b` ลง stack
+- `i32.add` — pop ทั้งสอง, push ผลบวก
+
+ค่าที่อยู่บนสุดของ stack เมื่อฟังก์ชันจบคือ return value เนื่องจากเราประกาศ `(result i32)` validator จะตรวจสอบว่า stack มี i32 เดียวบนสุดเมื่อฟังก์ชันจบลง
+
+## ลองรันดู
+
+ลองรัน WAT ด้านล่างเพื่อเห็นว่า stack machine ทำงานอย่างไรในทางปฏิบัติ:
+
+export const stackCode = `const wat = \`(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('add(3, 4)   =', instance.exports.add(3, 4));
+console.log('add(10, 32) =', instance.exports.add(10, 32));
+console.log('add(0, 0)   =', instance.exports.add(0, 0));`;
+
+<WasmRunner client:visible code={stackCode} />
+
+<Callout title="ไม่มี registers — มีแต่ stack">
+  Wasm ไม่มี named registers ทุกการคำนวณไหลผ่าน implicit operand stack แบบนี้ ทำให้ validation ง่าย (ตรวจ type บน stack) และคอมไพล์เป็น native code ได้ตรงไปตรงมา (backend จัดการ map stack slot เป็น hardware register ให้)
+</Callout>
+
+export const quizStackMachine = [
+  {
+    q: 'คำสั่ง `i32.add` ทำอะไรบน Wasm operand stack?',
+    options: [
+      'push ค่า i32 สองตัวลง stack',
+      'pop ค่า i32 สองตัว บวกกัน แล้ว push ผลลัพธ์',
+      'บวก constant เข้ากับ local variable โดยตรง',
+      'ประกาศฟังก์ชัน addition',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'หลังจากรัน `i32.const 3` แล้วตามด้วย `i32.const 4` มีค่ากี่ตัวบน operand stack?',
+    options: [
+      '0',
+      '1',
+      '2',
+      '3',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'เกิดอะไรขึ้นถ้า type บน stack ไม่ตรงกับ instruction signature?',
+    options: [
+      'runtime throw JavaScript exception',
+      'คำสั่งแปลง type ให้โดยอัตโนมัติ',
+      'module ถูก reject ตอน validation ก่อนรันจริง',
+      'ผลลัพธ์เป็น undefined behaviour',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/stack-machine-model" questions={quizStackMachine} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/stack-machine-model" />

@@ -1,0 +1,144 @@
+---
+title: 'Loops: loop และ br_if'
+description: 'เขียน counted และ conditional loop ใน WAT โดยใช้ construct loop และ br_if เพื่อสร้าง back-edge'
+sidebar:
+  order: 3
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+`loop` ใน WebAssembly **ไม่วนซ้ำอัตโนมัติ** มันเป็นเพียง labeled construct ที่จุดเริ่มต้นเป็น branch target การวนซ้ำจะเกิดขึ้นเมื่อวาง `br_if` ไว้ที่ท้าย body เพื่อกระโดดกลับไปที่ loop label เมื่อ condition ยังเป็นจริง
+
+## Loop construct
+
+`(loop $label ...)` กำหนดจุดเริ่มต้นของ loop `br $label` ภายใน body จะกระโดดกลับไปที่จุดเริ่มต้น — ตรงข้ามกับทิศทางของ `br` ใน `block` การออกจาก loop ทำได้โดยให้ execution ไปถึง `end` (fall-through) หรือกระโดดไปที่ outer label
+
+```wasm
+(module
+  (func (export "countDown") (param $n i32)
+    (loop $again
+      ;; body here
+      local.get $n
+      i32.const 1
+      i32.sub
+      local.tee $n     ;; decrement $n and keep value on stack
+      i32.const 0
+      i32.gt_s
+      br_if $again)))  ;; repeat while $n > 0
+```
+
+## Loop flow
+
+export const loopDiagram = `flowchart LR
+  A["init locals"] --> B["loop \$again (start)"]
+  B --> C["body: update acc, increment i"]
+  C --> D["i <= n?"]
+  D -->|yes| B
+  D -->|no| E["exit: return acc"]`;
+
+<Mermaid code={loopDiagram} title="Counted loop flow: br_if สร้าง back-edge" />
+
+## ตัวอย่าง counted loop: sumTo
+
+ฟังก์ชันด้านล่างรวมจำนวนเต็มตั้งแต่ 1 ถึง `n` โดยใช้ `loop` local `$i` เป็น counter และ `$acc` สะสมผลรวม
+
+```wasm
+(module
+  (func (export "sumTo") (param $n i32) (result i32)
+    (local $i i32)
+    (local $acc i32)
+    i32.const 1
+    local.set $i      ;; i = 1
+    i32.const 0
+    local.set $acc    ;; acc = 0
+    (loop $again
+      local.get $i
+      local.get $acc
+      i32.add
+      local.set $acc  ;; acc += i
+      local.get $i
+      i32.const 1
+      i32.add
+      local.set $i    ;; i++
+      local.get $i
+      local.get $n
+      i32.le_s
+      br_if $again)   ;; repeat while i <= n
+    local.get $acc))  ;; return acc
+```
+
+## ทดลองรัน
+
+export const loopsCode = `const wat = \`(module
+  (func (export "sumTo") (param $n i32) (result i32)
+    (local $i i32)
+    (local $acc i32)
+    i32.const 1
+    local.set $i
+    i32.const 0
+    local.set $acc
+    (loop $again
+      local.get $i
+      local.get $acc
+      i32.add
+      local.set $acc
+      local.get $i
+      i32.const 1
+      i32.add
+      local.set $i
+      local.get $i
+      local.get $n
+      i32.le_s
+      br_if $again)
+    local.get $acc))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('sumTo(5)  =', instance.exports.sumTo(5),  '(expected 15)');
+console.log('sumTo(10) =', instance.exports.sumTo(10), '(expected 55)');`;
+
+<WasmRunner client:visible code={loopsCode} />
+
+<Callout title="loop ไม่วนซ้ำอัตโนมัติ">
+`loop` construct เพียงกำหนดจุดเริ่มต้นของ back-edge ที่อาจเกิดขึ้น ถ้าไม่มี `br_if` (หรือ `br`) ที่ชี้กลับไปที่ loop label body จะทำงานเพียงครั้งเดียวแล้ว fall through ผู้เขียนโปรแกรมต้องรับผิดชอบทั้งการสร้างและการหยุดการวนซ้ำ
+</Callout>
+
+export const quizLoops = [
+  {
+    q: "ใน WAT `br $l` ทำอะไรเมื่อ `$l` เป็น `loop` label?",
+    options: [
+      "ออกจาก loop ทันที",
+      "กระโดดไปที่จุดเริ่มต้นของ loop",
+      "ทำให้เกิด runtime trap",
+      "เรียกฟังก์ชันถัดไปใน module"
+    ],
+    answer: 1
+  },
+  {
+    q: "วิธีออกจาก WAT loop คืออะไร?",
+    options: [
+      "ด้วยคำสั่ง `break`",
+      "ด้วย `return`",
+      "โดย fall off the end หรือ branch ไปที่ outer label",
+      "WAT loop ออกอัตโนมัติหลังจากรันครบจำนวนที่กำหนด"
+    ],
+    answer: 2
+  },
+  {
+    q: "ค่าเริ่มต้นของ local variable ที่ประกาศด้วย `(local $x i32)` คืออะไร?",
+    options: [
+      "0",
+      "Undefined",
+      "-1",
+      "ค่าของ local ก่อนหน้า"
+    ],
+    answer: 0
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/loops" questions={quizLoops} />
+
+<ProgressTracker client:visible id="control-flow-functions/loops" />

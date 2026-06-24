@@ -1,0 +1,134 @@
+---
+title: 'Component Model, SIMD & Threads'
+description: 'สร้าง Wasm component ที่ composable ด้วย WIT interface โดยใช้ wasm-tools พร้อมภาพรวม SIMD v128 และ threads proposal'
+sidebar:
+  order: 4
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+**Component Model** คือวิวัฒนาการถัดไปของ WebAssembly ที่อยู่เหนือ raw module ในขณะที่ core Wasm module เปิดเผยเฉพาะ numeric function, **component** เปิดเผย typed interface ที่ครอบคลุม — string, record, list, variant — ที่นิยามใน **WIT** (Wasm Interface Type language) Component สามารถ compose เข้าด้วยกันที่ระดับ toolchain ก่อน deployment ทำให้เกิด plugin ecosystem ที่ไม่ขึ้นกับภาษาอย่างแท้จริง
+
+## WIT — Wasm Interface Types
+
+ไฟล์ `.wit` คือ contract ระหว่าง component มันดูเหมือน typed IDL:
+
+```wit
+package example:greeter@0.1.0;
+
+interface greeter {
+  greet: func(name: string) -> string;
+}
+
+world greeter-world {
+  export greeter;
+}
+```
+
+`world` นิยามสิ่งที่ component export และ import `wasm-tools` (reference toolchain) สามารถ validate, compose และ inspect component จาก WIT definition
+
+## การสร้าง component จาก Rust
+
+```bash
+# ติดตั้ง cargo-component (Rust Component Model toolchain)
+cargo install cargo-component
+
+# สร้าง component project ใหม่
+cargo component new greeter --lib
+
+# Build เป็น component .wasm
+cargo component build --release
+# Output: target/wasm32-wasip2/release/greeter.wasm
+
+# ตรวจสอบ interface ของ component
+wasm-tools component wit greeter.wasm
+```
+
+`wasm-tools` suite จัดการกลไก low-level:
+
+```bash
+# Compose สอง component: greeter และ logger
+wasm-tools compose greeter.wasm -d logger.wasm -o composed.wasm
+
+# Validate component
+wasm-tools validate --features component-model greeter.wasm
+
+# แปลง core module เป็น component (adapter pattern)
+wasm-tools component new core.wasm --adapt wasi_snapshot_preview1.wasm -o component.wasm
+```
+
+## โมเดลการ compose component
+
+export const componentDiagram = `flowchart LR
+  subgraph "Component A (Rust)"
+    A_wit["WIT: export greeter"]
+    A_core["core wasm\\n(compiled Rust)"]
+  end
+  subgraph "Component B (Go)"
+    B_wit["WIT: import greeter\\nexport http-handler"]
+    B_core["core wasm\\n(compiled Go)"]
+  end
+  T["wasm-tools compose"]
+  OUT["composed.wasm\\n(deployable component)"]
+  A_wit --> T
+  B_wit --> T
+  T --> OUT`;
+
+<Mermaid code={componentDiagram} title="สอง component ที่ compose เป็น artifact ที่ deploy ได้หนึ่งชิ้น" />
+
+## SIMD — ประเภท v128
+
+**Fixed-Width SIMD** proposal (มาตรฐานแล้ว) เพิ่ม value type ใหม่หนึ่งประเภท: `v128` register `v128` เก็บ 128 bits ที่สามารถตีความได้หลายรูปแบบ lane:
+
+- `i8x16` — สิบหก 8-bit integer
+- `i16x8` — แปด 16-bit integer
+- `i32x4` — สี่ 32-bit integer
+- `f32x4` — สี่ 32-bit float
+- `f64x2` — สอง 64-bit float
+
+ใน WAT มีลักษณะดังนี้:
+
+```wasm
+(module
+  (func (export "add4f") (param $a v128) (param $b v128) (result v128)
+    local.get $a
+    local.get $b
+    f32x4.add)
+)
+```
+
+Compiler (Rust, C/Clang) ใช้ SIMD อัตโนมัติผ่าน auto-vectorisation เมื่อเปิดใช้ คุณแทบไม่เขียน SIMD WAT ด้วยมือ มันปรากฏใน compiler output สำหรับ kernel ที่ compute-heavy (image processing, audio codec, ML inference)
+
+## Threads proposal
+
+**Threads** proposal (Phase 4 — ใช้ได้ในเบราว์เซอร์และรันไทม์ส่วนใหญ่) เพิ่ม:
+
+- **Shared memory** — `(memory (shared) N N)` นิยาม memory ที่แชร์ข้าม thread ได้
+- **Atomic instruction** — `i32.atomic.load`, `i32.atomic.store`, `i32.atomic.rmw.add` เป็นต้น
+- **`wait` และ `notify`** — `memory.atomic.wait32` / `memory.atomic.notify` (เทียบเท่า Wasm ของ `futex`)
+
+ใน Rust การคอมไพล์ด้วย `RUSTFLAGS="-C target-feature=+atomics,+bulk-memory"` และ target `wasm32-unknown-unknown` (พร้อม custom allocator) เปิดใช้ multi-threaded Wasm ในเบราว์เซอร์ threads ต้องการ `SharedArrayBuffer` ซึ่งต้องการ response header `COOP`/`COEP`
+
+```bash
+# คอมไพล์ Rust ด้วย atomics + bulk-memory สำหรับ browser threads
+RUSTFLAGS="-C target-feature=+atomics,+bulk-memory" \
+  cargo build --target wasm32-unknown-unknown --release
+```
+
+<Callout title="Component Model คืออนาคตของการ compose Wasm">
+Component Model แทนที่ FFI glue แบบ ad-hoc ระหว่าง Wasm module ด้วย WIT คุณนิยาม typed interface ครั้งเดียว แล้ว `cargo-component` และ `wasm-tools` สร้าง binding code ทั้งสองทิศทางให้
+</Callout>
+
+export const quizComponentModelSimdThreads = [
+  { q: "ภาษาใดที่ใช้นิยาม Component Model interface contract?", options: ["WAT", "WIT", "WASM-IDL", "Protobuf"], answer: 1 },
+  { q: "Value type ใหม่ตัวเดียวที่ SIMD proposal แนะนำคืออะไร?", options: ["f128", "simd256", "v128", "i128"], answer: 2 },
+  { q: "Tool ใดที่ compose สอง Wasm component เป็น artifact ที่ deploy ได้หนึ่งชิ้น?", options: ["wasmtime compose", "cargo component", "wasm-tools compose", "wasm-pack"], answer: 2 },
+  { q: "ต้องใช้ browser security header ใดเพื่อใช้ SharedArrayBuffer สำหรับ Wasm threads?", options: ["Access-Control-Allow-Origin: *", "COOP และ COEP header", "Content-Security-Policy", "X-Frame-Options"], answer: 1 },
+];
+
+<Quiz client:visible id="wasi-and-beyond/component-model-simd-threads" questions={quizComponentModelSimdThreads} />
+
+<ProgressTracker client:visible id="wasi-and-beyond/component-model-simd-threads" />

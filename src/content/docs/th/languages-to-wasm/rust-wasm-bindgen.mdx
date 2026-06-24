@@ -1,0 +1,146 @@
+---
+title: 'Rust และ wasm-bindgen'
+description: 'ใช้ wasm-pack และ wasm-bindgen เพื่อคอมไพล์ Rust ไปเป็น WebAssembly และเรียกใช้จาก JavaScript'
+sidebar:
+  order: 2
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Rust เป็นภาษาที่ได้รับความนิยมมากที่สุดสำหรับการเขียน WebAssembly Module ใหม่ Zero-Cost Abstractions, ไม่มี Garbage Collector และ Tooling ที่ยอดเยี่ยมทำให้เหมาะกับ Wasm มาก **wasm-bindgen** Crate สร้าง JavaScript Glue Code อัตโนมัติ และ **wasm-pack** ห่อ Pipeline การ Build ทั้งหมดไว้ในคำสั่งเดียว
+
+## ติดตั้ง Toolchain
+
+```bash
+# ติดตั้ง Rust (ถ้ายังไม่มี)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# เพิ่ม WebAssembly Target ลงใน Rust Toolchain
+rustup target add wasm32-unknown-unknown
+
+# ติดตั้ง wasm-pack — เครื่องมือ Build Rust → Wasm แบบครบวงจร
+cargo install wasm-pack
+```
+
+## สร้างโปรเจกต์ใหม่
+
+```bash
+# สร้าง Library Crate (ไม่ใช่ Binary)
+cargo new --lib hello-wasm
+cd hello-wasm
+```
+
+เพิ่ม `wasm-bindgen` ลงใน `Cargo.toml`:
+
+```toml
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+```
+
+## เขียนฟังก์ชัน Rust
+
+เปิด `src/lib.rs` และเขียนฟังก์ชัน Export อย่างง่าย:
+
+```rust
+use wasm_bindgen::prelude::*;
+
+/// คืนค่า String ทักทาย
+#[wasm_bindgen]
+pub fn greet(name: &str) -> String {
+    format!("Hello, {}! from WebAssembly", name)
+}
+
+/// บวกเลขจำนวนเต็ม 32 บิตสองตัว
+#[wasm_bindgen]
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+```
+
+Attribute `#[wasm_bindgen]` บอก Code Generator ให้สร้าง JavaScript Binding ที่ตรงกัน หากไม่มี Attribute นี้ ฟังก์ชันจะถูกคอมไพล์ลงใน `.wasm` Binary แต่จะเข้าถึงจาก JS ไม่ได้
+
+## Build ด้วย wasm-pack
+
+```bash
+# Build สำหรับใช้กับ Bundler (webpack, Vite, Rollup)
+wasm-pack build --target bundler
+
+# Build สำหรับใช้โดยตรงในเบราว์เซอร์ผ่าน <script type="module">
+wasm-pack build --target web
+
+# Build สำหรับ Node.js
+wasm-pack build --target nodejs
+```
+
+ไดเรกทอรี `pkg/` จะถูกสร้างขึ้นพร้อมกับ:
+
+```
+pkg/
+  hello_wasm_bg.wasm   ← Wasm Binary ที่คอมไพล์แล้ว
+  hello_wasm.js        ← JS Glue ที่ Generate อัตโนมัติ
+  hello_wasm.d.ts      ← TypeScript Types
+  package.json         ← พร้อม Publish บน npm
+```
+
+## เรียกใช้จาก JavaScript
+
+```js
+// เมื่อใช้ --target web (ไม่ต้องการ Bundler)
+import init, { greet, add } from './pkg/hello_wasm.js';
+
+async function main() {
+  // init() ดาวน์โหลดและ Instantiate ไฟล์ .wasm
+  await init();
+
+  console.log(greet('world'));   // Hello, world! from WebAssembly
+  console.log(add(3, 4));        // 7
+}
+
+main();
+```
+
+เมื่อใช้ Bundler เช่น Vite, Import จะเหมือนกันแต่ `init()` ถูกจัดการอัตโนมัติ:
+
+```js
+// Vite / webpack — Bundler จัดการ Instantiation
+import { greet, add } from 'hello-wasm';
+
+console.log(greet('WebAssembly'));
+```
+
+## ส่งผ่าน Type ที่ซับซ้อน
+
+`wasm-bindgen` รองรับมากกว่าแค่ตัวเลข คุณสามารถส่งผ่าน:
+
+- `&str` / `String` — UTF-8 String คัดลอกผ่าน Shared Memory Buffer
+- `JsValue` — Handle ทึบแสงสำหรับค่า JavaScript ใดก็ได้
+- `Vec<u8>` — Byte Array ที่ Map กับ `Uint8Array`
+
+```rust
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub fn reverse_string(s: &str) -> String {
+    s.chars().rev().collect()
+}
+```
+
+<Callout title="wasm-pack จัดการ Pipeline ทั้งหมด">
+`wasm-pack build` คอมไพล์ Rust, รัน `wasm-bindgen` Code Generation และผลิตแพ็กเกจ npm พร้อม Publish ใน `pkg/` คุณแทบไม่ต้องเรียก `cargo` หรือ `wasm-bindgen-cli` โดยตรง
+</Callout>
+
+export const quizRustWasm = [
+  { q: "Attribute #[wasm_bindgen] ใน Rust ทำงานอย่างไร?", options: ["ทำเครื่องหมายฟังก์ชันว่า Unsafe", "สร้าง JavaScript Binding สำหรับฟังก์ชันที่ Annotate", "Inline ฟังก์ชันที่จุดที่เรียกใช้", "ปิดใช้งาน Borrow Checker ของ Rust"], answer: 1 },
+  { q: "Flag --target ใดของ wasm-pack ที่ควรใช้เมื่อต้องการเรียก Module โดยตรงจากเบราว์เซอร์ผ่าน <script type=\"module\"> โดยไม่มี Bundler?", options: ["--target bundler", "--target nodejs", "--target web", "--target deno"], answer: 2 },
+  { q: "wasm-bindgen ใช้ Type ใดเพื่อแทนค่า JavaScript แบบ Opaque ใน Rust?", options: ["JsObject", "JsValue", "DynVal", "WasmRef"], answer: 1 },
+  { q: "ต้องระบุ crate-type ใดใน Cargo.toml สำหรับ Wasm Library?", options: ["bin", "rlib", "cdylib", "proc-macro"], answer: 2 },
+];
+
+<Quiz client:visible id="languages-to-wasm/rust-wasm-bindgen" questions={quizRustWasm} />
+
+<ProgressTracker client:visible id="languages-to-wasm/rust-wasm-bindgen" />

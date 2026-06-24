@@ -1,0 +1,92 @@
+---
+title: 'การขยาย Memory และ Data Segment'
+description: 'ขยาย WebAssembly memory ขณะ runtime ด้วย memory.grow จัดการ buffer ที่ถูก detach เมื่อต้องสร้าง typed-array views ใหม่ และเริ่มต้นค่า memory ด้วย (data ...) segment'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+โมดูล WebAssembly เริ่มต้นด้วยจำนวนหน้าที่คุณประกาศใน `(memory N)` แต่บางครั้งคุณต้องการ memory เพิ่มขณะ runtime — เช่น เมื่อผู้ใช้อัปโหลดไฟล์ขนาดใหญ่หรือข้อมูลของคุณเพิ่มขึ้นเกินที่คาดไว้ คำสั่ง `memory.grow` และ segment `(data ...)` ครอบคลุมสองเรื่องที่เกี่ยวข้องกัน: การขยาย memory และการเติม byte แบบ static ล่วงหน้า
+
+## คำสั่ง `memory.grow`
+
+`memory.grow` รับ argument `i32` หนึ่งตัวจาก stack: จำนวนหน้าเพิ่มเติมที่ต้องการ allocate คืนค่าขนาด **เดิม** เป็นหน้า หรือ `-1` ถ้า grow ล้มเหลว (เช่น หน่วยความจำไม่พอหรือเกิน maximum ที่ประกาศไว้)
+
+```wasm
+(module
+  (memory (export "mem") 1)
+  (func (export "grow") (param $pages i32) (result i32)
+    local.get $pages
+    memory.grow))
+```
+
+คุณยังสามารถ grow memory จากฝั่ง JavaScript ด้วย `mem.grow(n)`:
+
+```js
+const mem = instance.exports.mem;
+const oldPages = mem.grow(1);   // returns previous page count, or -1
+```
+
+## Buffer detachment หลัง grow
+
+นี่คือจุดสำคัญมากที่สุด: เมื่อ WebAssembly memory ขยาย `ArrayBuffer` พื้นฐานจะถูก **detach** typed view ใดก็ตามที่สร้างจาก buffer เดิมจะกลายเป็นแบบว่างเปล่าและใช้งานไม่ได้ คุณต้องสร้าง view ใหม่ทั้งหมดจาก `mem.buffer` ทันทีหลังจาก grow ทุกครั้ง
+
+```js
+let view = new Uint8Array(mem.buffer);   // valid before grow
+mem.grow(1);
+// view is now detached — do NOT use it
+view = new Uint8Array(mem.buffer);       // re-create from fresh buffer
+```
+
+## Data segment
+
+Segment `(data ...)` ช่วยให้คุณฝัง byte แบบ static โดยตรงในโมดูลและให้ byte เหล่านั้นถูกเขียนลง memory โดยอัตโนมัติตอน instantiation นี่คือวิธีที่ compiled language เริ่มต้น string literal และ read-only table
+
+```wasm
+(module
+  (memory (export "mem") 1)
+  (data (i32.const 0) "Hello"))  ;; writes 5 UTF-8 bytes at offset 0
+```
+
+Byte จะถูก copy จากโมดูลลง memory ก่อนที่ฟังก์ชันใดจะรัน ดังนั้นข้อมูลจะพร้อมใช้งานทันทีเมื่อฟังก์ชัน export แรกถูกเรียก
+
+## ลองรัน
+
+ตัวอย่างด้านล่างใช้ segment `(data ...)` เขียน `"Hi"` ที่ offset 0 ขยาย memory หนึ่งหน้า สร้าง typed-array view ใหม่หลัง grow และตรวจสอบว่าทั้งขนาดใหม่และข้อมูลเดิมถูกต้อง
+
+export const growingDataCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (data (i32.const 0) "Hi")
+  (func (export "grow1") (result i32)
+    i32.const 1
+    memory.grow))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+const mem = instance.exports.mem;
+let view = new Uint8Array(mem.buffer);
+console.log('before grow - size (pages):', mem.buffer.byteLength / 65536);
+console.log('data[0..1]:', view[0], view[1]); // 72='H', 105='i'
+const oldPages = instance.exports.grow1();
+console.log('memory.grow returned (old pages):', oldPages);
+// MUST re-create view after grow — old ArrayBuffer is detached
+view = new Uint8Array(mem.buffer);
+console.log('after grow - size (pages):', mem.buffer.byteLength / 65536);`;
+
+<WasmRunner client:visible code={growingDataCode} />
+
+<Callout title="สร้าง views ใหม่หลัง grow">
+หลังจาก `memory.grow` ArrayBuffer เดิมจะถูก detach และ typed-array views ที่ชี้ไปยัง buffer นั้นจะหยุดทำงาน ต้องสร้าง views ใหม่จาก `mem.buffer` ทันทีหลังจาก grow
+</Callout>
+
+export const quizGrowingAndData = [
+  { q: "คำสั่ง memory.grow คืนค่าอะไร?", options: ["จำนวน page ทั้งหมดหลัง grow", "จำนวน bytes ที่เพิ่ม", "จำนวน page เดิมก่อน grow หรือ -1 เมื่อล้มเหลว", "0 เมื่อสำเร็จ"], answer: 2 },
+  { q: "เกิดอะไรกับ typed-array views ที่มีอยู่เมื่อ WebAssembly memory ขยาย?", options: ["ขนาดเปลี่ยนตามอัตโนมัติ", "ถูก detach และหยุดทำงาน ต้องสร้างใหม่", "ถูก garbage collect", "สะท้อนขนาดใหม่หลัง 1 tick"], answer: 1 },
+  { q: "(data (i32.const 0) \"Hello\") segment ทำอะไร?", options: ["ประกาศ global string constant", "เขียน 5 bytes ลง memory ที่ offset 0 ระหว่าง instantiation", "สร้าง Wasm string variable ชื่อ Hello", "จัดสรร 5 page ของ memory"], answer: 1 },
+];
+
+<Quiz client:visible id="linear-memory/growing-and-data" questions={quizGrowingAndData} />
+
+<ProgressTracker client:visible id="linear-memory/growing-and-data" />

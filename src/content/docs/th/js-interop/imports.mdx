@@ -1,0 +1,108 @@
+---
+title: 'ออบเจกต์ Imports'
+description: 'ส่งฟังก์ชัน JavaScript, memory และ globals ให้กับ Wasm module ผ่าน imports object — รวมถึงการเรียก JS console.log จากภายใน Wasm'
+sidebar:
+  order: 3
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+ไม่ใช่ทุก WebAssembly module จะพึ่งพาตัวเองได้ทั้งหมด เมื่อ module ต้องการเรียกฟังก์ชัน JavaScript, อ่านข้อมูลจาก shared memory หรือเข้าถึงค่า global ที่ host จัดการ มันจะประกาศ dependency เหล่านั้นด้วยคำสั่ง `(import ...)` ในระหว่าง instantiation JavaScript ต้องส่งค่าที่ตรงกันมาให้ — นี่คือสิ่งที่เรียกว่า **imports object**
+
+## ไวยากรณ์การประกาศ import
+
+การประกาศ import จะระบุชื่อของสิ่งที่ต้องการนำเข้าและอธิบาย type ของมัน อาร์กิวเมนต์ string สองตัวแรกสร้าง namespace สองระดับ: **module name** (key ชั้นนอก) และ **field name** (key ชั้นใน):
+
+```wasm
+(module
+  (import "env" "log" (func $log (param i32)))
+)
+```
+
+ที่นี่ `"env"` คือ module namespace และ `"log"` คือ field name การประกาศนี้หมายความว่า: "module นี้ต้องการฟังก์ชันชื่อ `log` ภายใน namespace `env` โดยฟังก์ชันนั้นต้องรับอาร์กิวเมนต์ `i32` หนึ่งตัว"
+
+## รูปแบบของ imports object
+
+imports object ที่ส่งให้ `WebAssembly.instantiate()` สะท้อน namespace สองระดับนั้น — key ชั้นนอกคือ module name และ key ชั้นในคือ field name:
+
+```js
+const importObject = {
+  env: {
+    log: (n) => console.log(n)
+  }
+};
+```
+
+ค่าภายในแต่ละตัวต้องตรงกับ type ที่ประกาศไว้ใน WAT ถ้าเป็น function import ต้องใช้ฟังก์ชัน JS; memory import ต้องใช้ `WebAssembly.Memory`; และ global import ต้องใช้ `WebAssembly.Global`
+
+## การ import ฟังก์ชัน JS
+
+นี่คือตัวอย่าง WAT module ที่สมบูรณ์ซึ่ง import ฟังก์ชัน `log` และเรียกใช้จากฟังก์ชัน `run` ที่ export ออกมา:
+
+```wasm
+(module
+  (import "env" "log" (func $log (param i32)))
+  (func (export "run")
+    i32.const 42
+    call $log))
+```
+
+ฟังก์ชัน `run` push ค่าคงที่ `42` ขึ้น stack จากนั้นเรียก `$log` — ซึ่งรับค่านั้นและส่งต่อไปยังฟังก์ชัน JS ที่ระบุไว้ใน imports object
+
+ฝั่ง JavaScript:
+
+```js
+const { instance } = await WebAssembly.instantiate(bytes, {
+  env: { log: (n) => console.log('Wasm says:', n) }
+});
+instance.exports.run(); // prints: Wasm says: 42
+```
+
+## ทดลองรัน
+
+export const importsCode = `const wat = \`(module
+  (import "env" "log" (func $log (param i32)))
+  (func (export "run")
+    i32.const 42
+    call $log))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {
+  env: { log: n => console.log('Wasm says:', n) }
+});
+instance.exports.run();`;
+
+<WasmRunner client:visible code={importsCode} />
+
+## สิ่งอื่นที่ import ได้
+
+ฟังก์ชันเป็น import ที่พบบ่อยที่สุด แต่กลไกเดียวกันนี้ใช้ได้กับ memory, globals และ tables ด้วย:
+
+```js
+// Import a shared Memory
+const memory = new WebAssembly.Memory({ initial: 1 });
+const importObject = {
+  env: {
+    memory,
+    log: (n) => console.log(n)
+  }
+};
+```
+
+การ `WebAssembly.Memory` import ทำให้ JavaScript และ Wasm แชร์ `ArrayBuffer` เดียวกัน ทำให้สามารถส่ง string, array และข้อมูลโครงสร้างอื่นๆ ไปมาได้โดยการอ่านและเขียน byte ดิบ Globals และ tables ก็ใช้รูปแบบเดียวกัน — ประกาศใน WAT ด้วย `(import ...)` และส่ง `WebAssembly.Global` หรือ `WebAssembly.Table` ที่ตรงกันใน imports object
+
+<Callout title="Imports ต้องตรงกันทุกประการ">
+namespace string (`"env"`) และ field name (`"log"`) ใน imports object ต้องตรงกับที่ WAT `(import ...)` ประกาศไว้ทุกอย่าง รวมถึงตัวพิมพ์ใหญ่-เล็กด้วย หากไม่ตรงจะเกิด `LinkError` ในระหว่าง instantiation
+</Callout>
+
+export const quizImports = [
+  { q: 'In `(import "env" "log" ...)`, which is the module namespace?', options: ['"log"', '"env"', '"import"', '"func"'], answer: 1 },
+  { q: 'What is the shape of the imports object for `(import "env" "log" (func ...))`?', options: ['`{ log: fn }`', '`{ env: { log: fn } }`', '`{ env: fn }`', '`{ "env.log": fn }`'], answer: 1 },
+  { q: "What error is thrown when the imports object is missing a required import?", options: ["TypeError", "RangeError", "LinkError", "SyntaxError"], answer: 2 },
+];
+
+<Quiz client:visible id="js-interop/imports" questions={quizImports} />
+
+<ProgressTracker client:visible id="js-interop/imports" />

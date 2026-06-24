@@ -1,0 +1,101 @@
+---
+title: 'Tooling'
+description: 'Survey the essential WebAssembly toolchain — wabt, Binaryen, and wasm-tools — and understand where each one fits in the build pipeline.'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Shipping efficient WebAssembly starts well before you write a single instruction. You need tools to convert `.wat` text into `.wasm` binary, to inspect what is inside a compiled module, and to shrink the bytes before they go over the network. Three projects cover almost every need: **wabt**, **Binaryen**, and **wasm-tools**.
+
+## The three tool families
+
+| Tool family | Maintained by | Core strength |
+|---|---|---|
+| **wabt** (WebAssembly Binary Toolkit) | WebAssembly CG | WAT ↔ binary conversion, validation, inspection |
+| **Binaryen** | Google / Emscripten | Optimisation and code generation, `wasm-opt` |
+| **wasm-tools** | Bytecode Alliance | Rust-based suite: parse, validate, compose, encode |
+
+Each family occupies a distinct stage in the pipeline. The diagram below shows how a `.wat` source file travels through these tools on its way to a deployed, optimised module.
+
+export const toolingOverviewDiagram = `flowchart LR
+  A[".wat source"] -->|"wat2wasm"| B[".wasm binary"]
+  B -->|"wasm-opt -O3"| C["optimised .wasm"]
+  C -->|"wasm2wat / wasm-objdump"| D["inspection / debug"]
+  B -->|"wasm-validate"| E["validation report"]
+  B -->|"wasm-tools parse"| F["structured analysis"]`;
+
+<Mermaid code={toolingOverviewDiagram} title="WAT → .wasm → optimised → inspect" />
+
+## wabt — the translation layer
+
+`wabt` is the official reference implementation of the WAT text format. Its flagship binary is `wat2wasm`, which converts a `.wat` file into a `.wasm` binary. The reverse direction — disassembling a `.wasm` back to human-readable WAT — is handled by `wasm2wat`. Two companion tools round out the package: `wasm-objdump` prints the section headers and symbol table of any binary, and `wasm-validate` checks whether a module conforms to the specification.
+
+```bash
+# Install via npm (works without a native build)
+npm install -g wabt
+
+# Compile WAT to binary
+wat2wasm add.wat -o add.wasm
+
+# Disassemble back to text
+wasm2wat add.wasm -o add.wat
+
+# Inspect section headers
+wasm-objdump -x add.wasm
+
+# Validate a module
+wasm-validate add.wasm
+```
+
+## Binaryen — the optimiser
+
+Binaryen is an optimising compiler infrastructure for WebAssembly. Its user-facing tool is `wasm-opt`, which rewrites a `.wasm` binary to produce a smaller or faster output. Emscripten, AssemblyScript, and `wasm-pack` (for Rust) all call `wasm-opt` automatically as part of their release builds — you benefit even if you never invoke it directly.
+
+```bash
+# Install
+npm install -g binaryen
+
+# Speed-optimise (prefer fast execution)
+wasm-opt -O3 input.wasm -o output.wasm
+
+# Size-optimise (prefer small download)
+wasm-opt -Oz input.wasm -o output.wasm
+```
+
+## wasm-tools — the modern toolkit
+
+`wasm-tools` is the Bytecode Alliance's next-generation suite, written in Rust and available as both a CLI and a library. It supports the WebAssembly Component Model proposals, composing multiple modules together, stripping custom sections, and encoding/decoding the binary format with spec-level accuracy.
+
+```bash
+# Install
+cargo install wasm-tools
+
+# Validate
+wasm-tools validate add.wasm
+
+# Print text format
+wasm-tools print add.wasm
+
+# Strip custom sections (removes debug info)
+wasm-tools strip add.wasm -o add.stripped.wasm
+```
+
+<Callout title="Pick the right tool for the job">
+Use `wabt` when you need WAT ↔ binary conversion or spec-level validation. Use `wasm-opt` (Binaryen) when you want to shrink or speed up a binary. Use `wasm-tools` when you are working with Component Model modules or need a programmatic Rust API.
+</Callout>
+
+export const quizToolingIndex = [
+  { q: "Which tool converts a .wat text file into a .wasm binary?", options: ["wasm-opt", "wat2wasm", "wasm-tools validate", "wasm2wat"], answer: 1 },
+  { q: "Which tool family is primarily focused on size and speed optimisation?", options: ["wabt", "wasm-tools", "Binaryen (wasm-opt)", "wasm-validate"], answer: 2 },
+  { q: "Which organisation maintains the wasm-tools project?", options: ["Google", "Mozilla", "Bytecode Alliance", "WebAssembly CG"], answer: 2 },
+  { q: "What does wasm2wat do?", options: ["Compiles C to WebAssembly", "Optimises a .wasm binary", "Disassembles a .wasm binary back to WAT text", "Validates spec compliance"], answer: 2 },
+];
+
+<Quiz client:visible id="tooling/index" questions={quizToolingIndex} />
+
+<ProgressTracker client:visible id="tooling/index" />

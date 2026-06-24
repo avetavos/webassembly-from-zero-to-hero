@@ -1,0 +1,69 @@
+---
+title: 'หน่วยความจำเชิงเส้น (Linear Memory)'
+description: 'เรียนรู้ว่า linear memory คืออะไร ทำไม WebAssembly ถึงต้องการมัน และ Wasm กับ JavaScript แชร์ ArrayBuffer เดียวกันสำหรับ string, array และ struct ได้อย่างไร'
+sidebar:
+  order: 1
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+ฟังก์ชัน WebAssembly ทำงานกับตัวเลขเท่านั้น — `i32`, `i64`, `f32` และ `f64` นั่นคือชุดชนิดข้อมูลทั้งหมด ไม่มี string type, array type หรือ struct type แล้วจะส่ง string จาก JavaScript ไปยังฟังก์ชัน Wasm หรือสร้าง dynamic array ภายใน Wasm ได้อย่างไร? คำตอบคือ **linear memory**
+
+## Linear memory คืออะไร?
+
+Linear memory คือกลุ่มของ byte ที่ต่อเนื่องกันซึ่งทั้ง WebAssembly และ JavaScript สามารถอ่านและเขียนได้ ฝั่ง WebAssembly เข้าถึงด้วยคำสั่งอย่าง `i32.load` และ `i32.store` ส่วนฝั่ง JavaScript จะได้รับ `ArrayBuffer` ธรรมดา — เป็น object เดียวกับที่ใช้กับ `TypedArray` views อย่าง `Uint8Array` และ `Int32Array`
+
+คำว่า "linear" หมายความว่า address space เป็นแบบ flat และหนึ่งมิติ: ทุก byte มี numeric offset เริ่มต้นที่ `0` และ address จะเพิ่มขึ้นตามลำดับจนถึงขนาดปัจจุบันของ buffer ไม่มี pointer-to-pointer, ไม่มี heap metadata ที่มองเห็นได้ มีแค่ raw byte ที่ numeric offset
+
+export const memoryLayoutDiagram = `flowchart LR
+  A["WebAssembly\\n(i32.load / i32.store)"] --> B["Shared ArrayBuffer\\n(linear memory)"]
+  B --> A
+  C["JavaScript\\n(typed array views)"] --> B
+  B --> C`;
+
+<Mermaid code={memoryLayoutDiagram} title="Wasm และ JS แชร์ ArrayBuffer เดียวกัน" />
+
+## ทำไม Linear memory จึงมีอยู่
+
+Value model ที่เป็นตัวเลขล้วนของ Wasm เป็นการออกแบบโดยเจตนา เพื่อให้ instruction set เล็กกะทัดรัด execution engine เรียบง่าย และ performance คาดเดาได้ แต่โปรแกรมจริงต้องการข้อมูลที่ซับซ้อน — UTF-8 string, byte array, struct ที่มีหลาย field Linear memory จึงเป็นทางออก:
+
+- **String** ถูกเก็บเป็น sequence ของ UTF-8 byte ที่ offset ใดออฟเซ็ตหนึ่ง โดยส่ง offset (เป็น `i32`) และความยาว byte (อีก `i32` หนึ่ง) ไปยังฟังก์ชัน Wasm แทนที่จะส่ง string โดยตรง
+- **Array** คือค่าหลายตัวที่เขียนต่อเนื่องกันเริ่มจาก base address
+- **Struct** คือ field ที่อัดรวมกันที่ offset คงที่จาก base address เหมือน C struct พอดี
+
+JavaScript และ Wasm ต่างถือ reference ไปยัง `ArrayBuffer` เดียวกัน ดังนั้นการเขียนจากฝั่งใดก็ตามจะมองเห็นได้จากอีกฝั่งทันที — ไม่มี serialization, ไม่มีการ copy
+
+## ตัวอย่างขั้นต่ำ
+
+โมดูลด้านล่างประกาศ memory หนึ่งหน้าและ export เพื่อให้ JavaScript ตรวจสอบได้ ฟังก์ชัน `store42` เขียนตัวเลข `42` เป็น little-endian integer 4 byte ที่ byte offset `0` จากนั้น JavaScript สร้าง `Int32Array` view บน buffer และอ่านค่านั้นกลับมา
+
+export const indexCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (func (export "store42")
+    i32.const 0
+    i32.const 42
+    i32.store))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+instance.exports.store42();
+const view = new Int32Array(instance.exports.mem.buffer);
+console.log('mem[0] =', view[0]);`;
+
+<WasmRunner client:visible code={indexCode} />
+
+<Callout title="ArrayBuffer เดียวที่แชร์ร่วมกัน">
+Linear memory คือ byte array ขนาดใหญ่ชุดเดียว — ทั้ง Wasm และ JS อ่านและเขียน ArrayBuffer เดียวกัน
+</Callout>
+
+export const quizLinearMemoryIndex = [
+  { q: "WebAssembly linear memory คืออะไร?", options: ["JavaScript heap ที่จัดการโดย browser GC", "กลุ่ม byte ต่อเนื่องที่แชร์ระหว่าง Wasm และ JS เป็น ArrayBuffer", "พื้นที่ memory แยกต่างหากจาก JavaScript", "Typed array ที่จัดสรรภายใน Web Worker"], answer: 1 },
+  { q: "ทำไม string ต้องเก็บใน linear memory แทนที่จะส่งตรงไปยังฟังก์ชัน Wasm?", options: ["เพราะฟังก์ชัน Wasm รับได้เฉพาะ numeric value type เท่านั้น ไม่มี string type", "เพราะ string ใน JavaScript เป็น immutable", "เพราะ Wasm ไม่สามารถ import ฟังก์ชัน JavaScript", "เพราะ ArrayBuffer ไม่รองรับ UTF-16"], answer: 0 },
+  { q: "JavaScript object ใดที่ทำหน้าที่ backup WebAssembly linear memory?", options: ["SharedArrayBuffer เท่านั้น", "JavaScript Array ธรรมดา", "ArrayBuffer", "DataView"], answer: 2 },
+];
+
+<Quiz client:visible id="linear-memory/index" questions={quizLinearMemoryIndex} />
+
+<ProgressTracker client:visible id="linear-memory/index" />
