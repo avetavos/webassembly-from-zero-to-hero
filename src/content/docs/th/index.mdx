@@ -1,6 +1,63 @@
 ---
 title: WebAssembly — From Zero to Hero
-description: Learn WebAssembly — the WAT text format, JS interop, linear memory, and compiling real languages to Wasm.
+description: เรียน WebAssembly ตั้งแต่พื้นฐาน — รูปแบบข้อความ WAT, JS interop, linear memory, การคอมไพล์ Rust/C/AssemblyScript, tooling และ WASI พร้อมตัวอย่างที่รันได้ในเบราว์เซอร์
 template: splash
+hero:
+  tagline: คอร์ส WebAssembly แบบ standalone ตั้งแต่ผู้เริ่มต้นจนถึงขั้นสูง เขียน WAT แล้วดูมันคอมไพล์และรันในเบราว์เซอร์ เชี่ยวชาญ JS interop และ linear memory แล้วคอมไพล์ภาษาจริงเป็น Wasm และก้าวข้ามเบราว์เซอร์ด้วย WASI
+  actions:
+    - text: เริ่มที่นี่
+      link: /webassembly-from-zero-to-hero/th/intro-what-is-wasm/
+      icon: right-arrow
+      variant: primary
+    - text: ข้ามไปที่รูปแบบ WAT
+      link: /webassembly-from-zero-to-hero/th/wat-text-format/
+      icon: open-book
 ---
-Coming soon.
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## สิ่งที่คุณจะได้เรียน
+
+<CardGrid>
+  <Card title="Intro: What is Wasm?" icon="rocket">
+    stack machine, ทำไม &amp; ที่ไหน Wasm รัน, โมดูลแรกของคุณ [เริ่ม →](/webassembly-from-zero-to-hero/th/intro-what-is-wasm/)
+  </Card>
+  <Card title="The WAT Text Format" icon="seti:default">
+    module, func, value type, local &amp; stack, เลขคณิต [เขียน WAT →](/webassembly-from-zero-to-hero/th/wat-text-format/)
+  </Card>
+  <Card title="Control Flow & Functions" icon="random">
+    block, branch, loop, if/else, call &amp; recursion [แตกแขนง →](/webassembly-from-zero-to-hero/th/control-flow-functions/)
+  </Card>
+  <Card title="JS Interop & Loading" icon="seti:javascript">
+    instantiate, import &amp; export, streaming, การส่งตัวเลข [เชื่อมต่อ →](/webassembly-from-zero-to-hero/th/js-interop/)
+  </Card>
+  <Card title="Linear Memory & Data" icon="document">
+    ArrayBuffer ที่แชร์กัน, typed-array view, การส่ง string, การขยาย [หน่วยความจำ →](/webassembly-from-zero-to-hero/th/linear-memory/)
+  </Card>
+  <Card title="Languages to Wasm" icon="seti:rust">
+    Rust (wasm-bindgen), C (Emscripten), AssemblyScript, การเลือกภาษา [คอมไพล์ →](/webassembly-from-zero-to-hero/th/languages-to-wasm/)
+  </Card>
+  <Card title="Tooling" icon="setting">
+    wabt, Binaryen (wasm-opt), การตรวจสอบ &amp; ลดขนาด .wasm [เครื่องมือ →](/webassembly-from-zero-to-hero/th/tooling/)
+  </Card>
+  <Card title="WASI & Beyond the Browser" icon="puzzle">
+    WASI, wasmtime/wasmer, component model, use case จริง [ไปต่อ →](/webassembly-from-zero-to-hero/th/wasi-and-beyond/)
+  </Card>
+</CardGrid>
+
+## คอร์สนี้ทำงานยังไง
+
+<CardGrid>
+  <Card title="รันในเบราว์เซอร์ของคุณ" icon="rocket">
+    เขียน WAT แล้วกด Run — มันคอมไพล์เป็น Wasm และรันตรงนี้เลยพร้อมผลลัพธ์จริง ไม่ต้องติดตั้ง
+  </Card>
+  <Card title="ไดอะแกรมที่อธิบายชัด" icon="puzzle">
+    stack machine, flow การ compile→instantiate และ memory layout เป็นไดอะแกรม Mermaid
+  </Card>
+  <Card title="Toolchain จริง" icon="approve-check">
+    คอมไพล์ Rust, C และ AssemblyScript เป็น Wasm — เปิดโปรเจกต์ AssemblyScript ที่รันได้ใน StackBlitz
+  </Card>
+  <Card title="สองภาษา + read mode" icon="translate">
+    ภาษาอังกฤษและไทย, แบบทดสอบที่บันทึกความคืบหน้า และโหมดอ่านแบบไร้สิ่งรบกวน
+  </Card>
+</CardGrid>
