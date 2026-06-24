@@ -1,0 +1,99 @@
+---
+title: 'What Is WebAssembly?'
+description: 'Explore the Wasm binary format, the stack VM, determinism, sandboxing, near-native speed, and the .wasm/.wat duality.'
+sidebar:
+  order: 2
+---
+
+import Callout from '../../../../components/Callout.astro';
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly is defined by four core properties: a **compact binary format**, a **stack-based virtual machine**, **deterministic execution**, and **sandboxed isolation**. Understanding each one explains why Wasm has become the universal portable execution layer it is today.
+
+## The Binary Format
+
+A `.wasm` file is a dense, type-annotated binary. Unlike JavaScript source, it requires no parsing beyond a single validation pass. The runtime can begin compiling it to native machine code almost immediately, which is why Wasm can achieve near-native performance even on first load.
+
+The binary is also small. Function bodies, type signatures, imports, and exports are all encoded in a minimal section-based layout. A module that does real work can weigh less than a kilobyte.
+
+## The Stack VM Model
+
+Wasm executes on a conceptual **stack machine**. Instructions push values onto an implicit operand stack and pop them off. There are no general-purpose registers you address by name — the VM manages them for you. This model is easy to validate (the type checker can walk the stack statically) and easy to compile to efficient register-based native code.
+
+You will explore this in depth in Module 2 when you write WAT by hand. For now, just note that `i32.const 42` pushes the 32-bit integer 42 onto the stack, and a function with `(result i32)` is expected to have exactly one i32 on the stack when it returns.
+
+## Deterministic Execution
+
+Given the same `.wasm` bytes and the same inputs, a Wasm module produces **identical results on every platform** — x86, ARM, RISC-V, browser, server, edge. Floating-point behaviour is specified precisely (IEEE 754 with no implementation-defined rounding modes), and there is no undefined behaviour in the C sense. This property makes Wasm excellent for reproducible builds, cryptography, simulation, and any domain where byte-exact reproducibility matters.
+
+## Sandboxed by Default
+
+Wasm modules are **hermetically isolated**. A fresh module has no access to the filesystem, the network, the DOM, clocks, or any other OS resource. It exists in a linear memory region that only it and its host can address. It can only interact with the outside world through functions that the host **explicitly imports** into it. If the host does not provide a function, the module cannot call it — period.
+
+This makes running untrusted third-party Wasm safe in a way that running arbitrary native code is not.
+
+## The .wasm / .wat Duality
+
+Every `.wasm` binary has an exact textual equivalent called **WAT** (WebAssembly Text format). The two representations are 1:1: any `.wasm` can be decoded to `.wat`, and any valid `.wat` can be assembled back to the identical `.wasm`. You will write WAT throughout this course as the clearest way to understand what the binary actually contains.
+
+Here is the simplest possible WAT module — a single exported function that returns the integer 42:
+
+```wasm
+(module
+  (func (export "answer") (result i32)
+    i32.const 42))
+```
+
+Reading this left-to-right: `module` is the top-level container; `func` defines a function; `(export "answer")` makes it callable from JavaScript as `instance.exports.answer()`; `(result i32)` declares it returns one 32-bit integer; and `i32.const 42` pushes 42 onto the stack, which becomes the return value.
+
+The runner below compiles that WAT string at runtime using WABT, instantiates the module, and calls `answer()`. You should see `answer() = 42` in the output.
+
+export const whatIsWasmCode = `const wat = \`(module (func (export "answer") (result i32) i32.const 42))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('answer() =', instance.exports.answer());`;
+
+<WasmRunner client:visible code={whatIsWasmCode} />
+
+<Callout title="Wasm runs in a sandbox">
+  Wasm code has no ambient access to the filesystem, network, or DOM. It can only do what the host explicitly imports into it. This makes untrusted Wasm modules safe to run.
+</Callout>
+
+export const quizWhatIsWasm = [
+  {
+    q: "What does 'deterministic execution' mean for WebAssembly?",
+    options: [
+      'It always runs faster than JavaScript',
+      'The same bytecode produces the same result on every platform',
+      'It prevents infinite loops',
+      'It uses the same random seed each run',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What is the relationship between .wasm and .wat?',
+    options: [
+      'They are completely different formats',
+      '.wat is compiled to .wasm, and they are 1:1 equivalent',
+      '.wasm is the source; .wat is an optimised form',
+      'WAT runs directly in the browser without compilation',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'By default, Wasm code can access...',
+    options: [
+      'The DOM and network directly',
+      'The filesystem and OS APIs',
+      'Only what the host explicitly imports into it',
+      'All browser APIs via window',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/what-is-wasm" questions={quizWhatIsWasm} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/what-is-wasm" />

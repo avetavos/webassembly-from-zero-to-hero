@@ -1,0 +1,108 @@
+---
+title: 'Why Wasm? Where Does It Run?'
+description: 'Understand the four reasons to use WebAssembly — speed, portability, language choice, security — and where it runs today.'
+sidebar:
+  order: 3
+---
+
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly did not appear by accident. It was designed to solve a specific cluster of problems that JavaScript alone cannot address. Understanding *why* Wasm exists — and *where* it runs — gives you the mental model you need to decide when to reach for it.
+
+## Four Reasons to Use Wasm
+
+### 1. Speed
+
+Wasm is compiled to a compact binary before it ever reaches the runtime. The engine does not parse source text, tokenize, or build an AST at load time. AOT or JIT compilation from the binary format is fast and produces near-native machine code. For compute-intensive work — image processing, audio codecs, cryptography, physics simulations — this gap is measurable and significant.
+
+### 2. Portability
+
+A single `.wasm` binary runs identically everywhere: x86-64 laptops, ARM phones, RISC-V embedded boards, browsers, edge nodes. There is no recompilation step for each target architecture. The runtime validates and executes the binary against a well-specified instruction set.
+
+### 3. Language Choice
+
+Wasm is a compilation *target*, not a language you write by hand in production. This means you choose the right tool for the job:
+
+- **Rust** — zero-cost abstractions, no garbage collector, excellent `wasm-pack` toolchain
+- **C / C++** — decades of existing native libraries, compiled with Emscripten
+- **Go** — good standard library support, growing ecosystem
+- **AssemblyScript** — TypeScript-like syntax that compiles directly to Wasm
+- **Python** — via Pyodide, a full CPython compiled to Wasm running in the browser
+
+### 4. Security
+
+Wasm runs inside a strict sandbox. The module cannot access the host's memory, file system, or network unless the host explicitly provides those capabilities as imports. Linear memory is bounds-checked on every access. There are no ambient permissions — a Wasm module starts with nothing and is granted only what it needs.
+
+## Where Wasm Runs Today
+
+### In the Browser
+
+The primary home of Wasm is the browser, via the WebAssembly JavaScript API. A page loads a `.wasm` binary, instantiates it with `WebAssembly.instantiate`, and calls its exported functions directly from JavaScript.
+
+```js
+const response = await fetch('module.wasm');
+const bytes = await response.arrayBuffer();
+const { instance } = await WebAssembly.instantiate(bytes, {});
+instance.exports.myFunction();
+```
+
+All major browsers — Chrome, Firefox, Safari, Edge — have shipped full Wasm support since 2017.
+
+### On the Server and Edge
+
+Node.js exposes the same `WebAssembly.*` API as the browser. Deno and Bun do the same. Cloudflare Workers and Fastly Compute support Wasm modules natively, which means you can deploy the identical binary to the browser *and* the edge without any changes.
+
+### Via WASI
+
+The **WebAssembly System Interface (WASI)** is a standardised ABI that lets Wasm code run outside the browser with controlled access to OS capabilities — files, sockets, clocks, random — without any JavaScript host at all. Runtimes like `wasmtime` and `wasmer` implement WASI, letting you execute a `.wasm` binary as a standalone process.
+
+### In Plugin Systems
+
+Wasm's sandboxing makes it ideal for plugin architectures. Tools like **Extism** and embedded `wasmtime` let applications load untrusted Wasm plugins, expose a controlled API surface, and enforce strict memory and capability limits — all without spinning up a separate process.
+
+## Wasm Complements JavaScript
+
+Wasm does not replace JavaScript. The DOM, event handling, fetch, and most web platform APIs are only accessible from JavaScript. The practical pattern is a division of labour: keep IO, events, and DOM manipulation in JavaScript, and hand CPU-heavy algorithms to a Wasm module.
+
+<Callout title="Wasm and JS are partners">
+  In the browser, Wasm shines for CPU-heavy work — codecs, cryptography, image/audio processing, physics engines, games. Keep DOM manipulation, event handling, and network IO in JavaScript. The two work best together.
+</Callout>
+
+export const quizWhyAndWhere = [
+  {
+    q: 'Which of these is NOT a primary reason to use WebAssembly?',
+    options: [
+      'Near-native execution speed',
+      'Built-in access to the DOM',
+      'Running code written in multiple languages',
+      'Deterministic sandboxed execution',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'WASI stands for...',
+    options: [
+      'WebAssembly Scripting Interface',
+      'Web API Standard Integration',
+      'WebAssembly System Interface',
+      'Wide-Area Script Interpreter',
+    ],
+    answer: 2,
+  },
+  {
+    q: 'Which statement best describes Wasm and JavaScript in the browser?',
+    options: [
+      'Wasm replaces JavaScript entirely',
+      'JavaScript replaces Wasm for all tasks',
+      'Wasm handles CPU-heavy work while JS handles the DOM and IO',
+      'They cannot be used in the same page',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/why-and-where" questions={quizWhyAndWhere} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/why-and-where" />

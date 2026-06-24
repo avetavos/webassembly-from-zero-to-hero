@@ -1,0 +1,97 @@
+---
+title: 'Value Types'
+description: 'The four core numeric types in WebAssembly: i32, i64, f32, and f64 — and how i64 maps to JavaScript BigInt.'
+sidebar:
+  order: 3
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly is a typed stack machine. Every value on the stack has a concrete type, and every function declares exactly what types it consumes and produces. But unlike most languages, Wasm has a very small set of types to choose from.
+
+## The four value types
+
+WebAssembly has exactly four value types:
+
+| Type | Width | Kind |
+|------|-------|------|
+| `i32` | 32-bit | Integer |
+| `i64` | 64-bit | Integer |
+| `f32` | 32-bit | Float |
+| `f64` | 64-bit | Float |
+
+There are no strings, booleans, arrays, or objects at the Wasm level. Everything is a number. Boolean logic is represented with `i32` values where `0` means false and any non-zero value means true.
+
+## Pushing constants onto the stack
+
+Each type has a `const` instruction that pushes a literal value:
+
+```wasm
+(module
+  (func (export "answer") (result i32)
+    i32.const 42))
+```
+
+For a 64-bit float:
+
+```wasm
+(module
+  (func (export "pi") (result f64)
+    f64.const 3.14159265358979))
+```
+
+And for a 64-bit integer — note that `i64` is special when crossing into JavaScript:
+
+```wasm
+(module
+  (func (export "bignum") (result i64)
+    i64.const 1000000000000))
+```
+
+## i64 and JavaScript BigInt
+
+JavaScript's `number` type is a 64-bit float, which can only represent integers exactly up to 2^53. An `i64` can hold values far beyond that. To preserve the full precision, the WebAssembly JavaScript API converts `i64` return values to `BigInt` rather than `number`. This means `typeof result === 'bigint'` — not `'number'`.
+
+You can verify this in the runner below.
+
+export const valueTypesCode = `const wat = \`(module
+  (func (export "pi") (result f64)
+    f64.const 3.14159265358979)
+  (func (export "bignum") (result i64)
+    i64.const 1000000000000))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('pi() =', instance.exports.pi());
+console.log('bignum() =', instance.exports.bignum());
+console.log('bignum is BigInt:', typeof instance.exports.bignum() === 'bigint');`;
+
+<WasmRunner client:visible code={valueTypesCode} />
+
+<Callout title="Wasm has only numeric types">
+  WebAssembly has exactly four value types: `i32`, `i64`, `f32`, and `f64`. There are no strings, booleans, or objects. When a function returns `i64`, JavaScript receives a `BigInt` — not a regular number.
+</Callout>
+
+export const quizValueTypes = [
+  {
+    q: "How many core value types does WebAssembly have?",
+    options: ["2 (integer and float)", "3 (i32, f64, and string)", "4 (i32, i64, f32, f64)", "8 (multiple integer widths)"],
+    answer: 2
+  },
+  {
+    q: "What JavaScript type does a Wasm `i64` return value become?",
+    options: ["number", "BigInt", "string", "undefined"],
+    answer: 1
+  },
+  {
+    q: "Which instruction pushes a floating-point constant onto the stack?",
+    options: ["f64.push 3.14", "f64.const 3.14", "push f64 3.14", "float.const 3.14"],
+    answer: 1
+  }
+];
+
+<Quiz client:visible id="wat-text-format/value-types" questions={quizValueTypes} />
+
+<ProgressTracker client:visible id="wat-text-format/value-types" />

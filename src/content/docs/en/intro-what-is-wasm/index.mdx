@@ -1,0 +1,82 @@
+---
+title: 'Intro: What Is WebAssembly?'
+description: 'Discover what WebAssembly is, what this course covers, and how source languages compile to a .wasm binary.'
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly (Wasm) is a **portable binary instruction format** designed for a stack-based virtual machine. It is not a programming language you write by hand in production — it is a **compilation target**: a compact, validated binary that browsers, servers, and edge runtimes can load and execute at near-native speed.
+
+Think of it the way you think of bytecode in the JVM or CLR, except it is designed to be vendor-neutral and run anywhere — in Chrome, Firefox, Safari, Node.js, Deno, Cloudflare Workers, and beyond.
+
+## What This Course Covers
+
+This course takes you from zero familiarity to confident Wasm practitioner. Here is what each module covers:
+
+| Module | Topic |
+|---|---|
+| 1 — Intro | What Wasm is, the binary/text duality, the stack VM model |
+| 2 — WAT Text Format | Writing WebAssembly Text format by hand to understand the fundamentals |
+| 3 — JS Interop | Calling Wasm from JavaScript and passing data back and forth |
+| 4 — Linear Memory | How Wasm's flat memory model works and how to share it with JS |
+| 5 — Languages to Wasm | Compiling Rust, C/C++, and AssemblyScript to `.wasm` |
+| 6 — Tooling | `wasm-pack`, `wasm-bindgen`, `emcc`, optimization, debugging |
+| 7 — WASI | The WebAssembly System Interface — running Wasm outside the browser |
+
+## How Source Code Becomes a `.wasm` Binary
+
+Every `.wasm` file starts life as source code in a higher-level language. A compiler reads that source and emits the compact binary that the runtime loads directly.
+
+export const sourceDiagram = `flowchart LR
+  A["Rust / C / C++ / AssemblyScript"] --> B["Compiler\n(rustc / emcc / asc)"]
+  B --> C[".wasm binary"]
+  C --> D["Browser\n(JS + Wasm API)"]
+  C --> E["Server / Edge\n(Node.js / WASI)"]`;
+
+<Mermaid code={sourceDiagram} title="Source language → compiler → .wasm binary → runtime" />
+
+<Callout title="Wasm is a compilation target">
+  You almost never write Wasm by hand in production. Instead you write Rust, C, C++, AssemblyScript (or WAT for learning) and compile to a compact `.wasm` binary. The browser or server loads the binary directly.
+</Callout>
+
+export const quizIntroIndex = [
+  {
+    q: 'What is WebAssembly?',
+    options: [
+      'A new programming language replacing JavaScript',
+      'A portable binary instruction format for a stack-based virtual machine',
+      'A JavaScript framework for web apps',
+      'A browser-specific scripting language',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'In production, .wasm binaries are typically produced by...',
+    options: [
+      'Writing WAT by hand',
+      'Compiling from a higher-level language like Rust or C',
+      'Transpiling JavaScript',
+      'Downloading from npm',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'Where can WebAssembly run?',
+    options: [
+      'Only in Chrome',
+      'Only in browsers',
+      'In browsers and server/edge runtimes',
+      'Only on Linux servers',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/index" questions={quizIntroIndex} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/index" />

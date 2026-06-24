@@ -1,0 +1,73 @@
+---
+title: 'JS Interop & Loading'
+description: 'Understand the boundary between JavaScript and WebAssembly — JS loads, compiles, and instantiates a module, provides imports, and calls exports.'
+sidebar:
+  order: 1
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly does not run on its own. It always runs inside a **host environment**, and on the web that host is JavaScript. JS is responsible for fetching the `.wasm` bytes, compiling them into a `WebAssembly.Module`, instantiating that module with any required imports, and finally calling the exported functions the module exposes. Wasm, for its part, lives in a tightly sandboxed memory environment — it cannot reach out to the DOM, the network, or any browser API unless JavaScript hands it a function that does so.
+
+## The host–module boundary
+
+The relationship between JS and Wasm is deliberate and explicit. Before any Wasm code runs, JavaScript must supply an **imports object** — a plain JS object whose keys match the import declarations inside the WAT module. Those imports can be JS functions, `WebAssembly.Memory` instances, `WebAssembly.Global` instances, or `WebAssembly.Table` instances. In return, once the module is instantiated, JS gets back an `instance.exports` object containing every symbol the module chose to export.
+
+export const boundaryDiagram = `flowchart LR
+  JS["JavaScript (host)"]
+  COMPILE["WebAssembly.instantiate(bytes, imports)"]
+  IMPORTS["imports object\n(functions, memory, globals)"]
+  MODULE["WebAssembly Module"]
+  EXPORTS["instance.exports\n(functions, memory, globals)"]
+
+  JS -->|"fetch .wasm bytes"| COMPILE
+  JS -->|"provides"| IMPORTS
+  IMPORTS --> COMPILE
+  COMPILE --> MODULE
+  MODULE -->|"exposes"| EXPORTS
+  EXPORTS -->|"JS calls exports"| JS`;
+
+<Mermaid code={boundaryDiagram} title="The JS ↔ Wasm boundary" />
+
+## A minimal runnable example
+
+The WAT module below exports a single function `greet` that takes no arguments and returns the integer `42`. The JavaScript side compiles the bytes, instantiates the module with an empty imports object `{}`, and calls `instance.exports.greet()`.
+
+```wasm
+(module
+  (func (export "greet") (result i32)
+    i32.const 42))
+```
+
+```js
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('greet() =', instance.exports.greet()); // 42
+```
+
+export const interopIndexCode = `const wat = \`(module
+  (func (export "greet") (result i32)
+    i32.const 42))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('greet() =', instance.exports.greet());`;
+
+<WasmRunner client:visible code={interopIndexCode} />
+
+<Callout title="Wasm is sandboxed by design">
+Wasm can't touch the DOM or network itself — JS hands it imports and reads its exports.
+</Callout>
+
+export const quizJsInteropIndex = [
+  { q: "What does JavaScript provide to a Wasm module at instantiation?", options: ["Only memory", "An imports object with functions, memory, and globals", "A DOM reference", "Compiled bytecode"], answer: 1 },
+  { q: "Which JS API instantiates a compiled Wasm module?", options: ["WebAssembly.compile()", "WebAssembly.run()", "WebAssembly.instantiate()", "WebAssembly.load()"], answer: 2 },
+  { q: "Can Wasm directly call DOM APIs?", options: ["Yes, through the global object", "Yes, using memory pointers", "No — it must import JS functions that do it", "No, but it can access navigator"], answer: 2 },
+];
+
+<Quiz client:visible id="js-interop/index" questions={quizJsInteropIndex} />
+
+<ProgressTracker client:visible id="js-interop/index" />

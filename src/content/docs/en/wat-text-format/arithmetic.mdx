@@ -1,0 +1,153 @@
+---
+title: Arithmetic and Comparisons
+description: 'Integer and float arithmetic, signed vs unsigned division, and comparison instructions that return 0 or 1.'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly provides a rich set of arithmetic and comparison instructions. Each instruction is typed — you always know whether you are working with integers or floats, and for integers, whether the operation is signed or unsigned.
+
+## Integer arithmetic
+
+The four basic operations for `i32` are `i32.add`, `i32.sub`, `i32.mul`, and division. All pop two operands and push one result:
+
+```wasm
+(module
+  (func (export "add") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.add)
+  (func (export "sub") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.sub)
+  (func (export "mul") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.mul))
+```
+
+The same instructions exist for `i64`: `i64.add`, `i64.sub`, `i64.mul`.
+
+## Signed vs unsigned division
+
+Division is where integer types reveal their complexity. An `i32` is just 32 bits — the bits themselves carry no sign information. The **instruction** decides whether to interpret those bits as a two's-complement signed integer or as an unsigned integer:
+
+```wasm
+(module
+  ;; signed: -7 / 2 = -3 (rounds toward zero)
+  (func (export "divSigned") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.div_s)
+
+  ;; unsigned: the same bit pattern as -7 (0xFFFFFFF9) / 2 = 2147483644
+  (func (export "divUnsigned") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.div_u))
+```
+
+Similarly `i32.rem_s` and `i32.rem_u` give signed and unsigned remainder.
+
+## Float arithmetic
+
+Float instructions mirror integer ones, but the type prefix changes:
+
+```wasm
+(module
+  (func (export "fadd") (param $a f64) (param $b f64) (result f64)
+    local.get $a
+    local.get $b
+    f64.add))
+```
+
+`f64.sub`, `f64.mul`, `f64.div`, `f64.sqrt`, `f64.floor`, `f64.ceil`, `f64.min`, and `f64.max` are all available. The same set exists for `f32`.
+
+## Comparison instructions
+
+Comparisons pop two values and push an `i32` result: `1` for true, `0` for false. There is no boolean type — WebAssembly uses `i32` as a boolean whenever it needs one.
+
+```wasm
+(module
+  ;; returns 1 if $a equals $b, else 0
+  (func (export "eq") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.eq)
+
+  ;; signed less-than: returns 1 if $a < $b (signed), else 0
+  (func (export "ltSigned") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.lt_s))
+```
+
+Comparison variants follow the same signed/unsigned pattern: `i32.lt_s` vs `i32.lt_u`, `i32.gt_s` vs `i32.gt_u`, `i32.le_s`, `i32.ge_u`, and so on.
+
+## Run it
+
+The example below compiles a module with subtraction, signed division, and a signed less-than comparison.
+
+export const arithmeticCode = `const wat = \`(module
+  (func (export "sub") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.sub)
+  (func (export "divS") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.div_s)
+  (func (export "isLess") (param $a i32) (param $b i32) (result i32)
+    local.get $a
+    local.get $b
+    i32.lt_s))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('sub(10, 3) =', instance.exports.sub(10, 3));
+console.log('divS(-7, 2) =', instance.exports.divS(-7, 2));
+console.log('isLess(3, 5) =', instance.exports.isLess(3, 5), '(1 = true)');
+console.log('isLess(5, 3) =', instance.exports.isLess(5, 3), '(0 = false)');`;
+
+<WasmRunner client:visible code={arithmeticCode} />
+
+<Callout title="Signedness is in the instruction, not the type">
+WebAssembly integer types (`i32`, `i64`) are just bit patterns — they carry no inherent sign. Division and remainder come in two variants: `div_s` / `rem_s` treat the bits as two's-complement signed integers; `div_u` / `rem_u` treat them as unsigned. Comparisons follow the same rule: `i32.lt_s` vs `i32.lt_u`. The type alone never tells you which interpretation is used.
+</Callout>
+
+export const quizArithmetic = [
+  {
+    q: "What does `i32.lt_s` return when the comparison is true?",
+    options: ["true (boolean)", "1 (i32)", "0 (i32)", "-1 (i32)"],
+    answer: 1
+  },
+  {
+    q: "What is the difference between `i32.div_s` and `i32.div_u`?",
+    options: [
+      "div_s is faster",
+      "div_s treats operands as signed; div_u treats them as unsigned",
+      "div_u only works on 64-bit values",
+      "They are identical — the result is always the same"
+    ],
+    answer: 1
+  },
+  {
+    q: "Which instruction multiplies two i32 values?",
+    options: ["i32.mul", "i32.times", "i32.product", "int.mul32"],
+    answer: 0
+  },
+  {
+    q: "Wasm comparisons like `i32.eq` push what type onto the stack?",
+    options: ["bool", "f64", "i32 (0 or 1)", "i1"],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="wat-text-format/arithmetic" questions={quizArithmetic} />
+
+<ProgressTracker client:visible id="wat-text-format/arithmetic" />

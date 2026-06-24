@@ -1,0 +1,69 @@
+---
+title: 'Linear Memory'
+description: 'Learn what linear memory is, why WebAssembly needs it, and how Wasm and JavaScript share a single ArrayBuffer for strings, arrays, and structs.'
+sidebar:
+  order: 1
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly functions work exclusively with numbers — `i32`, `i64`, `f32`, and `f64`. That is the complete set. There is no string type, no array type, no struct type. So how do you pass a string from JavaScript to a Wasm function, or build a dynamic array inside Wasm? The answer is **linear memory**.
+
+## What is linear memory?
+
+Linear memory is a single, contiguous block of bytes that both WebAssembly and JavaScript can read and write. On the WebAssembly side you access it with instructions like `i32.load` and `i32.store`. On the JavaScript side you get a plain `ArrayBuffer` — the same object you already use with `TypedArray` views like `Uint8Array` and `Int32Array`.
+
+The word "linear" means the address space is flat and one-dimensional: every byte has a numeric offset starting at `0`, and addresses increase linearly up to the current size of the buffer. There are no pointers-to-pointers, no heap metadata visible to the language, just raw bytes at numeric offsets.
+
+export const memoryLayoutDiagram = `flowchart LR
+  A["WebAssembly\\n(i32.load / i32.store)"] --> B["Shared ArrayBuffer\\n(linear memory)"]
+  B --> A
+  C["JavaScript\\n(typed array views)"] --> B
+  B --> C`;
+
+<Mermaid code={memoryLayoutDiagram} title="Wasm and JS share one ArrayBuffer" />
+
+## Why linear memory exists
+
+Wasm's numeric-only value model is a deliberate design choice that keeps the instruction set small, the execution engine simple, and performance predictable. But real programs need complex data — UTF-8 strings, byte arrays, structs with multiple fields. Linear memory provides the escape hatch:
+
+- **Strings** are stored as a sequence of UTF-8 bytes at some offset. You pass the offset (an `i32`) and the byte length (another `i32`) to a Wasm function instead of passing the string directly.
+- **Arrays** are a run of values written consecutively starting at a base address.
+- **Structs** are fields packed at fixed offsets from a base address, exactly like C structs.
+
+JavaScript and Wasm both hold a reference to the same `ArrayBuffer`, so writes from one side are immediately visible on the other — no serialization, no copying.
+
+## A minimal example
+
+The module below declares one page of memory and exports it so JavaScript can inspect it. The `store42` function writes the number `42` as a 4-byte little-endian integer at byte offset `0`. JavaScript then creates an `Int32Array` view over the buffer and reads that value back.
+
+export const indexCode = `const wat = \`(module
+  (memory (export "mem") 1)
+  (func (export "store42")
+    i32.const 0
+    i32.const 42
+    i32.store))\`;
+const { instance } = await WebAssembly.instantiate(await compileWat(wat), {});
+instance.exports.store42();
+const view = new Int32Array(instance.exports.mem.buffer);
+console.log('mem[0] =', view[0]);`;
+
+<WasmRunner client:visible code={indexCode} />
+
+<Callout title="One shared ArrayBuffer">
+Linear memory is one big byte array — both Wasm and JS read and write the same ArrayBuffer.
+</Callout>
+
+export const quizLinearMemoryIndex = [
+  { q: "What is WebAssembly linear memory?", options: ["A JavaScript heap managed by the browser GC", "A contiguous block of bytes shared between Wasm and JS as an ArrayBuffer", "A separate process memory space isolated from JavaScript", "A typed array allocated inside a Web Worker"], answer: 1 },
+  { q: "Why do strings need to be stored in linear memory rather than passed directly to a Wasm function?", options: ["Because Wasm functions only accept numeric value types — there is no string type", "Because strings are immutable in JavaScript", "Because Wasm cannot import JavaScript functions", "Because ArrayBuffer does not support UTF-16"], answer: 0 },
+  { q: "What JavaScript object backs WebAssembly linear memory?", options: ["SharedArrayBuffer only", "A regular JavaScript Array", "An ArrayBuffer", "A DataView"], answer: 2 },
+];
+
+<Quiz client:visible id="linear-memory/index" questions={quizLinearMemoryIndex} />
+
+<ProgressTracker client:visible id="linear-memory/index" />

@@ -1,0 +1,130 @@
+---
+title: 'Your First Wasm Module'
+description: 'Write a WAT module from scratch, compile it with compileWat, instantiate it, and call an exported function from JavaScript.'
+sidebar:
+  order: 5
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Every Wasm journey starts with the same loop: **write** a module in the WebAssembly Text format (WAT), **compile** it to bytes, **instantiate** it, and **call** an exported function. This lesson walks through that loop end-to-end with the smallest possible example — a `double` function that multiplies its argument by two.
+
+By the end you will have written real WAT, compiled it live in the browser, and called it from JavaScript.
+
+## Writing the WAT Module
+
+WAT is the human-readable text representation of a `.wasm` binary. Here is the complete module:
+
+```wasm
+(module
+  (func (export "double") (param $n i32) (result i32)
+    local.get $n
+    i32.const 2
+    i32.mul))
+```
+
+Let's break down every line:
+
+- **`(module ...)`** — the top-level wrapper. Every `.wasm` file contains exactly one module.
+- **`(func (export "double") ...)`** — declares a function and immediately makes it visible to the host as `"double"`. The export name is what JavaScript sees on `instance.exports`.
+- **`(param $n i32)`** — declares one parameter named `$n` of type `i32` (a 32-bit signed integer). The `$n` label is a WAT convenience — at the binary level it is just an index.
+- **`(result i32)`** — declares that this function returns one `i32`.
+- **`local.get $n`** — pushes the current value of `$n` onto the operand stack.
+- **`i32.const 2`** — pushes the constant `2` onto the stack.
+- **`i32.mul`** — pops the top two stack values, multiplies them, and pushes the result. Because this is the last instruction and its type matches `(result i32)`, the result becomes the return value.
+
+Wasm's stack-based design means there is no explicit `return` — the value left on top of the stack at the end of the function body is the return value.
+
+## Compile: WAT Bytes with `compileWat`
+
+The sandbox exposes a global `compileWat(watString)` function powered by the WABT library. It takes your WAT source string and returns a `Promise<Uint8Array>` — the raw `.wasm` bytes you would normally get from a file on disk or a network fetch.
+
+```js
+const bytes = await compileWat(wat);
+```
+
+## Instantiate: `WebAssembly.instantiate`
+
+`WebAssembly.instantiate(bytes, importObject)` is the standard browser API for creating a runnable Wasm instance. It returns a `Promise` that resolves to a `{ instance, module }` pair:
+
+- **`instance`** — the live, runnable object. Its `.exports` property contains all the functions and memories the module exported.
+- **`module`** — the compiled but inert `WebAssembly.Module`. You can share and re-instantiate it without recompiling.
+
+The second argument is the **import object** — a nested object of functions, memories, and globals you provide to the module from JavaScript. Because our `double` function imports nothing from the host, we pass `{}`.
+
+```js
+const { instance } = await WebAssembly.instantiate(bytes, {});
+```
+
+## Call: `instance.exports.double`
+
+Once instantiated, every exported function is available as a plain JavaScript function on `instance.exports`:
+
+```js
+instance.exports.double(21); // → 42
+```
+
+JavaScript numbers are automatically coerced to/from `i32`. The call is synchronous — no `await` needed.
+
+## Try It Live
+
+The runner below compiles the WAT, instantiates it, and calls `double` with three different inputs. Run it and watch the results in the console.
+
+export const firstModuleCode = `const wat = \`(module
+  (func (export "double") (param $n i32) (result i32)
+    local.get $n
+    i32.const 2
+    i32.mul))\`;
+
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+
+console.log('double(5)   =', instance.exports.double(5));
+console.log('double(21)  =', instance.exports.double(21));
+console.log('double(100) =', instance.exports.double(100));`;
+
+<WasmRunner client:visible code={firstModuleCode} />
+
+<Callout title="The compile–instantiate–call loop">
+  Every Wasm module follows the same pattern: compile to bytes, instantiate with `WebAssembly.instantiate`, then call an export. The second argument to `instantiate` is the import object — functions and memory you provide to the module from JavaScript. For now it is empty, but later lessons will fill it in.
+</Callout>
+
+export const quizYourFirstModule = [
+  {
+    q: 'What does `WebAssembly.instantiate(bytes, {})` return?',
+    options: [
+      'A string of WAT source code',
+      'A { instance, module } pair',
+      'A Promise<void>',
+      'The exported functions directly',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'What does the empty object `{}` represent in `WebAssembly.instantiate(bytes, {})`?',
+    options: [
+      'An empty result buffer',
+      'The import object — functions/memory provided by the host to the module',
+      'A debug options bag',
+      'The Wasm globals table',
+    ],
+    answer: 1,
+  },
+  {
+    q: 'In the `double` WAT function, which instruction produces the final return value?',
+    options: [
+      'local.get $n',
+      'i32.const 2',
+      'i32.mul',
+      '(result i32)',
+    ],
+    answer: 2,
+  },
+];
+
+<Quiz client:visible id="intro-what-is-wasm/your-first-module" questions={quizYourFirstModule} />
+
+<ProgressTracker client:visible id="intro-what-is-wasm/your-first-module" />

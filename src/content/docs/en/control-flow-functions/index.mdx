@@ -1,0 +1,105 @@
+---
+title: 'Control Flow — Overview'
+description: 'WebAssembly uses structured control flow: block, loop, and if with labeled branch targets — no arbitrary jumps.'
+sidebar:
+  order: 1
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly has no `goto`, no raw jump addresses, and no unstructured branches. Every transfer of control happens inside a labeled construct, and `br` targets that label — not a memory address or a line number. This design makes Wasm programs safe to validate in a single linear pass and easy for browsers to compile efficiently.
+
+## Structured constructs
+
+Wasm provides exactly three control-flow constructs:
+
+- **`block`** — a forward-only group. `br $label` exits the block, jumping to the instruction immediately *after* the closing `end`. Think of it as a labeled break.
+- **`loop`** — a backward-branch target. `br $label` jumps to the *beginning* of the loop, repeating it. Exiting a loop requires branching to an outer label or falling off the end.
+- **`if`** — a conditional branch. Pops an `i32` from the stack; if non-zero it executes the `then` arm, otherwise the optional `else` arm.
+
+All three constructs can carry a result type, making them expressions that leave a value on the stack.
+
+## Branch targets and direction
+
+The key insight is that `br` in Wasm is not a jump to an address. It is a jump *relative to the nesting structure*. A `br $b` inside a `block $b` exits that block; the same `br $l` inside a `loop $l` repeats that loop.
+
+export const cfOverviewDiagram = `flowchart LR
+  A["block \$b\\n  ...body...\\n  br \$b"] --> B["jumps to END\\nof block"]
+  C["loop \$l\\n  ...body...\\n  br_if \$l"] --> D["jumps to START\\nof loop"]`;
+
+<Mermaid code={cfOverviewDiagram} title="Branch targets in block vs loop" />
+
+`br_if` is the conditional variant — it pops an `i32` condition and only branches if it is non-zero.
+
+## What this module covers
+
+This module walks through each construct in depth:
+
+1. **`block` and `br`** — using labeled breaks to exit early from a sequence of instructions.
+2. **`loop` and `br_if`** — writing counted and conditional loops.
+3. **`if / else`** — conditional execution with optional result values.
+
+## Early exit with block and br
+
+The simplest use of `block` is an early-exit pattern. The function below pushes `42`, immediately branches out of the block, and the `i32.const 99` after the branch is never reached.
+
+```wasm
+(module
+  (func (export "earlyExit") (result i32)
+    (block $b (result i32)
+      i32.const 42
+      br $b
+      i32.const 99)  ;; never reached
+  ))
+```
+
+The `block` has a result type of `i32`. When `br $b` fires, the value `42` is already on the stack and it becomes the result of the block expression — and therefore the return value of the function.
+
+## Run it
+
+export const indexCode = `const wat = \`(module
+  (func (export "earlyExit") (result i32)
+    (block $b (result i32)
+      i32.const 42
+      br $b
+      i32.const 99)))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('earlyExit() =', instance.exports.earlyExit(), '(should be 42, not 99)');`;
+
+<WasmRunner client:visible code={indexCode} />
+
+<Callout title="br targets a label, not an address">
+Wasm control flow is structured — `br` targets a labeled `block` or `loop`, not an arbitrary address. This makes validation and compilation straightforward, and it is why Wasm has no equivalent of `goto`.
+</Callout>
+
+export const quizCfIndex = [
+  {
+    q: "What does `br` target in WebAssembly?",
+    options: [
+      "An absolute memory address",
+      "A labeled block or loop construct",
+      "The next instruction in the function",
+      "A JavaScript callback"
+    ],
+    answer: 1
+  },
+  {
+    q: "Which Wasm construct allows repeating a sequence of instructions?",
+    options: ["block", "loop", "if", "repeat"],
+    answer: 1
+  },
+  {
+    q: "Which instruction conditionally branches, based on an i32 value on the stack?",
+    options: ["br", "br_table", "br_if", "if"],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="control-flow-functions/index" questions={quizCfIndex} />
+
+<ProgressTracker client:visible id="control-flow-functions/index" />

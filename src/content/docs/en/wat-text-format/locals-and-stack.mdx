@@ -1,0 +1,117 @@
+---
+title: 'Locals and the Stack'
+description: 'Local variables, local.get/local.set/local.tee, and how the WebAssembly value stack works.'
+sidebar:
+  order: 4
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Mermaid from '../../../../components/Mermaid.astro';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+WebAssembly is a stack machine. There is no register file like in x86 or ARM — instead, instructions communicate by pushing and popping values on an implicit value stack. Understanding this model is the key to reading WAT fluently.
+
+## The value stack
+
+Every instruction operates on the top of the stack. An instruction pops its inputs and pushes its output. For example, `i32.add` pops two `i32` values and pushes one `i32` result.
+
+export const stackDiagram = `flowchart LR
+  A["Stack: []\\ni32.const 10"] --> B["Stack: [10]\\ni32.const 3"]
+  B --> C["Stack: [10, 3]\\ni32.add"]
+  C --> D["Stack: [13]"]`;
+
+<Mermaid code={stackDiagram} title="Value stack during i32.const 10 / i32.const 3 / i32.add" />
+
+At the end of a function, whatever is left on the stack must exactly match the declared `result` types. Leave too much or too little and the module fails validation.
+
+## Local variables
+
+Besides the stack, functions can declare local variables using `(local $name type)`. These are mutable slots that live for the duration of the function call.
+
+```wasm
+(module
+  (func (export "example") (param $x i32) (result i32)
+    (local $tmp i32)
+    local.get $x     ;; push $x
+    i32.const 1
+    i32.add          ;; pop two, push sum
+    local.set $tmp   ;; pop and store in $tmp
+    local.get $tmp)) ;; push $tmp back
+```
+
+Parameters are also locals — you can read them with `local.get` just like declared locals, but they are initialized with the call arguments.
+
+## local.tee: store and keep
+
+`local.tee` is like `local.set` but it leaves a copy of the value on the stack after storing. It is useful when you need to both save a value and immediately use it:
+
+```wasm
+(module
+  (func (export "storeAndDouble") (param $n i32) (result i32)
+    (local $saved i32)
+    local.get $n
+    local.tee $saved  ;; stores $n in $saved AND leaves the value on stack
+    i32.const 2
+    i32.mul))         ;; doubles the value that tee left behind
+```
+
+Without `local.tee` you would need `local.set` followed by `local.get`, which is two instructions instead of one.
+
+export const localsCode = `const wat = \`(module
+  (func (export "doubleSum") (param $a i32) (param $b i32) (result i32)
+    (local $sum i32)
+    local.get $a
+    local.get $b
+    i32.add
+    local.set $sum
+    local.get $sum
+    i32.const 2
+    i32.mul))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('doubleSum(3, 4) =', instance.exports.doubleSum(3, 4));`;
+
+<WasmRunner client:visible code={localsCode} />
+
+<Callout title="Wasm is a stack machine">
+  Each instruction pops its operand(s) from the value stack and pushes its result. `local.get` pushes a local variable's value; `local.set` pops and stores it; `local.tee` pops, stores, and pushes the value back — handy when you need to both save and use a value.
+</Callout>
+
+export const quizLocalsAndStack = [
+  {
+    q: "What does `local.tee $x` do?",
+    options: [
+      "Pops a value and stores it in $x, discarding it",
+      "Pushes the current value of $x without consuming it",
+      "Pops a value, stores it in $x, and pushes it back onto the stack",
+      "Swaps the top two values on the stack"
+    ],
+    answer: 2
+  },
+  {
+    q: "In a stack machine, what happens when `i32.add` executes?",
+    options: [
+      "It reads two globals and pushes their sum",
+      "It pops two i32 values and pushes their sum",
+      "It pushes two i32 values and waits for a pop",
+      "It adds the top value to a local variable"
+    ],
+    answer: 1
+  },
+  {
+    q: "Where must `(local $x i32)` appear in a function?",
+    options: [
+      "After the first instruction",
+      "At the very end of the function body",
+      "Before any instructions, after the param/result declarations",
+      "Anywhere in the function body"
+    ],
+    answer: 2
+  }
+];
+
+<Quiz client:visible id="wat-text-format/locals-and-stack" questions={quizLocalsAndStack} />
+
+<ProgressTracker client:visible id="wat-text-format/locals-and-stack" />

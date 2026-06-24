@@ -1,0 +1,109 @@
+---
+title: 'Modules and Functions'
+description: 'Understand the (module ...) wrapper, how to declare functions with (func ...), and how to export them to JavaScript.'
+sidebar:
+  order: 2
+---
+
+import WasmRunner from '../../../../components/WasmRunner.tsx';
+import Callout from '../../../../components/Callout.astro';
+import Quiz from '../../../../components/Quiz.tsx';
+import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+Every piece of WebAssembly code lives inside a **module**. The module is the top-level unit of compilation and deployment — it is what you compile, transfer over the network, and instantiate in the browser. Inside a module you define functions, declare memory, import from JavaScript, and choose what to export.
+
+## The module wrapper
+
+The outermost s-expression in every WAT file is `(module ...)`. Everything else is nested inside it:
+
+```wasm
+(module
+  ;; functions, imports, exports, memory, globals go here
+)
+```
+
+A module with no contents is valid WAT and compiles to a tiny `.wasm` file — it just has nothing useful in it yet.
+
+## Declaring a function
+
+Functions are declared with `(func ...)`. A function that takes no arguments and returns nothing looks like this:
+
+```wasm
+(module
+  (func
+    ;; empty body — does nothing
+  )
+)
+```
+
+To accept arguments you add `(param <name> <type>)` attributes. To declare a return type you add `(result <type>)`. Parameter names start with `$` and are optional but strongly recommended for readability:
+
+```wasm
+(module
+  (func (param $x i32) (param $y i32) (result i32)
+    local.get $x
+    local.get $y
+    i32.mul)
+)
+```
+
+This module compiles fine, but the function is completely unreachable from JavaScript because it has not been exported.
+
+## Exporting functions
+
+JavaScript can only call functions the module explicitly exports. There are two equivalent syntaxes.
+
+**Separate export statement** — define the function with a name, then export it:
+
+```wasm
+(module
+  (func $multiply (param $x i32) (param $y i32) (result i32)
+    local.get $x
+    local.get $y
+    i32.mul)
+  (export "multiply" (func $multiply))
+)
+```
+
+**Inline export** — attach the export directly to the `func` declaration:
+
+```wasm
+(module
+  (func (export "multiply") (param $x i32) (param $y i32) (result i32)
+    local.get $x
+    local.get $y
+    i32.mul)
+)
+```
+
+Both forms produce identical `.wasm` bytes. The inline style is more concise; the separate-statement style is useful when you want to export the same function under multiple names or keep declarations and exports visually separated.
+
+## Run it
+
+The example below defines a `multiply` function using the inline export syntax and calls it from JavaScript.
+
+export const modulesCode = `const wat = \`(module
+  (func (export "multiply") (param $x i32) (param $y i32) (result i32)
+    local.get $x
+    local.get $y
+    i32.mul))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('multiply(6, 7) =', instance.exports.multiply(6, 7));
+console.log('multiply(3, 4) =', instance.exports.multiply(3, 4));`;
+
+<WasmRunner client:visible code={modulesCode} />
+
+<Callout title="Everything lives in a module">
+Every WebAssembly function, global, memory, and table lives inside a `(module ...)` wrapper. JavaScript can only call functions the module explicitly exports.
+</Callout>
+
+export const quizModulesAndFuncs = [
+  { q: "Which syntax exports a function from a WAT module?", options: ['`(export "name" (func $f))`', '`(public func $f)`', '`export default func $f`', '`module.exports.f = $f`'], answer: 0 },
+  { q: "Can JavaScript call a function that is defined but not exported?", options: ["Yes, using WebAssembly.Module.exports()", "Yes, by index", "No — only exported functions are accessible from JS", "Yes, if the function has a name starting with $"], answer: 2 },
+  { q: "What is the outermost s-expression in every WAT file?", options: ["(func ...)", "(export ...)", "(module ...)", "(wasm ...)"], answer: 2 },
+];
+
+<Quiz client:visible id="wat-text-format/modules-and-funcs" questions={quizModulesAndFuncs} />
+
+<ProgressTracker client:visible id="wat-text-format/modules-and-funcs" />
