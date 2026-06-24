@@ -9,12 +9,12 @@ export default defineConfig({
   // GitHub Pages project site. Update `site` to your GitHub username and `base`
   // to your repo name if they differ.
   site: 'https://avetavos.github.io',
-  base: '/nodejs-deep-dive',
+  base: '/webassembly-from-zero-to-hero',
   output: 'static',
   integrations: [starlight({
-      title: 'Node.js Deep Dive',
+      title: 'WebAssembly — From Zero to Hero',
       head: [
-        { tag: 'script', attrs: { type: 'module', src: '/nodejs-deep-dive/enhance.js' } },
+        { tag: 'script', attrs: { type: 'module', src: '/webassembly-from-zero-to-hero/enhance.js' } },
       ],
       defaultLocale: 'en',
       locales: {
@@ -22,15 +22,16 @@ export default defineConfig({
         th: { label: 'ไทย', lang: 'th' },
       },
       customCss: ['./src/styles/custom.css'],
-      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/avetavos/nodejs-deep-dive' }],
+      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/avetavos/webassembly-from-zero-to-hero' }],
       sidebar: [
-        { label: 'JavaScript Essentials', items: [{ autogenerate: { directory: 'js-essentials' } }] },
-        { label: 'Event Loop & Async', items: [{ autogenerate: { directory: 'event-loop-async' } }] },
-        { label: 'Core APIs', items: [{ autogenerate: { directory: 'core-apis' } }] },
-        { label: 'Streams & I/O', items: [{ autogenerate: { directory: 'streams' } }] },
-        { label: 'HTTP & Networking', items: [{ autogenerate: { directory: 'http-networking' } }] },
-        { label: 'Modules & npm', items: [{ autogenerate: { directory: 'modules-npm' } }] },
-        { label: 'Testing & Tooling', items: [{ autogenerate: { directory: 'testing-tooling' } }] },
+        { label: 'Intro: What is Wasm?', items: [{ autogenerate: { directory: 'intro-what-is-wasm' } }] },
+        { label: 'The WAT Text Format', items: [{ autogenerate: { directory: 'wat-text-format' } }] },
+        { label: 'Control Flow & Functions', items: [{ autogenerate: { directory: 'control-flow-functions' } }] },
+        { label: 'JS Interop & Loading', items: [{ autogenerate: { directory: 'js-interop' } }] },
+        { label: 'Linear Memory & Data', items: [{ autogenerate: { directory: 'linear-memory' } }] },
+        { label: 'Languages to Wasm', items: [{ autogenerate: { directory: 'languages-to-wasm' } }] },
+        { label: 'Tooling', items: [{ autogenerate: { directory: 'tooling' } }] },
+        { label: 'WASI & Beyond the Browser', items: [{ autogenerate: { directory: 'wasi-and-beyond' } }] },
       ],
       }), preact()],
 });
