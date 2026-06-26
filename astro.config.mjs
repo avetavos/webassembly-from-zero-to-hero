@@ -15,6 +15,15 @@ export default defineConfig({
       title: 'WebAssembly — From Zero to Hero',
       head: [
         { tag: 'script', attrs: { type: 'module', src: '/webassembly-from-zero-to-hero/enhance.js' } },
+        { tag: 'link', attrs: { rel: 'manifest', href: '/webassembly-from-zero-to-hero/manifest.webmanifest' } },
+        { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/webassembly-from-zero-to-hero/apple-touch-icon.png' } },
+        { tag: 'link', attrs: { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/webassembly-from-zero-to-hero/icon-192.png' } },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#654FF0' } },
+        { tag: 'meta', attrs: { name: 'mobile-web-app-capable', content: 'yes' } },
+        { tag: 'meta', attrs: { name: 'apple-mobile-web-app-capable', content: 'yes' } },
+        { tag: 'meta', attrs: { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' } },
+        { tag: 'meta', attrs: { name: 'apple-mobile-web-app-title', content: "WebAssembly" } },
+        { tag: 'script', content: "if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/webassembly-from-zero-to-hero/sw.js',{scope:'/webassembly-from-zero-to-hero/'}).catch(function(){})})}" },
       ],
       defaultLocale: 'en',
       locales: {
