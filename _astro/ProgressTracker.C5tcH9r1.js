@@ -1,0 +1,1 @@
+import{d as m}from"./hooks.module.BflLFCwM.js";import{u as s,m as n,i as a}from"./progress-store.9rZZM1TA.js";import{u as l}from"./jsxRuntime.module.BZPHMOh1.js";function f({id:e}){const[o,t]=m(()=>a(e));function r(){o?(s(e),t(!1)):(n(e),t(!0))}return l("button",{class:`pt ${o?"pt--done":""}`,onClick:r,children:o?"✓ Completed":"Mark as complete"})}export{f as default};
