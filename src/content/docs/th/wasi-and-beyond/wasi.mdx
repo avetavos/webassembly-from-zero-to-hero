@@ -10,19 +10,19 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-WASI ไม่ได้แค่เปิดเผย system call — มันออกแบบใหม่วิธีที่โปรแกรมได้รับสิทธิ์เข้าถึงทรัพยากรระบบ แทนที่โมเดล POSIX ซึ่งโปรเซสสืบทอด ambient authority จาก user ID, WASI ใช้ **capability-based security**: โมดูลสามารถใช้ทรัพยากรได้เฉพาะเมื่อรันไทม์ส่ง capability มาให้อย่างชัดเจน
+WASI ไม่ได้แค่เปิดเผย system call — มันออกแบบใหม่วิธีที่โปรแกรมได้รับสิทธิ์เข้าถึงทรัพยากรระบบ แทนที่โมเดล POSIX ซึ่งโปรเซสสืบทอด ambient authority จาก user ID, WASI ใช้ **capability-based security**: module สามารถใช้ทรัพยากรได้เฉพาะเมื่อรันไทม์ส่ง capability มาให้อย่างชัดเจน
 
 ## ความปลอดภัยแบบ capability-based
 
 ในโปรเซส Unix ทั่วไป การเปิด `/etc/passwd` สำเร็จตราบใดที่ UID ของโปรเซสมีสิทธิ์อ่าน ไม่มี sandboxing ที่ขอบเขตแอปพลิเคชัน
 
-ใน WASI โมดูลไม่มี ambient access เลย รันไทม์ทำหน้าที่เป็นยาม:
+ใน WASI module ไม่มี ambient access เลย รันไทม์ทำหน้าที่เป็นยาม:
 
 - เพื่ออ่านจาก filesystem host ต้องส่ง pre-opened directory file descriptor ผ่าน `--dir`
 - เพื่อเข้าถึง environment variable host ต้องอนุญาตผ่าน `--env`
-- โดยค่าเริ่มต้น โมดูล WASI มีสิทธิ์เข้าถึง filesystem **ศูนย์**, network **ศูนย์** และ environment variable **ศูนย์**
+- โดยค่าเริ่มต้น module WASI มีสิทธิ์เข้าถึง filesystem **ศูนย์**, network **ศูนย์** และ environment variable **ศูนย์**
 
-ซึ่งหมายความว่าคุณสามารถรัน binary `.wasm` ที่ไม่น่าเชื่อถือได้อย่างปลอดภัย สิ่งเลวร้ายที่สุดที่โมดูลที่ถูก compromise สามารถทำได้ถูกจำกัดเฉพาะสิ่งที่มันได้รับมาเท่านั้น
+ซึ่งหมายความว่าคุณสามารถรัน binary `.wasm` ที่ไม่น่าเชื่อถือได้อย่างปลอดภัย สิ่งเลวร้ายที่สุดที่ module ที่ถูก compromise สามารถทำได้ถูกจำกัดเฉพาะสิ่งที่มันได้รับมาเท่านั้น
 
 ## WASI Preview 1 vs Preview 2
 
@@ -89,11 +89,28 @@ export const wasiCapDiagram = `flowchart TD
   E --> M
   A --> M`;
 
-<Mermaid code={wasiCapDiagram} title="Capability grants ไหลเข้าโมดูลเมื่อ startup" />
+<Mermaid code={wasiCapDiagram} title="Capability grants ไหลเข้า module เมื่อ startup" />
 
 <Callout title="หลักการสิทธิ์น้อยที่สุด">
-WASI บังคับใช้ least privilege โดยค่าเริ่มต้น โมดูลได้รับเฉพาะ capability ที่ผู้ดำเนินการรันไทม์ grant อย่างชัดเจน ไม่ใช่ทุกอย่างที่ OS user ปัจจุบันเข้าถึงได้
+WASI บังคับใช้ least privilege โดยค่าเริ่มต้น module ได้รับเฉพาะ capability ที่ผู้รัน runtime grant อย่างชัดเจน ไม่ใช่ทุกอย่างที่ OS user ปัจจุบันเข้าถึงได้
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| WASI capability-based security | ปลอดภัยกว่า POSIX ambient authority มาก — module ใช้ได้เฉพาะทรัพยากรที่ runtime ส่งมาให้อย่างชัดเจนเท่านั้น | ยังไม่ compatible กับ POSIX เต็มรูปแบบ native library จำนวนมากที่ assume ambient filesystem/network access จะ port เข้า WASI ไม่ราบรื่น |
+| Server-side Wasm (WASI runtime) vs container | Cold-start ระดับ microsecond เหมาะกับงาน edge/serverless ที่ต้อง spin up บ่อย | Container ecosystem ยังมี tooling, orchestration และ library support ที่ mature และครบกว่ามาก |
+
+## Common Mistakes
+
+- คาดหวังว่า filesystem หรือ network จะ "ใช้งานได้เลย" เหมือนโปรแกรม native ทั่วไป โดยไม่ grant capability ผ่าน `--dir` หรือ `--env` อย่างชัดเจน — module จะ fail แบบเงียบ ๆ หรือโยน permission error
+- คิดว่า WASI Preview 1 compatible กับ POSIX API เต็มรูปแบบ แล้วพยายาม port native library ที่ assume ambient access ตรง ๆ โดยไม่ปรับ
+- ไม่ track ว่า Preview 2 และ Component Model ยังเป็น standard ที่พัฒนาอยู่ — วางแผน production บน `wasm32-wasip2` วันนี้อาจต้องรับมือกับ breaking change ของ interface ในอนาคต
+
+> 💡 Real World Example
+>
+> Fastly Compute@Edge รัน untrusted customer code เป็น Wasm module พร้อม capability sandboxing แบบ WASI บนเครือข่าย edge ของตัวเอง ทำให้แต่ละ request ได้ sandbox ที่ปลอดภัยโดยไม่ต้องพึ่ง container isolation
 
 export const quizWasi = [
   { q: "ใน WASI โมดูลจะได้รับสิทธิ์เข้าถึง directory บน host filesystem อย่างไร?", options: ["เรียก open() ด้วย absolute path", "รันไทม์ pre-open directory และส่ง file descriptor", "WASI ให้สิทธิ์อ่านทุก directory โดยค่าเริ่มต้น", "โมดูลอ่าน /etc/fstab"], answer: 1 },

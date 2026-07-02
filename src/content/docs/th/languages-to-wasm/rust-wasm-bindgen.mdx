@@ -134,6 +134,23 @@ pub fn reverse_string(s: &str) -> String {
 `wasm-pack build` คอมไพล์ Rust, รัน `wasm-bindgen` Code Generation และผลิตแพ็กเกจ npm พร้อม Publish ใน `pkg/` คุณแทบไม่ต้องเรียก `cargo` หรือ `wasm-bindgen-cli` โดยตรง
 </Callout>
 
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| Rust + wasm-bindgen | Memory Safety จาก Ownership Model, Binary Size เล็ก, JS Binding สร้างอัตโนมัติ | Ownership/Borrowing เป็น Learning Curve สูงสำหรับคนที่ไม่เคยเขียน Rust มาก่อน |
+| C/C++ + Emscripten | Port Codebase C/C++ ที่มีอยู่แล้วได้เกือบทันที | Glue Code ใหญ่กว่า และมี Runtime Overhead จาก POSIX Emulation Layer |
+
+## Common Mistakes
+
+- สู้กับ Borrow Checker จนเสียเวลามาก แทนที่จะออกแบบ Ownership ให้เรียบง่ายตั้งแต่แรก เช่น `clone()` พร่ำเพรื่อเพื่อหนี Lifetime Error แทนที่จะแก้โครงสร้างข้อมูล
+- ลืมใส่ `#[wasm_bindgen]` บนฟังก์ชันที่ต้องการ Export ทำให้ฟังก์ชันคอมไพล์ผ่านลงใน `.wasm` แต่เรียกจาก JavaScript ไม่ได้
+- เลือก Type ที่ Serialize แพงอย่าง `JsValue` หรือ Struct ซับซ้อนผ่าน `serde` สำหรับ Hot Path ที่เรียกบ่อยๆ ทำให้ Performance แย่กว่าที่ควรจะเป็น
+
+> 💡 Real World Example
+>
+> 1Password ใช้ Rust คอมไพล์เป็น Wasm สำหรับส่วน Core Cryptography และ Vault Logic ที่ต้องรันในเบราว์เซอร์ เพื่อให้ได้ทั้ง Memory Safety และ Performance ใกล้เคียง Native โดยไม่ต้องพึ่ง JavaScript ล้วนๆ
+
 export const quizRustWasm = [
   { q: "Attribute #[wasm_bindgen] ใน Rust ทำงานอย่างไร?", options: ["ทำเครื่องหมายฟังก์ชันว่า Unsafe", "สร้าง JavaScript Binding สำหรับฟังก์ชันที่ Annotate", "Inline ฟังก์ชันที่จุดที่เรียกใช้", "ปิดใช้งาน Borrow Checker ของ Rust"], answer: 1 },
   { q: "Flag --target ใดของ wasm-pack ที่ควรใช้เมื่อต้องการเรียก Module โดยตรงจากเบราว์เซอร์ผ่าน <script type=\"module\"> โดยไม่มี Bundler?", options: ["--target bundler", "--target nodejs", "--target web", "--target deno"], answer: 2 },

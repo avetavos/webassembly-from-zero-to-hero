@@ -10,13 +10,13 @@ import WasmRunner from '../../../../components/WasmRunner.tsx';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-WebAssembly ถูกกำหนดด้วยคุณสมบัติหลัก 4 ประการ ได้แก่ **รูปแบบไบนารีกะทัดรัด**, **virtual machine แบบ stack-based**, **การรันแบบ deterministic** และ **การแยกแบบ sandboxed** การทำความเข้าใจแต่ละข้อจะอธิบายว่าทำไม Wasm จึงกลายเป็น universal portable execution layer ที่มันเป็นอยู่ทุกวันนี้
+WebAssembly ถูกกำหนดด้วยคุณสมบัติหลัก 4 ประการ ได้แก่ **binary format ขนาดกะทัดรัด**, **virtual machine แบบ stack-based**, **การรันแบบ deterministic** และ **การแยกแบบ sandboxed** การทำความเข้าใจแต่ละข้อจะอธิบายว่าทำไม Wasm จึงกลายเป็น universal portable execution layer ที่มันเป็นอยู่ทุกวันนี้
 
-## รูปแบบไบนารี
+## binary format
 
-ไฟล์ `.wasm` คือไบนารีที่หนาแน่นและมีการระบุ type ครบถ้วน ต่างจาก JavaScript source มันไม่ต้องผ่านการ parse นอกจาก validation pass เดียว runtime สามารถเริ่มคอมไพล์เป็น native machine code ได้เกือบทันที นี่คือเหตุผลที่ Wasm สามารถทำได้ใกล้ native performance แม้ในการโหลดครั้งแรก
+ไฟล์ `.wasm` คือ binary ที่หนาแน่นและมีการระบุ type ครบถ้วน ต่างจาก JavaScript source มันไม่ต้องผ่านการ parse นอกจาก validation pass เดียว runtime สามารถเริ่มคอมไพล์เป็น native machine code ได้เกือบทันที นี่คือเหตุผลที่ Wasm สามารถทำได้ใกล้ native performance แม้ในการโหลดครั้งแรก
 
-ไบนารียังมีขนาดเล็กอีกด้วย function body, type signature, import และ export ทั้งหมดถูก encode ในรูปแบบ section-based ที่มีขนาดขั้นต่ำ module ที่ทำงานจริงอาจมีน้ำหนักน้อยกว่า 1 kilobyte
+binary ยังมีขนาดเล็กอีกด้วย function body, type signature, import และ export ทั้งหมดถูก encode ในรูปแบบ section-based ที่มีขนาดขั้นต่ำ module ที่ทำงานจริงอาจมีน้ำหนักน้อยกว่า 1 kilobyte
 
 ## โมเดล Stack VM
 
@@ -36,7 +36,7 @@ Wasm module ถูก **แยกอย่างสมบูรณ์** module �
 
 ## ความสัมพันธ์ .wasm / .wat
 
-ไฟล์ `.wasm` ทุกไฟล์มีรูปแบบข้อความที่เทียบเท่าอย่างแน่นอนที่เรียกว่า **WAT** (WebAssembly Text format) ทั้งสองรูปแบบเป็น 1:1: `.wasm` ใดๆ สามารถถอดรหัสเป็น `.wat` ได้ และ `.wat` ที่ถูกต้องสามารถ assemble กลับเป็น `.wasm` ที่เหมือนกันได้ คุณจะเขียน WAT ตลอดทั้งคอร์สนี้ในฐานะวิธีที่ชัดเจนที่สุดในการทำความเข้าใจสิ่งที่ไบนารีมีอยู่จริง
+ไฟล์ `.wasm` ทุกไฟล์มีรูปแบบข้อความที่เทียบเท่าอย่างแน่นอนที่เรียกว่า **WAT** (WebAssembly Text format) ทั้งสองรูปแบบเป็น 1:1: `.wasm` ใดๆ สามารถถอดรหัสเป็น `.wat` ได้ และ `.wat` ที่ถูกต้องสามารถ assemble กลับเป็น `.wasm` ที่เหมือนกันได้ คุณจะเขียน WAT ตลอดทั้งคอร์สนี้ในฐานะวิธีที่ชัดเจนที่สุดในการทำความเข้าใจสิ่งที่ binary มีอยู่จริง
 
 ต่อไปนี้คือ WAT module ที่ง่ายที่สุดเท่าที่จะเป็นไปได้ ฟังก์ชัน export เดียวที่คืนค่า integer 42:
 
@@ -60,6 +60,25 @@ console.log('answer() =', instance.exports.answer());`;
 <Callout title="Wasm รันใน sandbox">
   โค้ด Wasm ไม่มีสิทธิ์เข้าถึง filesystem, network หรือ DOM โดยค่าเริ่มต้น มันทำได้เฉพาะสิ่งที่ host import เข้ามาอย่างชัดเจนเท่านั้น สิ่งนี้ทำให้การรัน Wasm module ที่ไม่น่าไว้ใจนั้นปลอดภัย
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| คอมไพล์ logic เป็น Wasm | ความเร็วใกล้ native, deterministic ข้าม platform, sandbox ปลอดภัยโดยดีฟอลต์ | เพิ่ม bundle size (binary + glue code) และต้องผ่าน fetch/compile/instantiate ก่อนรันได้ |
+| เขียนด้วย JavaScript ล้วน | ไม่มี compile step, debug ด้วย browser devtools ที่ mature มาก, source map พร้อมใช้ | performance ขึ้นกับ JIT warm-up ไม่ deterministic เท่า และไม่มี sandbox บังคับระดับ memory |
+
+## Common Mistakes
+
+- เข้าใจว่า binary format ของ Wasm แปลว่าเร็วกว่า JavaScript เสมอ — ในความเป็นจริง hot path ของ JS ที่ผ่าน JIT optimization มาดีแล้วบางครั้งเร็วกว่า Wasm ที่คอมไพล์แบบไม่ optimize
+- พยายามย้าย logic ทั้งแอปไปเป็น Wasm module เดียวใหญ่ๆ ทั้งที่ sandbox และ determinism มีประโยชน์ชัดเจนเฉพาะกับ compute-heavy path เท่านั้น ส่วน UI/DOM logic ควรอยู่ใน JS ต่อไป
+- ลืมนับ cost ของ fetch + compile + instantiate ตอนออกแบบ architecture — ถ้าเรียก module บ่อยแต่ module เล็กมาก overhead การ instantiate ซ้ำๆ อาจกินประโยชน์จาก binary format ที่กะทัดรัดไปหมด
+
+> 💡 Real World Example
+>
+> Figma รีไรท์ C++ rendering engine เดิมให้คอมไพล์เป็น Wasm binary แล้วรันใน sandbox ของ browser ได้โดยตรง ทำให้โหลดไฟล์ design ที่ซับซ้อนเร็วขึ้นมากโดยไม่ต้อง rewrite เป็น JavaScript
+>
+> Adobe พอร์ต Photoshop desktop codebase (C++) มาเป็น Photoshop บนเว็บ โดยอาศัย Wasm binary format และ deterministic execution เพื่อให้ image processing algorithm เดิมทำงานถูกต้องเหมือนบน desktop
 
 export const quizWhatIsWasm = [
   {

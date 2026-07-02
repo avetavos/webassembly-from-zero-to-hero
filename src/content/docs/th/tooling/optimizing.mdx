@@ -63,7 +63,7 @@ wee_alloc = "0.4"
 wasm-pack build --release --target web
 ```
 
-สำหรับโมดูลที่ไม่มี dynamic allocation เลย ให้คอมไพล์ด้วย `#![no_std]` และลบ allocator ออกทั้งหมด
+สำหรับ module ที่ไม่มี dynamic allocation เลย ให้คอมไพล์ด้วย `#![no_std]` และลบ allocator ออกทั้งหมด
 
 ## ขั้นตอนที่ 4 — lazy และ streaming instantiation
 
@@ -88,7 +88,7 @@ const bytes = await fetch('/module.wasm').then(r => r.arrayBuffer());
 const { instance } = await WebAssembly.instantiate(bytes, importObject);
 ```
 
-สำหรับโมดูลขนาดใหญ่ที่มีการเข้าชมซ้ำ ให้ cache `WebAssembly.Module` ที่คอมไพล์แล้วใน IndexedDB เพื่อข้ามการคอมไพล์ทั้งหมดในการโหลดครั้งถัดไป
+สำหรับ module ขนาดใหญ่ที่มีการเข้าชมซ้ำ ให้ cache `WebAssembly.Module` ที่คอมไพล์แล้วใน IndexedDB เพื่อข้ามการคอมไพล์ทั้งหมดในการโหลดครั้งถัดไป
 
 ## ขั้นตอนที่ 5 — วัดผลทุกอย่าง
 
@@ -112,6 +112,23 @@ wasm-tools validate output.wasm
 <Callout title="วัดผล แล้ว optimise แล้วจึงวัดผลอีกครั้ง">
 การประหยัดที่ใหญ่ที่สุดมักมาจากฟังก์ชันที่ขนาดใหญ่เกินไปเพียงตัวเดียวหรือ import ที่ไม่ได้ใช้ที่ dependency ดึงเข้ามา `twiggy top` หาฟังก์ชันนั้นได้ในไม่กี่วินาที แก้ไข root cause แทนที่จะเอื้อมหา `-Oz` อย่างสุ่มสี่สุ่มห้า
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| `wasm-opt -Oz` (การ optimise เชิงรุกสุด) | ลด binary size และเพิ่ม speed ได้มากที่สุดในทุกขั้นตอนของ playbook | build time นานขึ้น และ debug ยากขึ้นเพราะ code ถูกจัดเรียงใหม่จน source เดิมตามไม่ทัน |
+| เก็บ debug info / `--debug-names` ไว้ | symbolicate crash report และ debug production ได้ | เพิ่มขนาด binary ที่ผู้ใช้ต้อง download จริง ขัดกับเป้าหมายของบทนี้ |
+
+## Common Mistakes
+
+- Ship `.wasm` ตรงจาก compiler โดยไม่รัน `wasm-opt` เลยสักครั้ง พลาดการลดขนาด/เพิ่มความเร็วที่ได้มาแทบฟรีๆ ในขั้นตอนที่ 1
+- กระโดดไปใช้ `-Oz` หรือ flag เชิงรุกทันทีโดยไม่ profile ก่อนว่าจริงๆ แล้วอะไรใหญ่หรือช้า ทำให้แก้ผิดจุด
+- Strip debug info ทุก build รวมถึง build ที่ใช้ debug จริง พอมี crash ใน production ก็ไล่ยากเพราะ stack trace ไม่มีชื่อ
+
+> 💡 Real World Example
+>
+> **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` อยู่แล้ว ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักตั้ง budget ของขนาด binary ไว้ชัดเจน แล้วรัน playbook นี้ทั้งห้าขั้นตอนใน CI ก่อน deploy ทุกครั้ง
 
 export const quizOptimizing = [
   { q: "Which wasm-opt flag minimises binary size most aggressively?", options: ["-O3", "-Os", "-O2", "-Oz"], answer: 3 },

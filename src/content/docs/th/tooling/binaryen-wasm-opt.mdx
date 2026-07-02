@@ -9,7 +9,9 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-**Binaryen** คือโครงสร้างพื้นฐาน optimising compiler สำหรับ WebAssembly ของ Google เครื่องมือที่ใช้กันมากที่สุดคือ `wasm-opt` ซึ่งรับไบนารี `.wasm` ที่มีอยู่และเขียนใหม่เพื่อผลิต output ที่เล็กลงหรือเร็วขึ้น คุณไม่จำเป็นต้องเข้าใจ IR ภายในของ Binaryen เพื่อได้รับประโยชน์จากมัน — คำสั่งเดียวสามารถลด release binary ได้ 20–40%
+เมื่อ binary `.wasm` ที่ compile ออกมาจาก Rust, C หรือ AssemblyScript มีขนาดใหญ่เกินไปหรือทำงานช้ากว่าที่ควร นี่คือจุดที่ทีมส่วนใหญ่หันมาใช้ Binaryen เพื่อบีบขนาดและเพิ่ม performance ให้ binary ที่ compile เสร็จแล้ว โดยไม่ต้องแตะ source code เลย
+
+**Binaryen** คือโครงสร้างพื้นฐาน optimising compiler สำหรับ WebAssembly ของ Google เครื่องมือที่ใช้กันมากที่สุดคือ `wasm-opt` ซึ่งรับ binary `.wasm` ที่มีอยู่และเขียนใหม่เพื่อผลิต output ที่เล็กลงหรือเร็วขึ้น คุณไม่จำเป็นต้องเข้าใจ IR ภายในของ Binaryen เพื่อได้รับประโยชน์จากมัน — คำสั่งเดียวสามารถลด release binary ได้ 20–40%
 
 ## สิ่งที่ wasm-opt ทำ
 
@@ -57,7 +59,7 @@ wasm-opt -Oz input.wasm -o output.wasm
 | **AssemblyScript** | `asc --optimize` |
 | **Go (TinyGo)** | flag `-opt=z` |
 
-หากคุณใช้ `.wasm` จากสิ่งเหล่านี้ ไบนารีน่าจะถูก optimise แล้ว การเรียก `wasm-opt` ครั้งที่สองนั้นปลอดภัยแต่ได้ผลลัพธ์ที่ลดน้อยลง
+หากคุณใช้ `.wasm` จากสิ่งเหล่านี้ binary น่าจะถูก optimise แล้ว การเรียก `wasm-opt` ครั้งที่สองนั้นปลอดภัยแต่ได้ผลลัพธ์ที่ลดน้อยลง
 
 ## Flags เพิ่มเติมที่มีประโยชน์
 
@@ -88,6 +90,23 @@ echo "After:  $(wc -c < output.wasm) bytes"
 <Callout title="ให้ toolchain optimise — แล้วจึงวัดผล">
 หากคุณใช้ Emscripten, wasm-pack หรือ AssemblyScript `wasm-opt` เป็นส่วนหนึ่งของ release pipeline อยู่แล้ว เรียกใช้มันด้วยตนเองเฉพาะเมื่อคุณใช้ binary ที่คอมไพล์ล่วงหน้าจากบุคคลที่สาม หรือเมื่อคุณเขียน WAT ด้วยมือและต้องการบีบทุก byte
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| `wasm-opt -Oz` (การ optimise เชิงรุกสุด) | ได้ทั้ง size และ speed ที่ดีที่สุด | build time นานขึ้น และ mapping ระหว่าง source กับ output เพี้ยนจน debug ยากขึ้น |
+| เก็บ `--debug-names` ไว้ | อ่าน stack trace ได้ ทำให้ debug ง่ายขึ้นมาก | เพิ่มขนาด binary ที่ต้อง ship ให้ผู้ใช้จริง |
+
+## Common Mistakes
+
+- ข้าม `wasm-opt` ไปเลยแล้ว ship `.wasm` ที่ compiler สร้างออกมาตรงๆ พลาดโอกาสลด size/speed ที่ได้มาแทบฟรีๆ
+- เรียก `-O3` หรือ `-Oz` แบบสุ่มสี่สุ่มห้าโดยไม่วัดผลก่อน-หลัง ทำให้ไม่รู้เลยว่า flag ไหนช่วยจริงและช่วยแค่ไหน
+- Strip `--debug-names` ออกตั้งแต่ dev build ทำให้เวลาต้อง debug crash จริงๆ กลับไม่มี stack trace ที่อ่านออก
+
+> 💡 Real World Example
+>
+> **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักให้ความสำคัญกับ budget ของขนาด binary เป็นพิเศษ จึงนิยมใช้ `wasm-opt -Oz` กันเป็นมาตรฐาน
 
 export const quizBinaryen = [
   { q: "Which wasm-opt flag maximises binary size reduction?", options: ["-O3", "-Os", "-Oz", "-O2"], answer: 2 },

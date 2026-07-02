@@ -96,6 +96,23 @@ console.log('relu(7)  =', instance.exports.relu(7),  '(expected 7)');`;
 เมื่อ `br $label` ชี้ที่ `block` มันจะกระโดดไปข้างหน้าถึงคำสั่งหลัง `end` — เป็น early exit เมื่อชี้ที่ `loop` มันจะกระโดดไปข้างหลังถึงจุดเริ่มต้นของ loop — เป็นการวนซ้ำ คำสั่งเดียวกัน แต่คนละทิศทาง
 </Callout>
 
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| Structured control flow (`block`/`loop`/`br`) | validate ได้แบบ static และปลอดภัยกว่า เพราะไม่มี arbitrary `goto` ที่กระโดดไปที่ไหนก็ได้ | เขียน control flow ที่ซับซ้อนยากขึ้น ต้องซ้อน `block` หลายชั้นแทนการ jump ตรงจุด |
+| ไม่มี raw jump แบบ assembly-style | engine ตรวจสอบ label ทุกตัวได้ตั้งแต่ compile time ลด security risk | CFG ที่มาจาก native code (เช่นมี `goto` เยอะๆ) ต้องแปลงผ่าน algorithm อย่าง relooper ก่อนถึงจะ map เข้า Wasm ได้ |
+
+## Common Mistakes
+
+- นับ nesting depth ผิดเวลามี `block` ซ้อนกันหลายชั้น ทำให้ `br` หรือ `br_table` ชี้ผิด label (off-by-one ใน depth)
+- ลืมว่า `br_table` ต้องมี default label เสมอ ดัชนีที่เกินขอบเขตของรายการทั้งหมดจะตกไปที่ default โดยอัตโนมัติ
+- สับสนทิศทางของ `br` เมื่อเปลี่ยนจาก `block` ไป `loop` — `br` ตัวเดียวกัน forward ใน block แต่ backward ใน loop ถ้าไม่ระวัง label ก็จะพา flow ไปผิดทาง
+
+> 💡 Real World Example
+>
+> Emscripten ใช้ relooper algorithm (มาจากงานของ rustc/LLVM toolchain) แปลง arbitrary control-flow graph จากโค้ด C/C++ ให้กลายเป็น structured `block`/`loop`/`br` ที่ Wasm ต้องการ เพราะ native code เต็มไปด้วย `goto` ที่ Wasm ไม่รองรับตรงๆ
+
 export const quizBranches = [
   {
     q: "`br $b` กระโดดไปที่ไหนเมื่อ `$b` เป็น `block` label?",

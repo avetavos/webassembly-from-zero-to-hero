@@ -102,6 +102,23 @@ console.log('VERSION =', instance.exports.VERSION.value);`;
 เมื่อ Wasm function คืนค่า `i64` JavaScript จะได้รับเป็น `BigInt` — ไม่ใช่ `number` ธรรมดา ตรวจสอบด้วย `typeof result === 'bigint'` การคำนวณระหว่าง `BigInt` กับ `number` ต้องแปลงชนิดข้อมูลก่อนอย่างชัดเจน
 </Callout>
 
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| `instantiateStreaming` | เริ่มคอมไพล์ทันทีที่ bytes เริ่มไหลมาจาก network ไม่ต้องรอดาวน์โหลดครบ ทำให้ exports พร้อมใช้เร็วขึ้น | ต้องพึ่ง server ที่ตั้งค่า `Content-Type: application/wasm` ให้ถูกต้อง ไม่งั้น reject ทันที |
+| `instantiate` แบบ buffer เต็มไฟล์ | เขียนง่าย ควบคุม flow ได้ตรงไปตรงมา ใช้ได้แม้ไม่ควบคุม MIME type ของ server | ต้องรอดาวน์โหลดครบก่อนเริ่มคอมไพล์ exports จึงพร้อมใช้ช้ากว่า |
+
+## Common Mistakes
+
+- ลืมแปลงผลลัพธ์ที่เป็น `i64` ให้เป็น `BigInt` ก่อนนำไปคำนวณกับ `number` ธรรมดา ทำให้โค้ดโยน `TypeError` หรือปัดค่าคลาดเคลื่อนแบบเงียบๆ
+- อ่าน/เขียนข้อมูลก้อนใหญ่ผ่าน exported memory ทีละไบต์หรือทีละ call แทนที่จะสร้าง typed array view ครอบ `.buffer` แล้วอ่าน-เขียนรวดเดียว ทำให้เสีย performance โดยไม่จำเป็น
+- โหลดทั้งไฟล์ด้วย `arrayBuffer()` ก่อนแล้วค่อย instantiate เพื่อไปอ่าน exports แทนที่จะใช้ `instantiateStreaming` ซึ่งคอมไพล์ไปพร้อมกับการดาวน์โหลด
+
+> 💡 Real World Example
+>
+> Squoosh (เครื่องมือบีบอัดภาพของ Google) export ฟังก์ชัน codec หลายตัว (MozJPEG, WebP, AVIF ฯลฯ) จาก Wasm module แล้วเรียกใช้ exports เหล่านั้นตรงๆ จาก JS พร้อมอ่านผลลัพธ์ภาพผ่าน exported memory เพื่อให้ได้ throughput สูงสุด
+
 export const quizExports = [
   { q: "ค่า Wasm i64 ที่ถูก export จะกลายเป็น JavaScript type ใด?", options: ["number", "BigInt", "string", "Int64"], answer: 1 },
   { q: "จะอ่านค่าของ Wasm global ที่ถูก export ใน JavaScript ได้อย่างไร?", options: ["`exports.NAME`", "`exports.NAME.value`", "`exports.global(NAME)`", "`exports[NAME].get()`"], answer: 1 },

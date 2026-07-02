@@ -1,5 +1,5 @@
 ---
-title: 'โมดูลและฟังก์ชัน'
+title: 'module และฟังก์ชัน'
 description: 'ทำความเข้าใจตัวห่อ (module ...) วิธีประกาศฟังก์ชันด้วย (func ...) และวิธี export มันไปยัง JavaScript'
 sidebar:
   order: 2
@@ -10,9 +10,9 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-โค้ด WebAssembly ทุกชิ้นอยู่ภายใน **โมดูล** โมดูลเป็นหน่วยระดับบนสุดของการคอมไพล์และการดีพลอย — มันคือสิ่งที่คุณคอมไพล์ ส่งผ่านเครือข่าย และ instantiate ในเบราว์เซอร์ ภายในโมดูลคุณกำหนดฟังก์ชัน ประกาศหน่วยความจำ import จาก JavaScript และเลือกว่าจะ export อะไร
+โค้ด WebAssembly ทุกชิ้นอยู่ภายใน **module** module เป็นหน่วยระดับบนสุดของการคอมไพล์และการดีพลอย — มันคือสิ่งที่คุณคอมไพล์ ส่งผ่านเครือข่าย และ instantiate ในเบราว์เซอร์ ภายใน module คุณกำหนดฟังก์ชัน ประกาศหน่วยความจำ import จาก JavaScript และเลือกว่าจะ export อะไร
 
-## ตัวห่อโมดูล
+## ตัวห่อ module
 
 s-expression ที่อยู่นอกสุดในไฟล์ WAT ทุกไฟล์คือ `(module ...)` ทุกอย่างที่เหลือถูกซ้อนอยู่ภายในมัน:
 
@@ -22,7 +22,7 @@ s-expression ที่อยู่นอกสุดในไฟล์ WAT ท�
 )
 ```
 
-โมดูลที่ไม่มีเนื้อหาเป็น WAT ที่ถูกต้องและคอมไพล์ออกมาเป็นไฟล์ `.wasm` เล็ก ๆ — เพียงแต่มันยังไม่มีอะไรที่มีประโยชน์อยู่ในนั้น
+module ที่ไม่มีเนื้อหาเป็น WAT ที่ถูกต้องและคอมไพล์ออกมาเป็นไฟล์ `.wasm` เล็ก ๆ — เพียงแต่มันยังไม่มีอะไรที่มีประโยชน์อยู่ในนั้น
 
 ## การประกาศฟังก์ชัน
 
@@ -47,11 +47,11 @@ s-expression ที่อยู่นอกสุดในไฟล์ WAT ท�
 )
 ```
 
-โมดูลนี้คอมไพล์ได้ดี แต่ฟังก์ชันนั้นเข้าถึงไม่ได้เลยจาก JavaScript เพราะมันยังไม่ได้ถูก export
+module นี้คอมไพล์ได้ดี แต่ฟังก์ชันนั้นเข้าถึงไม่ได้เลยจาก JavaScript เพราะมันยังไม่ได้ถูก export
 
 ## การ export ฟังก์ชัน
 
-JavaScript สามารถเรียกได้เฉพาะฟังก์ชันที่โมดูล export ออกมาอย่างชัดเจนเท่านั้น มีไวยากรณ์ที่เทียบเท่ากันสองแบบ
+JavaScript สามารถเรียกได้เฉพาะฟังก์ชันที่ module export ออกมาอย่างชัดเจนเท่านั้น มีไวยากรณ์ที่เทียบเท่ากันสองแบบ
 
 **คำสั่ง export แยกต่างหาก** — กำหนดฟังก์ชันพร้อมชื่อ แล้ว export มัน:
 
@@ -94,9 +94,26 @@ console.log('multiply(3, 4) =', instance.exports.multiply(3, 4));`;
 
 <WasmRunner client:visible code={modulesCode} />
 
-<Callout title="ทุกอย่างอยู่ในโมดูล">
-ฟังก์ชัน, global, memory และ table ของ WebAssembly ทุกอย่างอยู่ภายในตัวห่อ `(module ...)` JavaScript สามารถเรียกได้เฉพาะฟังก์ชันที่โมดูล export ออกมาอย่างชัดเจนเท่านั้น
+<Callout title="ทุกอย่างอยู่ใน module">
+ฟังก์ชัน, global, memory และ table ของ WebAssembly ทุกอย่างอยู่ภายในตัวห่อ `(module ...)` JavaScript สามารถเรียกได้เฉพาะฟังก์ชันที่ module export ออกมาอย่างชัดเจนเท่านั้น
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| เขียน WAT เอง | เห็นโครงสร้าง `(module ...)` และ `(func ...)` ตรง ๆ เข้าใจว่า export ทำงานยังไงในระดับ binary format | ต้องเขียน boilerplate เองทั้งหมด ไม่มี type system ระดับสูงช่วยเช็คให้ก่อน compile |
+| ปล่อยให้ compiler generate Wasm (Rust/C/AssemblyScript) | ได้ module ที่มี memory layout, import/export จัดการให้อัตโนมัติ เหมาะกับ codebase ขนาดใหญ่ | อ่าน `.wasm` ที่ได้ตรง ๆ ยาก ต้องพึ่งเครื่องมือแปลงกลับเป็น WAT เพื่อ debug |
+
+## Common Mistakes
+
+- ประกาศ `(result i32)` ไว้แต่ตัว body ของฟังก์ชันจบลงโดยไม่มีค่า `i32` เหลืออยู่บน stack พอดีหนึ่งตัว เช่นมี branch ออกจากฟังก์ชันกลางทางโดยไม่ push ค่ากลับ ทำให้ module validation ไม่ผ่าน
+- สลับลำดับ operand ตอน push ขึ้น stack ก่อนเรียก instruction ภายในตัว body ของ `func` ทำให้ผลลัพธ์ที่ export ออกไปผิด ทั้งที่ syntax ถูกต้องทุกอย่าง
+- ใช้ `br`/`br_if` กระโดดออกจาก block ภายในฟังก์ชันโดยไม่คำนึงว่า target ของ branch คาดหวังอะไรอยู่บน stack ทำให้ signature ของ `func` กับสภาพ stack จริงไม่ตรงกัน
+
+> 💡 Real World Example
+>
+> ทีมที่ debug production `.wasm` ที่บริษัทอย่าง Cloudflare Workers มักใช้ `wasm2wat` แปลง binary module กลับมาเป็น WAT ที่อ่านได้ เพื่อตรวจสอบว่าฟังก์ชันที่ export ออกไปมี signature และ body ตรงกับที่ต้องการจริงหรือไม่
 
 export const quizModulesAndFuncs = [
   { q: "ไวยากรณ์ใดที่ export ฟังก์ชันจากโมดูล WAT?", options: ['`(export "name" (func $f))`', '`(public func $f)`', '`export default func $f`', '`module.exports.f = $f`'], answer: 0 },

@@ -10,7 +10,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-การส่ง WebAssembly ที่มีประสิทธิภาพเริ่มต้นก่อนที่คุณจะเขียนคำสั่งแรก คุณต้องมีเครื่องมือเพื่อแปลงข้อความ `.wat` ให้เป็นไบนารี `.wasm` เพื่อตรวจสอบว่ามีอะไรอยู่ในโมดูลที่คอมไพล์แล้ว และเพื่อลดขนาดไบต์ก่อนที่จะส่งผ่านเครือข่าย โปรเจกต์สามตัวครอบคลุมความต้องการเกือบทั้งหมด: **wabt**, **Binaryen** และ **wasm-tools**
+การส่ง WebAssembly ที่มีประสิทธิภาพเริ่มต้นก่อนที่คุณจะเขียนคำสั่งแรก คุณต้องมีเครื่องมือเพื่อแปลงข้อความ `.wat` ให้เป็น binary `.wasm` เพื่อตรวจสอบว่ามีอะไรอยู่ใน module ที่คอมไพล์แล้ว และเพื่อลดขนาดไบต์ก่อนที่จะส่งผ่านเครือข่าย โปรเจกต์สามตัวครอบคลุมความต้องการเกือบทั้งหมด: **wabt**, **Binaryen** และ **wasm-tools**
 
 ## ตระกูลเครื่องมือทั้งสาม
 
@@ -20,7 +20,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 | **Binaryen** | Google / Emscripten | การ optimise และ code generation, `wasm-opt` |
 | **wasm-tools** | Bytecode Alliance | ชุดเครื่องมือที่เขียนด้วย Rust: parse, validate, compose, encode |
 
-แต่ละตระกูลครอบครองขั้นตอนที่แตกต่างกันใน pipeline แผนภาพด้านล่างแสดงให้เห็นว่าไฟล์ต้นฉบับ `.wat` เดินทางผ่านเครื่องมือเหล่านี้อย่างไรจนกลายเป็นโมดูลที่ถูก deploy และ optimise แล้ว
+แต่ละตระกูลครอบครองขั้นตอนที่แตกต่างกันใน pipeline แผนภาพด้านล่างแสดงให้เห็นว่าไฟล์ต้นฉบับ `.wat` เดินทางผ่านเครื่องมือเหล่านี้อย่างไรจนกลายเป็น module ที่ถูก deploy และ optimise แล้ว
 
 export const toolingOverviewDiagram = `flowchart LR
   A[".wat source"] -->|"wat2wasm"| B[".wasm binary"]
@@ -33,7 +33,7 @@ export const toolingOverviewDiagram = `flowchart LR
 
 ## wabt — ชั้นการแปล
 
-`wabt` คือ reference implementation ของ WAT text format binary หลักคือ `wat2wasm` ซึ่งแปลงไฟล์ `.wat` เป็นไบนารี `.wasm` ทิศทางย้อนกลับ — การ disassemble `.wasm` กลับเป็น WAT ที่อ่านได้ — จัดการโดย `wasm2wat` เครื่องมือเสริมสองตัวทำให้ครบชุด: `wasm-objdump` แสดง section headers และ symbol table ของไบนารีใดก็ได้ และ `wasm-validate` ตรวจสอบว่าโมดูลเป็นไปตามข้อกำหนดหรือไม่
+`wabt` คือ reference implementation ของ WAT text format binary หลักคือ `wat2wasm` ซึ่งแปลงไฟล์ `.wat` เป็น binary `.wasm` ทิศทางย้อนกลับ — การ disassemble `.wasm` กลับเป็น WAT ที่อ่านได้ — จัดการโดย `wasm2wat` เครื่องมือเสริมสองตัวทำให้ครบชุด: `wasm-objdump` แสดง section headers และ symbol table ของ binary ใดก็ได้ และ `wasm-validate` ตรวจสอบว่า module เป็นไปตามข้อกำหนดหรือไม่
 
 ```bash
 # ติดตั้งผ่าน npm (ทำงานโดยไม่ต้องสร้าง native)
@@ -54,7 +54,7 @@ wasm-validate add.wasm
 
 ## Binaryen — ตัว optimise
 
-Binaryen คือโครงสร้างพื้นฐาน compiler สำหรับ WebAssembly ที่ทำการ optimise เครื่องมือที่ใช้กันมากที่สุดคือ `wasm-opt` ซึ่งเขียนไบนารี `.wasm` ที่มีอยู่ใหม่เพื่อผลิต output ที่เล็กลงหรือเร็วขึ้น Emscripten, AssemblyScript และ `wasm-pack` (สำหรับ Rust) ทั้งหมดเรียก `wasm-opt` โดยอัตโนมัติเป็นส่วนหนึ่งของ release builds
+Binaryen คือโครงสร้างพื้นฐาน compiler สำหรับ WebAssembly ที่ optimise เครื่องมือที่ใช้กันมากที่สุดคือ `wasm-opt` ซึ่งเขียน binary `.wasm` ที่มีอยู่ใหม่เพื่อผลิต output ที่เล็กลงหรือเร็วขึ้น Emscripten, AssemblyScript และ `wasm-pack` (สำหรับ Rust) ทั้งหมดเรียก `wasm-opt` โดยอัตโนมัติเป็นส่วนหนึ่งของ release builds
 
 ```bash
 # ติดตั้ง
@@ -69,7 +69,7 @@ wasm-opt -Oz input.wasm -o output.wasm
 
 ## wasm-tools — ชุดเครื่องมือสมัยใหม่
 
-`wasm-tools` คือชุดเครื่องมือรุ่นใหม่ของ Bytecode Alliance เขียนด้วย Rust และมีทั้งในรูปแบบ CLI และ library รองรับ WebAssembly Component Model proposals การรวมหลายโมดูลเข้าด้วยกัน การลบ custom sections และการ encode/decode ในรูปแบบ binary
+`wasm-tools` คือชุดเครื่องมือรุ่นใหม่ของ Bytecode Alliance เขียนด้วย Rust และมีทั้งในรูปแบบ CLI และ library รองรับ WebAssembly Component Model proposals การรวมหลาย module เข้าด้วยกัน การลบ custom sections และการ encode/decode ในรูปแบบ binary
 
 ```bash
 # ติดตั้ง
@@ -86,7 +86,7 @@ wasm-tools strip add.wasm -o add.stripped.wasm
 ```
 
 <Callout title="เลือกเครื่องมือที่เหมาะกับงาน">
-ใช้ `wabt` เมื่อต้องการแปลง WAT ↔ binary หรือ validate ตามข้อกำหนด ใช้ `wasm-opt` (Binaryen) เมื่อต้องการลดขนาดหรือเพิ่มความเร็วของไบนารี ใช้ `wasm-tools` เมื่อทำงานกับ Component Model modules หรือต้องการ Rust API แบบ programmatic
+ใช้ `wabt` เมื่อต้องการแปลง WAT ↔ binary หรือ validate ตามข้อกำหนด ใช้ `wasm-opt` (Binaryen) เมื่อต้องการลดขนาดหรือเพิ่มความเร็วของ binary ใช้ `wasm-tools` เมื่อทำงานกับ Component Model modules หรือต้องการ Rust API แบบ programmatic
 </Callout>
 
 export const quizToolingIndex = [

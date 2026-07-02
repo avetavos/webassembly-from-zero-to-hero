@@ -10,7 +10,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-การโหลด WebAssembly module จาก JavaScript เป็นกระบวนการสองขั้นตอน: **compile** ไบต์ให้กลายเป็น module artifact ที่ผ่านการตรวจสอบแล้ว จากนั้น **instantiate** module นั้นเพื่อให้ได้ instance ที่ทำงานได้จริงพร้อม exports ที่เรียกใช้ได้ ตัวแปรส่วนกลาง `WebAssembly` ของเบราว์เซอร์เปิดเผย API เฉพาะสำหรับทั้งสองขั้นตอน รวมถึง shortcut ที่สะดวกซึ่งทำทั้งสองอย่างในคราวเดียว
+การโหลด WebAssembly module จาก JavaScript เป็น process สองขั้นตอน: **compile** ไบต์ให้กลายเป็น module artifact ที่ผ่านการตรวจสอบแล้ว จากนั้น **instantiate** module นั้นเพื่อให้ได้ instance ที่ทำงานได้จริงพร้อม exports ที่เรียกใช้ได้ ตัวแปรส่วนกลาง `WebAssembly` ของเบราว์เซอร์เปิดเผย API เฉพาะสำหรับทั้งสองขั้นตอน รวมถึง shortcut ที่สะดวกซึ่งทำทั้งสองอย่างในคราวเดียว
 
 ## WebAssembly.compile()
 
@@ -93,6 +93,23 @@ console.log('cube(3) =', instance.exports.cube(3));`;
 <Callout title="คอมไพล์ครั้งเดียว สร้าง instance ได้หลายครั้ง">
 `WebAssembly.Module` คือ artifact ที่คอมไพล์แล้ว สามารถเก็บไว้ ส่งผ่าน `postMessage` หรือ instantiate ซ้ำได้หลายครั้งโดยไม่ต้องคอมไพล์ใหม่ แยกขั้นตอน compile และ instantiate ออกจากกันทุกครั้งที่ต้องการสร้างมากกว่าหนึ่ง instance ของ module เดียวกัน
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| `instantiateStreaming` | คอมไพล์ทับซ้อนกับการดาวน์โหลด ได้ instance พร้อมใช้เร็วที่สุด | ต้องการ `Content-Type: application/wasm` จาก server ถ้าผิดจะ reject ด้วย `TypeError` ทันที |
+| `compile` + `instantiate` แยกขั้นตอน | ควบคุมได้ละเอียด เช่น cache `Module` ไว้ใช้ instantiate ซ้ำหลายครั้งโดยไม่ต้องคอมไพล์ใหม่ | ต้องมี buffer เต็มไฟล์อยู่ในหน่วยความจำก่อนจึงจะเริ่มคอมไพล์ได้ |
+
+## Common Mistakes
+
+- โหลดไฟล์ด้วย `arrayBuffer()` ก่อนเสมอแล้วค่อยเรียก `WebAssembly.instantiate()` ทั้งที่ควรใช้ `instantiateStreaming` เพื่อคอมไพล์ไปพร้อมกับดาวน์โหลด
+- คอมไพล์ module ใหม่ทุกครั้งที่ต้องการ instance เพิ่ม แทนที่จะแยก `WebAssembly.compile()` ออกมาครั้งเดียวแล้วเรียก `WebAssembly.instantiate(module, ...)` ซ้ำจาก `Module` เดิม
+- ลืมว่า export ที่เป็น `i64` จะกลับมาเป็น `BigInt` แล้วเอาไปบวก/คูณกับ `number` ตรงๆ โดยไม่แปลงชนิดก่อน ทำให้โค้ด throw error
+
+> 💡 Real World Example
+>
+> Squoosh คอมไพล์ Wasm codec หลายตัวไว้ล่วงหน้าเพียงครั้งเดียว แล้ว instantiate ใหม่ทุกครั้งที่ผู้ใช้เลือกบีบอัดภาพด้วย codec นั้น เพื่อเลี่ยงต้นทุนการคอมไพล์ซ้ำซ้อนในทุก session
 
 export const quizInstantiate = [
   { q: "What does WebAssembly.instantiate(bytes, {}) return?", options: ["A WebAssembly.Module", "A Promise<{module, instance}>", "A Uint8Array", "An ArrayBuffer"], answer: 1 },

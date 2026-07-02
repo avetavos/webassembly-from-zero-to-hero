@@ -16,7 +16,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
 ## การเขียน WAT Module
 
-WAT คือการแสดงข้อความที่มนุษย์อ่านได้ของ `.wasm` ไบนารี ต่อไปนี้คือ module ที่สมบูรณ์:
+WAT คือการแสดงข้อความที่มนุษย์อ่านได้ของ `.wasm` binary ต่อไปนี้คือ module ที่สมบูรณ์:
 
 ```wasm
 (module
@@ -30,7 +30,7 @@ WAT คือการแสดงข้อความที่มนุษย�
 
 - **`(module ...)`** — wrapper ระดับบนสุด ทุกไฟล์ `.wasm` มี module เดียว
 - **`(func (export "double") ...)`** — ประกาศฟังก์ชันและทำให้ host มองเห็นได้ในชื่อ `"double"` ทันที ชื่อ export คือสิ่งที่ JavaScript เห็นบน `instance.exports`
-- **`(param $n i32)`** — ประกาศ parameter หนึ่งตัวชื่อ `$n` ประเภท `i32` (32-bit signed integer) label `$n` เป็นความสะดวกของ WAT ที่ระดับไบนารีมันเป็นแค่ index
+- **`(param $n i32)`** — ประกาศ parameter หนึ่งตัวชื่อ `$n` ประเภท `i32` (32-bit signed integer) label `$n` เป็นความสะดวกของ WAT ที่ระดับ binary มันเป็นแค่ index
 - **`(result i32)`** — ประกาศว่าฟังก์ชันนี้ return `i32` หนึ่งตัว
 - **`local.get $n`** — push ค่าปัจจุบันของ `$n` ลงบน operand stack
 - **`i32.const 2`** — push ค่าคงที่ `2` ลงบน stack
@@ -91,6 +91,23 @@ console.log('double(100) =', instance.exports.double(100));`;
 <Callout title="Loop คอมไพล์–instantiate–เรียก">
   ทุก Wasm module ทำตาม pattern เดิม: คอมไพล์เป็น bytes, instantiate ด้วย `WebAssembly.instantiate` แล้วเรียก export argument ที่สองของ `instantiate` คือ import object ซึ่งเป็นฟังก์ชันและ memory ที่คุณ provide ให้ module จาก JavaScript ตอนนี้มันว่าง แต่บทเรียนหลังๆ จะเพิ่มเติม
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| เรียกฟังก์ชันผ่าน Wasm module | ความเร็วใกล้ native เมื่อ workload หนัก, ผลลัพธ์ deterministic | ต้องผ่าน loop compile → instantiate → call ทุกครั้งที่โหลด module ใหม่ ซึ่งมี overhead ที่ JS function ธรรมดาไม่มี |
+| เรียกฟังก์ชัน JavaScript ตรงๆ | เรียกได้ทันทีไม่ต้อง compile/instantiate, debug ง่ายด้วย devtools | ไม่ได้ความเร็วระดับ native และไม่มี sandbox guarantee แบบ Wasm |
+
+## Common Mistakes
+
+- เขียนฟังก์ชันง่ายๆ อย่าง `double` เป็น Wasm module แล้วคาดหวังว่าจะเร็วกว่า JS เสมอ ทั้งที่ function เล็กขนาดนี้ JS JIT compile ให้เร็วพอๆ กันอยู่แล้ว ความต่างจะเห็นชัดก็ต่อเมื่อ workload หนักจริง
+- ลืมว่า `WebAssembly.instantiate` ต้องรันทุกครั้งก่อนเรียก export ได้ แล้วพยายาม migrate ทั้งแอปไปเป็น Wasm module ย่อยจำนวนมาก ทำให้ต้อง compile/instantiate ซ้ำๆ โดยไม่จำเป็น
+- ไม่ cache `WebAssembly.Module` ที่ compile ไว้แล้วเมื่อต้อง instantiate module เดิมซ้ำหลายครั้ง ทำให้เสีย cost ของ compile step ไปโดยเปล่าประโยชน์ โดยเฉพาะกับ module เล็กที่ถูกเรียกไม่บ่อย
+
+> 💡 Real World Example
+>
+> Figma ใช้ compile-instantiate-call loop แบบเดียวกับในบทนี้ (แต่ในสเกลใหญ่กว่ามาก) เพื่อรัน rendering engine ที่คอมไพล์จาก C++ เป็น Wasm ทำให้โหลดไฟล์ design เร็วขึ้นราว 3 เท่าเทียบกับตอนที่ยังเป็น pure JavaScript
 
 export const quizYourFirstModule = [
   {

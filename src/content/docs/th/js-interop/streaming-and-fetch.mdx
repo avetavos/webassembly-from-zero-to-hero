@@ -10,7 +10,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-ในแอปพลิเคชันจริง คุณจะไม่มี WAT source ในขณะ runtime — แต่จะ fetch ไฟล์ไบนารี `.wasm` ที่คอมไพล์แล้วจาก server แทน API ที่แนะนำสำหรับวิธีนี้คือ `WebAssembly.instantiateStreaming()` ซึ่งเริ่มคอมไพล์ bytes ตั้งแต่เริ่มรับข้อมูลผ่านเครือข่าย แทนที่จะรอให้ดาวน์โหลดเสร็จสมบูรณ์ก่อน
+ในแอปพลิเคชันจริง คุณจะไม่มี WAT source ในขณะ runtime — แต่จะ fetch ไฟล์ binary `.wasm` ที่คอมไพล์แล้วจาก server แทน API ที่แนะนำสำหรับวิธีนี้คือ `WebAssembly.instantiateStreaming()` ซึ่งเริ่มคอมไพล์ bytes ตั้งแต่เริ่มรับข้อมูลผ่านเครือข่าย แทนที่จะรอให้ดาวน์โหลดเสร็จสมบูรณ์ก่อน
 
 ## instantiateStreaming เทียบกับ instantiate
 
@@ -99,6 +99,23 @@ console.log('(In production: replace compileWat with instantiateStreaming + fetc
 <Callout title="ให้บริการไฟล์ .wasm ด้วย application/wasm เสมอ">
 `WebAssembly.instantiateStreaming` จะ reject ด้วย `TypeError` หาก MIME type ของ response ไม่ใช่ `application/wasm` ตั้งค่า web server ของคุณ (nginx, Express ฯลฯ) ให้แมป `.wasm` → `application/wasm`
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| `instantiateStreaming` | เริ่มคอมไพล์ทันทีที่ bytes แรกมาถึง ลด time-to-interactive ได้ชัดเจนสำหรับ module ขนาดใหญ่ | ต้องพึ่ง server ส่ง header `Content-Type: application/wasm` ให้ถูกต้อง มิเช่นนั้น reject ด้วย `TypeError` |
+| fallback ด้วย `arrayBuffer()` + `instantiate` | ทำงานได้แน่นอนแม้ควบคุม MIME type ของ server ไม่ได้ | เสียเวลารอดาวน์โหลดครบไฟล์ก่อนเริ่มคอมไพล์ ทำให้ startup ช้าลง |
+
+## Common Mistakes
+
+- เรียก `fetch()` แล้ว `await response.arrayBuffer()` ก่อนเสมอโดยไม่ลอง `instantiateStreaming` ก่อน ทั้งที่ควรใช้ streaming เป็นค่าเริ่มต้นแล้ว fallback เฉพาะตอนจับ `TypeError`
+- ลืมตั้งค่า server (nginx, Express ฯลฯ) ให้ map นามสกุล `.wasm` เป็น `application/wasm` ทำให้ `instantiateStreaming` reject ทุกครั้งโดยไม่รู้สาเหตุ
+- ส่งข้อมูลก้อนใหญ่กลับไปมาผ่าน exports/imports ทีละ call หลัง instantiate สำเร็จ แทนที่จะใช้ shared linear memory เขียน-อ่านครั้งเดียว ทำให้เสีย throughput ที่ streaming ช่วยประหยัดมาไปเปล่าๆ
+
+> 💡 Real World Example
+>
+> Squoosh ใช้ `instantiateStreaming` โหลด codec แต่ละตัวเพื่อให้ startup เร็วที่สุด ส่วน AutoCAD Web ก็อาศัย streaming instantiation ในการโหลด engine ขนาดใหญ่ ควบคู่กับ interop ที่มีประสิทธิภาพระหว่าง JS กับ Wasm เพื่อให้ผู้ใช้โต้ตอบกับโมเดล CAD ได้แบบ real-time
 
 export const quizStreamingAndFetch = [
   { q: "เหตุใด instantiateStreaming จึงเหมาะสมกว่า instantiate สำหรับ production?", options: ["มันข้ามการตรวจสอบ", "มันคอมไพล์ขณะที่ bytes stream เข้ามา ลด latency", "มันทำงานได้โดยไม่ต้องมี server", "มันรองรับ Wasm features มากกว่า"], answer: 1 },

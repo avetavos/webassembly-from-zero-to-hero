@@ -83,6 +83,24 @@ tinygo build -o wasm.wasm -target wasm ./main.go
 AssemblyScript คือวิธีที่เร็วที่สุดในการ Ship Wasm Module แรก ถ้าภายหลังต้องการการควบคุมในระดับต่ำกว่าหรือ JS Binding ที่สมบูรณ์กว่า การย้ายไป Rust ทำได้ไม่ยากเพราะทั้งคู่ผลิต Interface `.wasm` เดิม — ฝั่ง JavaScript ที่เรียกใช้ไม่ต้องเปลี่ยน
 </Callout>
 
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| Rust + wasm-bindgen | Memory Safety จาก Ownership Model และ Binary Size เล็กมาก ไม่มี GC | Learning Curve สูงกว่าตัวอื่นเพราะต้องเข้าใจ Ownership/Borrowing |
+| C/C++ + Emscripten | Ecosystem C/C++ มหาศาล Port Codebase เดิมได้เกือบทันที | Glue Code และ POSIX Emulation Layer เพิ่ม Runtime Overhead ทำให้ Binary ใหญ่ |
+| AssemblyScript | Syntax คุ้นเคยสำหรับทีม TypeScript เริ่มต้นได้เร็วที่สุด | Ecosystem จำกัดมาก และ **ไม่ semantically เหมือน TypeScript ทุกจุด** — Type System ต่างกัน |
+
+## Common Mistakes
+
+- เลือกภาษาตามความถนัดของทีมอย่างเดียวโดยไม่ดู Binary Size ที่ตามมา เช่น ใช้ Emscripten สำหรับ Module เล็กๆ ที่ไม่มี Codebase เดิมให้ Port ทำให้ Ship Runtime ใหญ่เกินจำเป็น
+- Ship Emscripten Build แบบไม่ Optimise — ไม่ Strip POSIX Emulation Layer และไม่ใช้ Flag อย่าง `-O3` หรือ `-sMINIMAL_RUNTIME` จน Bundle บวม
+- คิดว่า AssemblyScript คือ TypeScript ทั้งหมด แล้วใช้ Syntax หรือ Semantics ที่ `asc` ไม่รองรับ จนเจอ Compile Error หรือ Bug แปลกๆ ที่ตามหายาก
+
+> 💡 Real World Example
+>
+> Figma เลือก C++ กับ Emscripten สำหรับ Rendering Engine ที่ Port มาจาก Desktop ส่วน 1Password ใช้ Rust คอมไพล์เป็น Wasm สำหรับ Core Cryptography และ Vault Logic ที่รันในเบราว์เซอร์ ขณะที่ Shopify Functions ให้ Merchant เขียน Custom Checkout Logic ด้วย Rust หรือ AssemblyScript แล้วคอมไพล์เป็น Wasm — สามตัวอย่างที่เลือกภาษาต่างกันตาม Requirement ของตัวเอง
+
 export const quizChoosingLang = [
   { q: "Toolchain ใดเหมาะที่สุดเมื่อต้อง Port ไลบรารี C ที่มีอยู่ซึ่งใช้ printf และ malloc?", options: ["wasm-pack (Rust)", "Emscripten (emcc)", "asc (AssemblyScript)", "tinygo"], answer: 1 },
   { q: "Toolchain สองตัวใดที่ผลิต Wasm Binary ขนาดเล็กที่สุดเพราะไม่มี Garbage Collector หรือ Runtime Heap?", options: ["Emscripten และ TinyGo", "Rust และ AssemblyScript", "AssemblyScript และ TinyGo", "Rust และ Emscripten"], answer: 1 },

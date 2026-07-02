@@ -122,6 +122,23 @@ RUSTFLAGS="-C target-feature=+atomics,+bulk-memory" \
 Component Model แทนที่ FFI glue แบบ ad-hoc ระหว่าง Wasm module ด้วย WIT คุณนิยาม typed interface ครั้งเดียว แล้ว `cargo-component` และ `wasm-tools` สร้าง binding code ทั้งสองทิศทางให้
 </Callout>
 
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| WASI capability-based security | ปลอดภัยกว่าโมเดลเดิมมาก — component ได้สิทธิ์เฉพาะ capability ที่ host grant อย่างชัดเจนเท่านั้น | ยังไม่ compatible กับ POSIX เต็มรูปแบบ โค้ด native บางตัวที่ assume ว่ามี ambient filesystem/network access จะ port เข้า component ไม่ราบรื่น |
+| Server-side Wasm (edge/serverless) | Cold-start ระดับ microsecond เหมาะกับการ deploy component บน edge/serverless มาก | Ecosystem ยังไม่ mature เท่า container — tooling รอบ Component Model และ orchestration ยังไม่ผ่านสนามรบมาเท่า |
+
+## Common Mistakes
+
+- คิดว่า SIMD หรือ multi-threading proposal ใช้ได้ในทุก Wasm runtime — ทั้งคู่ยังเป็น opt-in feature ที่ต้อง compile ด้วย target/flag เฉพาะ ไม่ใช่ทุกรันไทม์รองรับเหมือนกัน
+- มองข้าม versioning churn ของ Component Model — มันยังเป็น standard ที่พัฒนาอยู่ WIT interface ระหว่าง version อาจ breaking เปลี่ยนได้ ถ้าผูก production กับมันตอนนี้ต้องเตรียมรับมือ
+- ลืมว่า component ที่ import WASI interface ก็ยังต้องได้รับ capability grant จาก host อย่างชัดเจนเหมือนเดิม — compose component สำเร็จไม่ได้แปลว่ามันจะเข้าถึง filesystem หรือ network ได้เอง
+
+> 💡 Real World Example
+>
+> Fermyon Spin ใช้ Component Model ร่วมกับ WASI เป็นแกนหลักในการ build และ deploy serverless Wasm microservice ส่วน Fastly Compute@Edge รัน untrusted customer code เป็น Wasm module พร้อม capability sandboxing แบบ WASI บนเครือข่าย edge ของตัวเอง
+
 export const quizComponentModelSimdThreads = [
   { q: "ภาษาใดที่ใช้นิยาม Component Model interface contract?", options: ["WAT", "WIT", "WASM-IDL", "Protobuf"], answer: 1 },
   { q: "Value type ใหม่ตัวเดียวที่ SIMD proposal แนะนำคืออะไร?", options: ["f128", "simd256", "v128", "i128"], answer: 2 },

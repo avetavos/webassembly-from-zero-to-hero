@@ -1,5 +1,5 @@
 ---
-title: 'หน่วยความจำเชิงเส้น (Linear Memory)'
+title: 'Linear Memory'
 description: 'เรียนรู้ว่า linear memory คืออะไร ทำไม WebAssembly ถึงต้องการมัน และ Wasm กับ JavaScript แชร์ ArrayBuffer เดียวกันสำหรับ string, array และ struct ได้อย่างไร'
 sidebar:
   order: 1
@@ -39,7 +39,7 @@ JavaScript และ Wasm ต่างถือ reference ไปยัง `Array
 
 ## ตัวอย่างขั้นต่ำ
 
-โมดูลด้านล่างประกาศ memory หนึ่งหน้าและ export เพื่อให้ JavaScript ตรวจสอบได้ ฟังก์ชัน `store42` เขียนตัวเลข `42` เป็น little-endian integer 4 byte ที่ byte offset `0` จากนั้น JavaScript สร้าง `Int32Array` view บน buffer และอ่านค่านั้นกลับมา
+module ด้านล่างประกาศ memory หนึ่งหน้าและ export เพื่อให้ JavaScript ตรวจสอบได้ ฟังก์ชัน `store42` เขียนตัวเลข `42` เป็น little-endian integer 4 byte ที่ byte offset `0` จากนั้น JavaScript สร้าง `Int32Array` view บน buffer และอ่านค่านั้นกลับมา
 
 export const indexCode = `const wat = \`(module
   (memory (export "mem") 1)

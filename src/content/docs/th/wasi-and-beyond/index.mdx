@@ -14,7 +14,7 @@ WebAssembly ถูกออกแบบมาสำหรับเบราว�
 
 ## ทำไมต้องรัน Wasm นอกเบราว์เซอร์?
 
-ในเบราว์เซอร์ JavaScript engine คือ host ที่ให้สภาพแวดล้อมรันไทม์, จัดการหน่วยความจำ และเปิดเผย browser API นอกเบราว์เซอร์ไม่มี JavaScript engine, DOM หรือ `fetch` โมดูล Wasm ที่ต้องการอ่านไฟล์, เขียน stdout หรือเปิด socket ต้องการ host อื่นมาจัดหาความสามารถเหล่านั้น
+ในเบราว์เซอร์ JavaScript engine คือ host ที่ให้สภาพแวดล้อมรันไทม์, จัดการหน่วยความจำ และเปิดเผย browser API นอกเบราว์เซอร์ไม่มี JavaScript engine, DOM หรือ `fetch` module Wasm ที่ต้องการอ่านไฟล์, เขียน stdout หรือเปิด socket ต้องการ host อื่นมาจัดหาความสามารถเหล่านั้น
 
 WASI คือคำตอบที่เป็นมาตรฐาน: ชุดนิยาม system-call คล้าย POSIX ที่แสดงออกมาเป็น Wasm import รันไทม์ใดก็ตามที่ implement WASI สามารถรัน binary `.wasm` เดียวกัน — บน Linux, macOS, Windows หรือไมโครคอนโทรลเลอร์ขนาดเล็ก
 
@@ -36,7 +36,7 @@ export const overviewDiagram = `flowchart LR
 2. **WASI Runtime** — executable อิสระเช่น `wasmtime` หรือ `wasmer` ที่ implement WASI spec เป็น Wasm import function และบังคับใช้ capability grant
 3. **Wasm Module** — binary ที่คอมไพล์แล้ว มัน import WASI function แบบเดียวกับ Wasm import อื่น ๆ ไม่มีการเรียก OS โดยตรง
 
-## บทเรียนในโมดูลนี้
+## บทเรียนใน module นี้
 
 | # | บทเรียน | สิ่งที่คุณจะเรียนรู้ |
 |---|---------|---------------------|

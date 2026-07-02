@@ -1,0 +1,76 @@
+---
+title: Glossary
+description: คำศัพท์ WebAssembly ที่ใช้ตลอด course นี้ — รักษา terminology ภาษาอังกฤษตามที่ developer ใช้จริง
+sidebar:
+  order: 99
+---
+
+import Callout from '../../../components/Callout.astro';
+import ProgressTracker from '../../../components/ProgressTracker.tsx';
+
+## Core
+
+| English | Thai Style | หมายเหตุ |
+|---------|-----------|---------|
+| Module | module | หน่วยระดับบนสุดของโค้ด Wasm ที่ถูกคอมไพล์และ deploy ร่วมกัน |
+| Instance | instance | module ที่ถูก instantiate แล้วพร้อม state และ exports ที่เรียกใช้ได้จริง |
+| Binary / Binary Format | binary / binary format | รูปแบบ `.wasm` แบบ byte ที่ browser เอ็กซิคิวต์ได้โดยตรง |
+| WAT (WebAssembly Text format) | WAT | รูปแบบข้อความที่มนุษย์อ่านได้ ซึ่งแมปแบบ 1:1 กับ binary |
+| Sandbox | sandbox | สภาพแวดล้อมหน่วยความจำที่ Wasm ทำงานอยู่ภายใน แยกจาก DOM/เครือข่ายโดยสิ้นเชิงเว้นแต่ host จะเปิดให้ |
+| Compile (verb) | คอมไพล์ | คำกริยาไทยมาตรฐานที่ developer ใช้พูดกันจริง ไม่แปลเป็น "แปลภาษา" หรืออื่น ๆ |
+
+## Memory
+
+| English | Thai Style | หมายเหตุ |
+|---------|-----------|---------|
+| Linear Memory | Linear Memory | flat, untyped byte array ที่ทั้ง Wasm และ JS อ่าน/เขียนได้โดยตรง |
+| Page | page | หน่วยการเติบโตของ memory ขนาดคงที่ 64KiB |
+| 64KiB | 64KiB | ขนาดของหนึ่ง page พอดี |
+| TypedArray View | TypedArray view | มุมมองแบบ typed (เช่น `Uint8Array`, `Int32Array`) ที่วางทับ `ArrayBuffer` ของ memory |
+| memory.grow | `memory.grow` | คำสั่งขยาย linear memory ทีละ page — ทำให้ view เก่า detach |
+
+## Interop
+
+| English | Thai Style | หมายเหตุ |
+|---------|-----------|---------|
+| Import | import | ค่า/ฟังก์ชันที่ module ประกาศว่าต้องการรับจาก host |
+| Export | export | symbol ที่ module เปิดเผยให้ host เรียกใช้ได้ |
+| Glue Code | glue code | โค้ด JS ที่เชื่อมระหว่าง Wasm module กับ browser API |
+| instantiateStreaming | `instantiateStreaming` | API ที่คอมไพล์ bytes ระหว่างดาวน์โหลด แทนที่จะรอให้เสร็จก่อน |
+| BigInt / i64 | BigInt / i64 | ชนิด JS ที่จำเป็นสำหรับส่งค่า `i64` ข้ามขอบเขต JS ↔ Wasm |
+
+## Execution
+
+| English | Thai Style | หมายเหตุ |
+|---------|-----------|---------|
+| Stack Machine | stack machine | โมเดล execution ที่ operand อยู่บน value stack แทนที่จะอยู่ใน register |
+| Structured Control Flow | structured control flow | control flow ที่ validate ได้แบบ static ไม่มี arbitrary goto |
+| br / br_if | `br` / `br_if` | คำสั่ง branch แบบไม่มีเงื่อนไข / มีเงื่อนไขใน WAT |
+| Function Table | function table | ตารางเก็บ function reference สำหรับ indirect call |
+
+## Ecosystem
+
+| English | Thai Style | หมายเหตุ |
+|---------|-----------|---------|
+| WASI | WASI | WebAssembly System Interface — capability-based API สำหรับ Wasm นอก browser |
+| Component Model | Component Model | มาตรฐานใหม่สำหรับประกอบหลาย module/ภาษาเข้าด้วยกัน |
+| wasm-bindgen | `wasm-bindgen` | เครื่องมือสร้าง glue code ระหว่าง Rust กับ JavaScript |
+| Emscripten | Emscripten | toolchain คอมไพล์ C/C++ เป็น Wasm พร้อม runtime จำลอง POSIX |
+| wasm-opt | `wasm-opt` | เครื่องมือจาก Binaryen สำหรับลดขนาด/เพิ่มความเร็วของ binary `.wasm` |
+
+## เมื่อ **ไม่** ควรใช้ literal Thai translation
+
+| หลีกเลี่ยง | ใช้แทน |
+|------------|--------|
+| หน่วยมอดูล / มอดูล | module |
+| รูปแบบไบนารี (แปลตรงตัวทุกครั้ง) | binary format |
+| ดำเนินการ (แทนคำว่า operation ทั่วไป) | operation |
+| กระบวนการ (เมื่อหมายถึง workflow ทางเทคนิค) | process / ขั้นตอน |
+| ทำการ + กริยา | ตัดทิ้ง แล้วใช้กริยาตรง ๆ |
+| ผู้ดำเนินการรันไทม์ | ผู้รัน runtime |
+
+<Callout title="ทำไมคำเหล่านี้ไม่แปลเป็นไทยทั้งหมด">
+Course นี้เก็บคำศัพท์แกนกลางของ WebAssembly ไว้เป็นภาษาอังกฤษ — module, binary, instance, import/export — เพราะเป็นคำที่ developer ใช้พูดคุยกันจริงในโค้ด, spec และ error message การแปลคำเหล่านี้ทั้งหมดจะทำให้อ่าน spec หรือ error จริงแล้วเชื่อมโยงกับสิ่งที่เรียนไม่ได้ ส่วนคำกริยาอย่าง "คอมไพล์" ยังคงใช้รูปไทยเพราะเป็นคำที่ developer พูดกันตามธรรมชาติในชีวิตประจำวัน ไม่ใช่ตัวขัดขวางความเข้าใจ
+</Callout>
+
+<ProgressTracker client:visible id="th/glossary" />

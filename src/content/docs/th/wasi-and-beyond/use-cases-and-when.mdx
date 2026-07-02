@@ -46,9 +46,9 @@ Online code judge, notebook runner (เช่น WasmRunner ในคอร์�
 
 Sandboxed memory model ของ Wasm รับประกัน:
 
-- โมดูลไม่สามารถเข้าถึง host memory นอก linear memory ของตัวเอง
-- โมดูลไม่สามารถทำ arbitrary syscall — เฉพาะ WASI import ที่รันไทม์เปิดเผย
-- โมดูลไม่สามารถสร้าง thread หรือ process ด้วยตัวเอง
+- module ไม่สามารถเข้าถึง host memory นอก linear memory ของตัวเอง
+- module ไม่สามารถทำ arbitrary syscall — เฉพาะ WASI import ที่รันไทม์เปิดเผย
+- module ไม่สามารถสร้าง thread หรือ process ด้วยตัวเอง
 
 ทำให้ Wasm เป็น **sandbox ที่ปลอดภัยและเบาที่สุดที่มีอยู่** — เบากว่า Docker, เบากว่า gVisor, เบากว่า eBPF sandbox
 
@@ -92,6 +92,23 @@ export const decisionDiagram = `flowchart TD
 <Callout title="Wasm ชนะด้านความปลอดภัย + portability ไม่ใช่ throughput ล้วน ๆ">
 อย่าใช้ Wasm เพราะมัน "เร็ว" ใช้มันเพราะคุณต้องการ sandbox ที่ปลอดภัย, binary ที่พกพาได้ หรือ plugin interface ที่ไม่ขึ้นกับภาษา Throughput ล้วน ๆ บนเซิร์ฟเวอร์มักได้ประโยชน์จาก native binary มากกว่า
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| WASI capability-based security | ปลอดภัยกว่ามาก — plugin หรือ sandboxed code ได้สิทธิ์เฉพาะที่ grant อย่างชัดเจน ไม่มี ambient access | ยังไม่ compatible กับ POSIX เต็มรูปแบบ native library บางตัวที่ assume ambient filesystem/network access จะ port เข้ามาไม่ราบรื่น |
+| Edge/serverless (Wasm) vs container | Cold-start ระดับ microsecond และ footprint เล็กกว่า container มาก เหมาะกับ edge PoP | Container ecosystem ยังมี tooling และ battle-tested orchestration กว้างกว่า รวมถึง library support ที่ครบกว่า |
+
+## Common Mistakes
+
+- คาดหวังว่า filesystem หรือ network จะ "ใช้งานได้เลย" โดยไม่ grant capability ให้ WASI runtime อย่างชัดเจน — code จะ fail แบบเงียบ ๆ หรือโยน permission error
+- เลือกใช้ Wasm เป็นตัวแทน container ในทุกกรณีโดยไม่ตระหนักว่า tooling, orchestration และ library support ของ container ยัง mature กว่ามาก
+- Deploy ไป edge platform โดยไม่ตรวจสอบก่อนว่า runtime ปลายทางรองรับ SIMD หรือ threads proposal จริงหรือไม่ — feature เหล่านี้ยัง opt-in และไม่ universal
+
+> 💡 Real World Example
+>
+> Cloudflare Workers และ Fastly Compute@Edge ใช้ Wasm sandboxing เพื่อ isolate tenant code นับพันตัวบน edge network เดียวกัน โดยได้ cold-start ระดับ microsecond ที่ container ทำไม่ได้
 
 export const quizUseCasesAndWhen = [
   { q: "คุณสมบัติใดที่ทำให้ Wasm น่าสนใจเป็นพิเศษสำหรับแพลตฟอร์ม edge/serverless?", options: ["Memory footprint ขนาดใหญ่", "Cold start เป็น microsecond พร้อม isolation ที่แข็งแกร่งต่อ request", "GPU access แบบ native", "HTTP server ในตัว"], answer: 1 },

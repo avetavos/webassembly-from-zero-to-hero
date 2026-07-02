@@ -34,7 +34,7 @@ export const stringFlowDiagram = `flowchart LR
 
 ## การ Encode ด้วย TextEncoder
 
-`TextEncoder.encode(str)` แปลง JavaScript string เป็น `Uint8Array` ของ UTF-8 byte อักขระหลาย byte (emoji, ตัวอักษรที่มีเครื่องหมายกำกับ, ตัวอักษร CJK) ให้ byte มากกว่าจำนวน character เสมอ ดังนั้นการดำเนินการ memory ควรใช้ byte length เสมอ ไม่ใช่ string length
+`TextEncoder.encode(str)` แปลง JavaScript string เป็น `Uint8Array` ของ UTF-8 byte อักขระหลาย byte (emoji, ตัวอักษรที่มีเครื่องหมายกำกับ, ตัวอักษร CJK) ให้ byte มากกว่าจำนวน character เสมอ ดังนั้น memory operation ควรใช้ byte length เสมอ ไม่ใช่ string length
 
 ## การเขียน byte ลง Wasm memory
 
@@ -60,7 +60,7 @@ Constructor `Uint8Array` แบบ 3 argument สร้าง view เริ่�
 
 ## ลองรัน
 
-โมดูล Wasm ด้านล่าง expose ฟังก์ชัน `echo` ที่ส่งคืน `(ptr, len)` เดิมที่รับมา ฝั่ง JavaScript encode `"Hello Wasm"` เขียนที่ offset 256 เรียก `echo` แล้ว decode ผลลัพธ์
+module Wasm ด้านล่าง expose ฟังก์ชัน `echo` ที่ส่งคืน `(ptr, len)` เดิมที่รับมา ฝั่ง JavaScript encode `"Hello Wasm"` เขียนที่ offset 256 เรียก `echo` แล้ว decode ผลลัพธ์
 
 export const passingStringsCode = `const wat = \`(module
   (memory (export "mem") 1)
@@ -82,6 +82,23 @@ console.log('round-trip:', decoded);`;
 <Callout title="ส่ง (ptr, len) ไม่ใช่ string">
 ฟังก์ชัน WebAssembly ไม่สามารถรับ JavaScript string โดยตรงได้ รูปแบบมาตรฐานคือเขียน UTF-8 byte ลง memory แล้วส่ง integer pointer และ integer length ไปยังฟังก์ชัน Wasm
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| ส่ง (ptr, len) ผ่าน linear memory แทน string โดยตรง | zero-copy อ่าน/เขียน byte ได้เร็ว ไม่ต้อง serialize ซ้ำผ่าน host boundary | ต้อง encode/decode UTF-8 เองและคำนวณ byte length ให้ถูกต้องทุกครั้ง |
+| กำหนด address คงที่สำหรับเขียน string (manual layout) | เรียบง่าย ไม่ต้องมี allocator หรือ runtime เพิ่ม | ไม่มี GC คอยเตือนเมื่อ string ใหม่ยาวเกินพื้นที่เดิม ต้องเผื่อขนาด buffer เอง |
+
+## Common Mistakes
+
+- ใช้ `str.length` (จำนวน character) แทน `encoded.length` (จำนวน byte จริงหลัง UTF-8 encode) ตอนคำนวณ length ที่จะส่งให้ Wasm ทำให้ string ที่มีอักขระหลาย byte เช่น emoji หรือภาษาไทยถูก truncate หรือ decode ผิด
+- เขียน byte ที่ offset คงที่ (เช่น 256) โดยไม่เผื่อพื้นที่ให้พอกับ string ที่ยาวขึ้นเรื่อยๆ ทำให้ข้อมูลใหม่ทับ region อื่นที่ยังใช้งานอยู่
+- เก็บ typed-array view ไว้ใช้ซ้ำข้าม call แล้วลืมว่าถ้ามี `memory.grow` เกิดขึ้นระหว่างทาง view เก่าจะถูก detach ทำให้เขียนหรืออ่าน string ผิดตำแหน่ง
+
+> 💡 Real World Example
+>
+> FFmpeg.wasm ส่ง filename และ metadata string ผ่านรูปแบบ (ptr, len) เดียวกันนี้ข้าม linear memory เพื่อสั่งงาน decoder ที่คอมไพล์มาจาก C โดยไม่ต้องแปลง string ผ่าน glue code ที่ช้าลง
 
 export const quizPassingStrings = [
   { q: "วิธีส่ง JavaScript string ไปยังฟังก์ชัน WebAssembly คือ?", options: ["ส่งโดยตรงเป็น parameter", "เขียน UTF-8 bytes ลง memory แล้วส่ง (ptr, len)", "แปลงเป็นตัวเลขก่อน", "ใช้ postMessage"], answer: 1 },

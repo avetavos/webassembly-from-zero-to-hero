@@ -10,7 +10,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-โมดูล WebAssembly สามารถประกาศ byte block ดิบที่เรียกว่า **linear memory** ซึ่งต่างจาก JavaScript heap โดย memory นี้เป็น flat, untyped array ของ byte ที่ทั้งโมดูล Wasm และ JavaScript สามารถอ่านและเขียนได้โดยตรง เป็นกลไกหลักในการส่งข้อมูลที่ซับซ้อน — string, array, struct — ระหว่าง WebAssembly และ host
+module WebAssembly สามารถประกาศ byte block ดิบที่เรียกว่า **linear memory** ซึ่งต่างจาก JavaScript heap โดย memory นี้เป็น flat, untyped array ของ byte ที่ทั้ง module Wasm และ JavaScript สามารถอ่านและเขียนได้โดยตรง เป็นกลไกหลักในการส่งข้อมูลที่ซับซ้อน — string, array, struct — ระหว่าง WebAssembly และ host
 
 ## การประกาศ memory ด้วย `(memory N)`
 
@@ -20,7 +20,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 (memory 1)
 ```
 
-นี่จะให้โมดูลของคุณมี byte ที่ addressable ได้ 65 536 byte ทั้งหมดถูก initialise เป็น zero ตอน instantiation
+นี่จะให้ module ของคุณมี byte ที่ addressable ได้ 65 536 byte ทั้งหมดถูก initialise เป็น zero ตอน instantiation
 
 ## การโหลดและจัดเก็บ integer
 
@@ -33,7 +33,7 @@ WebAssembly มีคำสั่ง load และ store แบบ typed สำ
 
 ## การ Export memory ไปยัง JavaScript
 
-JavaScript ไม่สามารถเข้าถึง Wasm memory ได้จนกว่าโมดูลจะ export มัน ใช้ inline export syntax:
+JavaScript ไม่สามารถเข้าถึง Wasm memory ได้จนกว่า module จะ export มัน ใช้ inline export syntax:
 
 ```wasm
 (memory (export "mem") 1)
@@ -47,7 +47,7 @@ const memory = new WebAssembly.Memory({ initial: 1 });
 
 ## ตัวอย่างการ Store และ Load
 
-นี่คือโมดูลที่สมบูรณ์ที่เก็บค่า `i32` ที่ byte address 100 และโหลดกลับทันที:
+นี่คือ module ที่สมบูรณ์ที่เก็บค่า `i32` ที่ byte address 100 และโหลดกลับทันที:
 
 ```wasm
 (module
@@ -81,8 +81,25 @@ console.log('byte at offset 100:', view[100]);`;
 <WasmRunner client:visible code={memoryBasicsCode} />
 
 <Callout title="หน้า 64 KiB">
-แต่ละหน้ามีขนาด 65 536 byte พอดี โมดูลที่มี `(memory 1)` จะมี 65 536 byte และค่าเริ่มต้นทั้งหมดเป็นศูนย์
+แต่ละหน้ามีขนาด 65 536 byte พอดี module ที่มี `(memory 1)` จะมี 65 536 byte และค่าเริ่มต้นทั้งหมดเป็นศูนย์
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| TypedArray view ทับ `mem.buffer` โดยตรง | อ่าน/เขียน byte แบบ zero-copy รวดเร็ว ไม่ต้อง allocate เพิ่ม | ต้องสร้าง view ใหม่ทุกครั้งที่ memory ถูก grow ไม่งั้น view เก่าจะชี้ไปยัง buffer ที่ detach ไปแล้ว |
+| จัดการ layout ของ memory เอง (คำนวณ address ด้วยมือ) | ควบคุม memory ได้เต็มที่ ไม่มี overhead จาก runtime | ไม่มี garbage collector หรือ bounds-checking แบบ JavaScript คอยช่วย ต้องดูแล lifetime ของข้อมูลเอง |
+
+## Common Mistakes
+
+- เขียนที่ address เกินขอบเขตของ page ที่จองไว้ (เช่น จอง `(memory 1)` แต่ store ที่ offset เกิน 65 536) ทำให้เกิด trap เพราะ WebAssembly ไม่มี garbage collector หรือ bounds-checking layer ให้แบบ JavaScript
+- ลืมว่า `(memory N)` ขยายได้ทีละทั้ง page (64 KiB) เท่านั้น จะจองแค่บางไบต์ไม่ได้ ทำให้เผลอ allocate เกินความจำเป็น
+- ลืม export memory ด้วย `(memory (export "mem") 1)` แล้วสงสัยว่าทำไม JavaScript เข้าถึง `instance.exports.mem` ไม่ได้
+
+> 💡 Real World Example
+>
+> เครื่องมือแก้ไขภาพในเบราว์เซอร์สไตล์ Squoosh ใช้ linear memory เก็บ raw pixel buffer โดยตรง แทนที่จะ copy ข้อมูลภาพไปมาระหว่าง JavaScript กับ Wasm ทุกครั้งที่ประมวลผล ทำให้ resize หรือ compress ภาพขนาดใหญ่ได้เร็วขึ้นมาก
 
 export const quizMemoryBasics = [
   { q: "หนึ่งหน้าของ WebAssembly memory มีกี่ bytes?", options: ["4 096", "65 536", "1 048 576", "512"], answer: 1 },

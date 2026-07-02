@@ -1,6 +1,6 @@
 ---
 title: 'wabt — The Binary Toolkit'
-description: 'ใช้ wat2wasm, wasm2wat, wasm-objdump และ wasm-validate เพื่อแปลง ตรวจสอบ และ validate โมดูล WebAssembly'
+description: 'ใช้ wat2wasm, wasm2wat, wasm-objdump และ wasm-validate เพื่อแปลง ตรวจสอบ และ validate module WebAssembly'
 sidebar:
   order: 2
 ---
@@ -9,6 +9,8 @@ import WasmRunner from '../../../../components/WasmRunner.tsx';
 import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
+
+นักพัฒนามักหยิบ WABT ขึ้นมาใช้เมื่อต้องแปลงไปมาระหว่าง `.wat` กับ `.wasm`, ตรวจสอบ binary ที่ compile มาจากเครื่องมืออื่นว่าเนื้อในมีอะไรบ้าง หรือ validate module ก่อน deploy จริง
 
 **wabt** — WebAssembly Binary Toolkit — คือ reference implementation ของ WAT text format งานแปลง ตรวจสอบ หรือ validate ใดก็ตามที่เกี่ยวข้องกับ text ↔ binary boundary จะผ่านหนึ่งในสี่โปรแกรมหลักของมัน
 
@@ -29,7 +31,7 @@ wat2wasm add.wat --no-check=false --output=/dev/null
 
 ## wasm2wat
 
-`wasm2wat` ทำกระบวนการย้อนกลับ: อ่านไบนารี `.wasm` และ emit WAT text ที่อ่านได้ สิ่งนี้มีค่ามากเมื่อคุณต้องการตรวจสอบว่า compiler ระดับสูง (Emscripten, wasm-pack ฯลฯ) ผลิตอะไรออกมาจริงๆ
+`wasm2wat` ทำ process ย้อนกลับ: อ่าน binary `.wasm` และ emit WAT text ที่อ่านได้ สิ่งนี้มีค่ามากเมื่อคุณต้องการตรวจสอบว่า compiler ระดับสูง (Emscripten, wasm-pack ฯลฯ) ผลิตอะไรออกมาจริงๆ
 
 ```bash
 # Disassemble ไปยัง stdout
@@ -76,7 +78,7 @@ Code[1]:
 
 ## wasm-validate
 
-`wasm-validate` ตรวจสอบว่าไบนารีเป็นไปตามข้อกำหนด WebAssembly มันออกด้วย code 0 เมื่อสำเร็จและแสดง diagnostic เมื่อล้มเหลว ใช้ใน CI เพื่อตรวจจับโมดูลที่เสียหายหรือไม่ถูกต้องก่อนที่จะถึง production
+`wasm-validate` ตรวจสอบว่า binary เป็นไปตามข้อกำหนด WebAssembly มันออกด้วย code 0 เมื่อสำเร็จและแสดง diagnostic เมื่อล้มเหลว ใช้ใน CI เพื่อตรวจจับ module ที่เสียหายหรือไม่ถูกต้องก่อนที่จะถึง production
 
 ```bash
 # Validate โมดูล
@@ -89,7 +91,7 @@ wasm-validate --enable-threads shared.wasm
 
 ## Run it — magic bytes และความยาว binary
 
-สี่ไบต์แรกที่ offset 0 ของทุกไฟล์ `.wasm` ที่ถูกต้องคือ `00 61 73 6d` — module magic (`\0asm`) runnable ด้านล่างคอมไพล์โมดูล WAT ขั้นต่ำและแสดงทั้งความยาว binary และสี่ magic bytes เหล่านั้น
+สี่ไบต์แรกที่ offset 0 ของทุกไฟล์ `.wasm` ที่ถูกต้องคือ `00 61 73 6d` — module magic (`\0asm`) runnable ด้านล่างคอมไพล์ module WAT ขั้นต่ำและแสดงทั้งความยาว binary และสี่ magic bytes เหล่านั้น
 
 export const wabtCode = `const wat = \`(module
   (func (export "add") (param $a i32) (param $b i32) (result i32)
@@ -107,8 +109,25 @@ console.log('Decoded magic:', String.fromCharCode(...bytes.slice(1, 4)));`;
 <WasmRunner client:visible code={wabtCode} />
 
 <Callout title="Magic number ระบุทุกไฟล์ .wasm">
-ไบนารี WebAssembly ทั้งหมดเริ่มต้นด้วย magic number สี่ไบต์ `00 61 73 6d` ตามด้วย version `01 00 00 00` เครื่องมือหรือ loader ใดก็ตามที่อ่านไฟล์ `.wasm` จะตรวจสอบไบต์เหล่านี้ก่อนเสมอ
+binary WebAssembly ทั้งหมดเริ่มต้นด้วย magic number สี่ไบต์ `00 61 73 6d` ตามด้วย version `01 00 00 00` เครื่องมือหรือ loader ใดก็ตามที่อ่านไฟล์ `.wasm` จะตรวจสอบไบต์เหล่านี้ก่อนเสมอ
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| `wasm-opt -Oz` (การ optimise เชิงรุกสุด หลัง `wat2wasm`) | ได้ size และ speed ที่ดีที่สุด | build time นานขึ้น และ binary ที่ได้ห่างไกลจาก `.wat` ต้นฉบับจน debug ยากขึ้น |
+| เก็บ `--debug-names` ไว้ตอน `wat2wasm` | `wasm2wat`/`wasm-objdump` แสดงชื่อฟังก์ชันที่อ่านออกได้ | เพิ่มขนาด binary ที่ต้อง ship ให้ผู้ใช้จริง |
+
+## Common Mistakes
+
+- คอมไพล์ `.wat` เป็น `.wasm` แล้ว ship ตรงๆ โดยไม่ผ่าน `wasm-opt` เลย พลาดการลดขนาดที่ได้มาแทบฟรีๆ
+- รัน `wasm-validate` หลังจาก deploy ไปแล้ว แทนที่จะ validate ทุก module ใน CI ก่อน ship เสมอ
+- เปิด `--debug-names` ทิ้งไว้ใน production build โดยไม่คิดเรื่อง trade-off ของขนาด binary ที่เพิ่มขึ้น
+
+> 💡 Real World Example
+>
+> **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติหลังขั้นตอนที่เทียบเท่ากับ `wat2wasm` เมื่อ build ด้วย `-O2`/`-O3` ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักใช้ `wasm-validate` เป็นด่านบังคับใน CI ก่อน deploy ทุกครั้ง
 
 export const quizWabt = [
   { q: "Which flag tells wat2wasm to keep $name annotations in the output binary?", options: ["--keep-names", "--debug-names", "--names=true", "--preserve-symbols"], answer: 1 },

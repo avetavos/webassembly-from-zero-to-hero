@@ -120,6 +120,23 @@ export function clamp(value: f64, lo: f64, hi: f64): f64 {
 AssemblyScript ใช้ `i32`, `i64`, `f32`, `f64` แทน `number` ของ TypeScript ทำให้ Mapping กับ Wasm Instruction ชัดเจนและผลิต Binary ขนาดเล็กมาก — ไม่มี Runtime หรือ GC Overhead
 </Callout>
 
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| AssemblyScript | Syntax คุ้นเคยสำหรับคนที่เขียน TypeScript อยู่แล้ว เริ่มต้นได้เร็ว ไม่มี GC หรือ Runtime Overhead | Ecosystem จำกัดมากเมื่อเทียบกับ Rust หรือ C และ **ไม่ semantically เหมือน TypeScript ทุกจุด** — Type System และ Feature Set ต่างกัน |
+| Rust + wasm-bindgen | Memory Safety จาก Ownership Model, Binary Size เล็ก, Ecosystem ใหญ่กว่า | Learning Curve สูงกว่ามากสำหรับทีมที่ไม่เคยเขียน Rust (Ownership/Borrowing) |
+
+## Common Mistakes
+
+- คิดว่า AssemblyScript คือ TypeScript เต็มรูปแบบ แล้วใช้ Feature ที่ TS รองรับแต่ `asc` ไม่รองรับ (เช่น Union Type ซับซ้อน หรือ `any`) จนเจอ Compile Error ที่ไม่คาดคิด
+- ลืมว่า `number` ของ TypeScript ไม่มีอยู่จริงใน AssemblyScript ต้องระบุ `i32`/`i64`/`f32`/`f64` ให้ชัดเจนเสมอ
+- เลือก AssemblyScript สำหรับงานที่ต้องพึ่ง Library จำนวนมาก (เช่น Image Processing ที่ซับซ้อน) โดยไม่เช็ค Ecosystem ก่อน จนต้องเขียน Logic เองใหม่ทั้งหมด
+
+> 💡 Real World Example
+>
+> NEAR Protocol ใช้ AssemblyScript เป็นหนึ่งในภาษาหลักสำหรับเขียน Smart Contract ที่คอมไพล์เป็น Wasm และ Shopify Functions ก็รองรับ AssemblyScript เป็นตัวเลือกให้ Merchant เขียน Custom Checkout Logic ควบคู่กับ Rust
+
 export const quizAssemblyScript = [
   { q: "AssemblyScript ใช้ Numeric Type ใดสำหรับเลขจำนวนเต็ม 32 บิต?", options: ["number", "int", "i32", "Int32"], answer: 2 },
   { q: "จะทำให้ฟังก์ชัน AssemblyScript เรียกได้จาก JavaScript ได้อย่างไร?", options: ["ใช้ Keyword export", "ใช้ module.exports", "ใส่ Annotation ด้วย @extern", "ประกาศใน asconfig.json"], answer: 0 },

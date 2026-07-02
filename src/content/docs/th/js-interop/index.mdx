@@ -1,6 +1,6 @@
 ---
 title: 'JS Interop & การโหลด'
-description: 'ทำความเข้าใจขอบเขตระหว่าง JavaScript กับ WebAssembly — JS โหลด คอมไพล์ และ instantiate โมดูล จัดหา imports และเรียกใช้ exports'
+description: 'ทำความเข้าใจขอบเขตระหว่าง JavaScript กับ WebAssembly — JS โหลด คอมไพล์ และ instantiate module จัดหา imports และเรียกใช้ exports'
 sidebar:
   order: 1
 ---
@@ -11,11 +11,13 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-WebAssembly ไม่สามารถทำงานได้โดยลำพัง มันทำงานอยู่ภายใน **host environment** เสมอ และบนเว็บนั้น host ก็คือ JavaScript ฝั่ง JS มีหน้าที่ดึงข้อมูล bytes จากไฟล์ `.wasm` คอมไพล์ให้กลายเป็น `WebAssembly.Module` สร้าง instance ของโมดูลนั้นพร้อมกับ imports ที่จำเป็น และในที่สุดก็เรียกฟังก์ชันที่โมดูลเปิดเผยออกมา ส่วน Wasm นั้นอาศัยอยู่ในสภาพแวดล้อมหน่วยความจำที่ถูก sandbox อย่างเข้มงวด — มันไม่สามารถเข้าถึง DOM, เครือข่าย หรือ browser API ใด ๆ ได้เลย เว้นแต่ JavaScript จะส่งฟังก์ชันที่ทำสิ่งนั้นมาให้
+WebAssembly ไม่สามารถทำงานได้โดยลำพัง มันทำงานอยู่ภายใน **host environment** เสมอ และบนเว็บนั้น host ก็คือ JavaScript ฝั่ง JS มีหน้าที่ดึงข้อมูล bytes จากไฟล์ `.wasm` คอมไพล์ให้กลายเป็น `WebAssembly.Module` สร้าง instance ของ module นั้นพร้อมกับ imports ที่จำเป็น และในที่สุดก็เรียกฟังก์ชันที่ module เปิดเผยออกมา ส่วน Wasm นั้นอาศัยอยู่ในสภาพแวดล้อมหน่วยความจำที่ถูก sandbox อย่างเข้มงวด — มันไม่สามารถเข้าถึง DOM, เครือข่าย หรือ browser API ใด ๆ ได้เลย เว้นแต่ JavaScript จะส่งฟังก์ชันที่ทำสิ่งนั้นมาให้
 
 ## ขอบเขตระหว่าง host กับ module
 
-ความสัมพันธ์ระหว่าง JS และ Wasm นั้นมีเจตนาและชัดเจน ก่อนที่โค้ด Wasm ใด ๆ จะทำงาน JavaScript ต้องจัดเตรียม **imports object** ซึ่งเป็น JS object ธรรมดาที่มี keys ตรงกับการประกาศ import ภายในโมดูล WAT imports เหล่านั้นอาจเป็นฟังก์ชัน JS, instance ของ `WebAssembly.Memory`, instance ของ `WebAssembly.Global` หรือ instance ของ `WebAssembly.Table` ก็ได้ ในทางกลับกัน เมื่อโมดูลถูก instantiate แล้ว JS จะได้รับ object `instance.exports` กลับมา ซึ่งประกอบด้วยทุก symbol ที่โมดูลเลือกจะ export ออกมา
+ความสัมพันธ์ระหว่าง JS และ Wasm นั้นมีเจตนาและชัดเจน ก่อนที่โค้ด Wasm ใด ๆ จะทำงาน JavaScript ต้องเตรียม **imports object** — JS object ธรรมดาที่มี keys ตรงกับการประกาศ import ภายใน module WAT
+
+imports เหล่านั้นอาจเป็นฟังก์ชัน JS, instance ของ `WebAssembly.Memory`, instance ของ `WebAssembly.Global` หรือ instance ของ `WebAssembly.Table` ก็ได้ ในทางกลับกัน เมื่อ module ถูก instantiate แล้ว JS จะได้รับ object `instance.exports` กลับมา ซึ่งประกอบด้วยทุก symbol ที่ module เลือกจะ export ออกมา
 
 export const boundaryDiagram = `flowchart LR
   JS["JavaScript (host)"]
@@ -35,7 +37,7 @@ export const boundaryDiagram = `flowchart LR
 
 ## ตัวอย่างที่รันได้แบบเรียบง่ายที่สุด
 
-โมดูล WAT ด้านล่าง export ฟังก์ชันเดียวชื่อ `greet` ที่ไม่รับอาร์กิวเมนต์และคืนค่าจำนวนเต็ม `42` ฝั่ง JavaScript คอมไพล์ bytes สร้าง instance ของโมดูลด้วย imports object ว่าง `{}` และเรียก `instance.exports.greet()`
+module WAT ด้านล่าง export ฟังก์ชันเดียวชื่อ `greet` ที่ไม่รับอาร์กิวเมนต์และคืนค่าจำนวนเต็ม `42` ฝั่ง JavaScript คอมไพล์ bytes สร้าง instance ของ module ด้วย imports object ว่าง `{}` และเรียก `instance.exports.greet()`
 
 ```wasm
 (module

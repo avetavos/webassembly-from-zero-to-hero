@@ -10,7 +10,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-โมดูล WebAssembly เริ่มต้นด้วยจำนวนหน้าที่คุณประกาศใน `(memory N)` แต่บางครั้งคุณต้องการ memory เพิ่มขณะ runtime — เช่น เมื่อผู้ใช้อัปโหลดไฟล์ขนาดใหญ่หรือข้อมูลของคุณเพิ่มขึ้นเกินที่คาดไว้ คำสั่ง `memory.grow` และ segment `(data ...)` ครอบคลุมสองเรื่องที่เกี่ยวข้องกัน: การขยาย memory และการเติม byte แบบ static ล่วงหน้า
+module WebAssembly เริ่มต้นด้วยจำนวนหน้าที่คุณประกาศใน `(memory N)` แต่บางครั้งคุณต้องการ memory เพิ่มขณะ runtime — เช่น เมื่อผู้ใช้อัปโหลดไฟล์ขนาดใหญ่หรือข้อมูลของคุณเพิ่มขึ้นเกินที่คาดไว้ คำสั่ง `memory.grow` และ segment `(data ...)` ครอบคลุมสองเรื่องที่เกี่ยวข้องกัน: การขยาย memory และการเติม byte แบบ static ล่วงหน้า
 
 ## คำสั่ง `memory.grow`
 
@@ -44,7 +44,7 @@ view = new Uint8Array(mem.buffer);       // re-create from fresh buffer
 
 ## Data segment
 
-Segment `(data ...)` ช่วยให้คุณฝัง byte แบบ static โดยตรงในโมดูลและให้ byte เหล่านั้นถูกเขียนลง memory โดยอัตโนมัติตอน instantiation นี่คือวิธีที่ compiled language เริ่มต้น string literal และ read-only table
+Segment `(data ...)` ช่วยให้คุณฝัง byte แบบ static โดยตรงใน module และให้ byte เหล่านั้นถูกเขียนลง memory โดยอัตโนมัติตอน instantiation นี่คือวิธีที่ compiled language เริ่มต้น string literal และ read-only table
 
 ```wasm
 (module
@@ -52,7 +52,7 @@ Segment `(data ...)` ช่วยให้คุณฝัง byte แบบ stat
   (data (i32.const 0) "Hello"))  ;; writes 5 UTF-8 bytes at offset 0
 ```
 
-Byte จะถูก copy จากโมดูลลง memory ก่อนที่ฟังก์ชันใดจะรัน ดังนั้นข้อมูลจะพร้อมใช้งานทันทีเมื่อฟังก์ชัน export แรกถูกเรียก
+Byte จะถูก copy จาก module ลง memory ก่อนที่ฟังก์ชันใดจะรัน ดังนั้นข้อมูลจะพร้อมใช้งานทันทีเมื่อฟังก์ชัน export แรกถูกเรียก
 
 ## ลองรัน
 
@@ -80,6 +80,23 @@ console.log('after grow - size (pages):', mem.buffer.byteLength / 65536);`;
 <Callout title="สร้าง views ใหม่หลัง grow">
 หลังจาก `memory.grow` ArrayBuffer เดิมจะถูก detach และ typed-array views ที่ชี้ไปยัง buffer นั้นจะหยุดทำงาน ต้องสร้าง views ใหม่จาก `mem.buffer` ทันทีหลังจาก grow
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| TypedArray view ที่สร้างจาก `mem.buffer` | เข้าถึง byte แบบ zero-copy รวดเร็ว ไม่มี overhead จากการ copy | ต้องสร้าง view ใหม่ทุกครั้งหลัง `memory.grow` เพราะ buffer เดิมถูก detach ไปแล้ว |
+| จัดการ growth และ layout ของ memory เอง | คุมได้ว่าจะขยายเมื่อไหร่ ขนาดเท่าไหร่ | ไม่มี GC ช่วยตรวจ ต้อง track เองว่า pointer หรือ view ตัวไหนยังใช้งานได้อยู่หลัง grow |
+
+## Common Mistakes
+
+- Cache typed-array view ไว้ก่อนเรียก `memory.grow` แล้วลืมสร้างใหม่ ทำให้ view ชี้ไปยัง buffer ที่ถูก detach ไปแล้ว อ่านหรือเขียนค่าผิดแบบเงียบๆ โดยไม่มี error เตือน
+- คิดว่า `memory.grow(n)` รับจำนวน byte ทั้งที่จริงมันรับจำนวน page (แต่ละ page 64 KiB) ทำให้เผลอขอ memory เกินความจำเป็นไปมาก
+- วาง `(data ...)` segment ที่ offset overlap กับพื้นที่ที่ JavaScript จะเขียนทับภายหลัง ทำให้ข้อมูลเริ่มต้นถูกเขียนทับโดยไม่ตั้งใจ
+
+> 💡 Real World Example
+>
+> FFmpeg.wasm ใช้ linear memory buffer ที่ขยายได้ (`memory.grow`) เพื่อ stream เฟรมวิดีโอที่ decode แล้วระหว่าง JavaScript กับ Wasm โดยตรง โดยไม่ต้อง copy เฟรมทั้งหมดกลับไปมาทุกครั้งที่หน่วยความจำไม่พอ
 
 export const quizGrowingAndData = [
   { q: "คำสั่ง memory.grow คืนค่าอะไร?", options: ["จำนวน page ทั้งหมดหลัง grow", "จำนวน bytes ที่เพิ่ม", "จำนวน page เดิมก่อน grow หรือ -1 เมื่อล้มเหลว", "0 เมื่อสำเร็จ"], answer: 2 },

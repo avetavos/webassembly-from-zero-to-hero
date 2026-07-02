@@ -107,6 +107,23 @@ console.log('factorial(10) =', instance.exports.factorial(10), '(expected 362880
 ก่อน `call $fn` ให้ push argument ของฟังก์ชันจากซ้ายไปขวา หลังจาก call return ผลลัพธ์จะอยู่บน stack ทันที — พร้อมสำหรับคำสั่งถัดไป Wasm ไม่มี named argument syntax ตำแหน่งบน stack คือทุกอย่าง
 </Callout>
 
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| Structured `call` (ไม่มี arbitrary jump ข้าม stack frame) | engine validate ได้ว่า call graph ถูกต้องตั้งแต่ compile time ปลอดภัยกว่าการกระโดดข้าม address ตรงๆ | ไม่มี manual stack manipulation แบบ assembly ทำให้ pattern บางอย่าง (เช่น coroutine แบบเดิม) ต้องเขียนใหม่ |
+| Recursion ผ่าน `call` ธรรมดา | เขียนง่าย เข้าใจง่าย เหมือน recursive function ในภาษาอื่น | Wasm ไม่มี automatic stack growth เหมือน native thread บางตัว recursion ลึกเกินไปจะ trap ด้วย stack exhaustion |
+
+## Common Mistakes
+
+- เขียน recursive function โดยไม่มี base case ที่ครอบคลุมครบ (เช่นลืมเช็ค `n < 0`) ทำให้ recursion ไม่มีวันจบ
+- คาดหวังว่า Wasm จะทำ tail-call optimization ให้อัตโนมัติเหมือนบางภาษา แต่ทุก `call` เพิ่ม frame เข้า call stack เสมอ ทำให้ recursion ลึกๆ เสี่ยง stack exhaustion
+- push argument ผิดลำดับก่อน `call` (WAT ไม่มี named argument) ทำให้ parameter ไปผูกกับตำแหน่งผิดโดยไม่มี error ตอน compile
+
+> 💡 Real World Example
+>
+> Wasmtime ใช้ structured call stack ของ Wasm ในการ verify และ compile function call ให้เร็วโดยไม่ต้องวิเคราะห์ arbitrary jump และยัง enforce stack size limit เพื่อจับ unbounded recursion ก่อนที่จะ crash process จริง
+
 export const quizCallsRecursion = [
   {
     q: "วิธีเรียกฟังก์ชันชื่อ `$add` ใน WAT คืออะไร?",

@@ -12,7 +12,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
 การเขียน WAT ด้วยมือเป็นวิธีที่ดีในการเรียนรู้ Execution Model ของ Wasm แต่ในทางปฏิบัติคุณจะคอมไพล์จาก **ภาษาโปรแกรมจริง** คอมไพเลอร์จะจัดการ Register Allocation, Memory Layout และ Binary Encoding ให้ — คุณเพียงแค่เขียนโค้ดตามสไตล์ของภาษานั้น แล้วได้ไฟล์ `.wasm` ออกมา
 
-โมดูลนี้ครอบคลุม Toolchain สี่ตัวที่ใช้บ่อยที่สุดในปัจจุบัน เปรียบเทียบข้อดีข้อเสีย และให้คำสั่ง Build จริงของแต่ละตัว
+module นี้ครอบคลุม Toolchain สี่ตัวที่ใช้บ่อยที่สุดในปัจจุบัน เปรียบเทียบข้อดีข้อเสีย และให้คำสั่ง Build จริงของแต่ละตัว
 
 ## ภาพรวม Toolchain ทั้งสี่ตัว
 
@@ -20,7 +20,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 |------|-----------|-------------|----------|
 | **Rust** | `wasm-pack` / `wasm-bindgen` | เล็ก (ไม่มี GC, ไม่มี Runtime) | โค้ด Wasm ใหม่, แพ็กเกจ npm |
 | **C / C++** | Emscripten (`emcc`) | กลาง–ใหญ่ (มี libc emulation) | Port ไลบรารี C/C++ ที่มีอยู่ |
-| **AssemblyScript** | `asc` | เล็กมาก | นักพัฒนา TypeScript, โมดูลเรียบง่าย |
+| **AssemblyScript** | `asc` | เล็กมาก | นักพัฒนา TypeScript, module เรียบง่าย |
 | **TinyGo** | `tinygo build` | เล็ก | นักพัฒนา Go, ไมโครคอนโทรลเลอร์ |
 
 ## แผนผัง Toolchain แต่ละตัว

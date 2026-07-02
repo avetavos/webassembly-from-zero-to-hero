@@ -24,7 +24,7 @@ export const stackDiagram = `flowchart LR
 
 <Mermaid code={stackDiagram} title="Value stack ระหว่าง i32.const 10 / i32.const 3 / i32.add" />
 
-เมื่อสิ้นสุดฟังก์ชัน สิ่งที่เหลืออยู่บน stack ต้องตรงกับชนิด `result` ที่ประกาศไว้อย่างแน่ชัด หากเหลือมากเกินไปหรือน้อยเกินไป โมดูลจะ validation ไม่ผ่าน
+เมื่อสิ้นสุดฟังก์ชัน สิ่งที่เหลืออยู่บน stack ต้องตรงกับชนิด `result` ที่ประกาศไว้อย่างแน่ชัด หากเหลือมากเกินไปหรือน้อยเกินไป module จะ validation ไม่ผ่าน
 
 ## ตัวแปร local
 
@@ -78,6 +78,23 @@ console.log('doubleSum(3, 4) =', instance.exports.doubleSum(3, 4));`;
 <Callout title="Wasm เป็น stack machine">
   แต่ละคำสั่งจะ pop ตัวถูกดำเนินการ (operand) ของมันออกจาก value stack และ push ผลลัพธ์ของมัน `local.get` จะ push ค่าของตัวแปร local; `local.set` จะ pop แล้วเก็บมัน; `local.tee` จะ pop เก็บ แล้ว push ค่ากลับไป — มีประโยชน์เมื่อคุณต้องการทั้งบันทึกและใช้ค่า
 </Callout>
+
+## Trade-offs
+
+| ตัวเลือก | Benefit | Cost |
+|---|---|---|
+| เขียน WAT เอง | บังคับให้เข้าใจ value stack และ local จริง ๆ เพราะไม่มี syntax sugar มาบัง เหมาะมากสำหรับเรียนรู้ | ต้อง track stack depth เองตลอด แค่ลืม `local.set` หนึ่งบรรทัดก็ทำให้ validation พังได้ |
+| ให้ compiler generate Wasm | compiler จัดการ stack allocation และ register-to-local mapping ให้อัตโนมัติ productive กว่ามากสำหรับแอปจริง | ควบคุม lifetime ของ local แบบละเอียดเองไม่ได้ ต้องเชื่อใจ compiler |
+
+## Common Mistakes
+
+- จบ block หรือฟังก์ชันโดยมีค่าค้างอยู่บน stack มากกว่าที่ signature ประกาศไว้ เช่นลืม pop ค่าที่ push ไว้ระหว่างทาง ทำให้ module validation ไม่ผ่าน
+- ใช้ `local.tee` ทั้งที่ตั้งใจจะใช้ `local.set` ทำให้ค่าที่ไม่ต้องการค้างอยู่บน stack เกินมาโดยไม่รู้ตัว
+- ลืมว่า branch อย่าง `br`/`br_if` ที่กระโดดออกจาก block ต้องทิ้ง stack ไว้ในสภาพที่ target ของ branch คาดหวังพอดี ไม่ใช่แค่ปล่อยให้ไหลไปตามลำดับปกติ
+
+> 💡 Real World Example
+>
+> วิศวกรที่ debug production `.wasm` blob ที่บริษัทอย่าง Cloudflare Workers มักใช้ `wasm2wat` แปลง binary กลับเป็น WAT ที่อ่านได้ เพื่อไล่ดู stack ทีละคำสั่งตอนหา bug ที่ compiler สร้างโค้ดผิดพลาด
 
 export const quizLocalsAndStack = [
   {
