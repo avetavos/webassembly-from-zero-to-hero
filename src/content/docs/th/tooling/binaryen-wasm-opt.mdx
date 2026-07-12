@@ -109,10 +109,10 @@ echo "After:  $(wc -c < output.wasm) bytes"
 > **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักให้ความสำคัญกับ budget ของขนาด binary เป็นพิเศษ จึงนิยมใช้ `wasm-opt -Oz` กันเป็นมาตรฐาน
 
 export const quizBinaryen = [
-  { q: "Which wasm-opt flag maximises binary size reduction?", options: ["-O3", "-Os", "-Oz", "-O2"], answer: 2 },
-  { q: "Do you need the original source code to run wasm-opt?", options: ["Yes, wasm-opt needs the C/Rust source", "Yes, wasm-opt needs the WAT source", "No, wasm-opt works on the binary alone", "Only if you use -O3 or higher"], answer: 2 },
-  { q: "Which toolchain calls wasm-opt automatically during a release build?", options: ["tsc (TypeScript)", "Babel", "wasm-pack (Rust)", "esbuild"], answer: 2 },
-  { q: "What does --strip-dwarf do?", options: ["Removes all exported functions", "Removes DWARF debug info to reduce binary size", "Strips the import section", "Converts f64 to f32"], answer: 1 },
+  { q: "wasm-opt flag ไหนลด binary size ได้มากที่สุด?", options: ["-O3", "-Os", "-Oz", "-O2"], answer: 2 },
+  { q: "ต้องมี source code ต้นฉบับเพื่อรัน wasm-opt ไหม?", options: ["ต้องมี, wasm-opt ต้องใช้ C/Rust source", "ต้องมี, wasm-opt ต้องใช้ WAT source", "ไม่ต้อง, wasm-opt ทำงานกับ binary ได้เลย", "เฉพาะตอนใช้ -O3 ขึ้นไป"], answer: 2 },
+  { q: "toolchain ไหนเรียก wasm-opt อัตโนมัติตอน release build?", options: ["tsc (TypeScript)", "Babel", "wasm-pack (Rust)", "esbuild"], answer: 2 },
+  { q: "--strip-dwarf ทำอะไร?", options: ["ลบ exported functions ทั้งหมด", "ลบ DWARF debug info เพื่อลด binary size", "ตัด import section ออก", "แปลง f64 เป็น f32"], answer: 1 },
 ];
 
 <Quiz client:visible id="tooling/binaryen-wasm-opt" questions={quizBinaryen} />

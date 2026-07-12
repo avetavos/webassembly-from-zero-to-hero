@@ -116,7 +116,7 @@ console.log('abs(3)     =', instance.exports.abs(3),     '(expected 3)');`;
 
 > 💡 Real World Example
 >
-> เวลา Emscripten คอมไพล์ C/C++ ที่มี ternary หรือ if-else ซับซ้อน relooper algorithm (จาก rustc/LLVM ecosystem) จะ reconstruct โครงสร้าง `if`/`else` ที่ validate ได้ให้ตรงกับ arbitrary control-flow graph ของโค้ดต้นฉบับ
+> เวลา Emscripten คอมไพล์ C/C++ ที่มี ternary หรือ if-else ซับซ้อน relooper algorithm (อัลกอริทึมที่ Emscripten พัฒนาขึ้นเอง) จะ reconstruct โครงสร้าง `if`/`else` ที่ validate ได้ให้ตรงกับ arbitrary control-flow graph ของโค้ดต้นฉบับ
 
 export const quizIfElse = [
   {

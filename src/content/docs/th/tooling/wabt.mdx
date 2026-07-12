@@ -130,10 +130,10 @@ binary WebAssembly ทั้งหมดเริ่มต้นด้วย mag
 > **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติหลังขั้นตอนที่เทียบเท่ากับ `wat2wasm` เมื่อ build ด้วย `-O2`/`-O3` ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักใช้ `wasm-validate` เป็นด่านบังคับใน CI ก่อน deploy ทุกครั้ง
 
 export const quizWabt = [
-  { q: "Which flag tells wat2wasm to keep $name annotations in the output binary?", options: ["--keep-names", "--debug-names", "--names=true", "--preserve-symbols"], answer: 1 },
-  { q: "What are the first four bytes of every valid .wasm file?", options: ["ff fe 00 00", "00 61 73 6d", "77 61 73 6d", "01 00 00 00"], answer: 1 },
-  { q: "Which wabt tool prints section headers and exports without a full disassembly?", options: ["wasm2wat", "wasm-validate", "wasm-objdump -x", "wat2wasm --inspect"], answer: 2 },
-  { q: "What exit code does wasm-validate return on a valid module?", options: ["1", "0", "2", "It depends on the OS"], answer: 1 },
+  { q: "flag ไหนบอกให้ wat2wasm เก็บ $name annotations ไว้ใน binary ที่ได้?", options: ["--keep-names", "--debug-names", "--names=true", "--preserve-symbols"], answer: 1 },
+  { q: "4 bytes แรกของทุกไฟล์ .wasm ที่ valid คืออะไร?", options: ["ff fe 00 00", "00 61 73 6d", "77 61 73 6d", "01 00 00 00"], answer: 1 },
+  { q: "wabt tool ไหนที่แสดง section headers และ exports โดยไม่ต้อง disassemble ทั้งหมด?", options: ["wasm2wat", "wasm-validate", "wasm-objdump -x", "wat2wasm --inspect"], answer: 2 },
+  { q: "wasm-validate คืน exit code อะไรเมื่อ module ถูกต้อง?", options: ["1", "0", "2", "ขึ้นอยู่กับ OS"], answer: 1 },
 ];
 
 <Quiz client:visible id="tooling/wabt" questions={quizWabt} />

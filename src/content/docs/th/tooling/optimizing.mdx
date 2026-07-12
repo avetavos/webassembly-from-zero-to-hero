@@ -131,10 +131,10 @@ wasm-tools validate output.wasm
 > **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` อยู่แล้ว ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักตั้ง budget ของขนาด binary ไว้ชัดเจน แล้วรัน playbook นี้ทั้งห้าขั้นตอนใน CI ก่อน deploy ทุกครั้ง
 
 export const quizOptimizing = [
-  { q: "Which wasm-opt flag minimises binary size most aggressively?", options: ["-O3", "-Os", "-O2", "-Oz"], answer: 3 },
-  { q: "What is the benefit of WebAssembly.instantiateStreaming over instantiate?", options: ["It supports SIMD instructions", "It avoids the need for a MIME type", "The browser compiles while downloading, reducing startup time", "It works without a server"], answer: 2 },
-  { q: "What does --strip-debug remove from a binary?", options: ["Exported functions", "The code section", "DWARF debug information", "The type section"], answer: 2 },
-  { q: "Which technique eliminates the allocator entirely for Rust modules?", options: ["Using wee_alloc", "Using #![no_std] with no dynamic allocation", "Compiling with -O3", "Stripping producer sections"], answer: 1 },
+  { q: "wasm-opt flag ไหนที่ลด binary size ได้มากที่สุด?", options: ["-O3", "-Os", "-O2", "-Oz"], answer: 3 },
+  { q: "WebAssembly.instantiateStreaming ได้เปรียบกว่า instantiate ตรงไหน?", options: ["รองรับ SIMD instructions", "ไม่ต้องใช้ MIME type", "browser compile ไปพร้อมกับ download ช่วยลด startup time", "ทำงานได้โดยไม่ต้องมี server"], answer: 2 },
+  { q: "--strip-debug ลบอะไรออกจาก binary?", options: ["exported functions", "code section", "DWARF debug information", "type section"], answer: 2 },
+  { q: "เทคนิคไหนที่กำจัด allocator ออกไปทั้งหมดสำหรับ Rust modules?", options: ["ใช้ wee_alloc", "ใช้ #![no_std] โดยไม่มี dynamic allocation", "คอมไพล์ด้วย -O3", "ตัด producer sections ออก"], answer: 1 },
 ];
 
 <Quiz client:visible id="tooling/optimizing" questions={quizOptimizing} />

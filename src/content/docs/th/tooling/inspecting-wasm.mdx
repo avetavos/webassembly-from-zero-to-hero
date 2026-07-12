@@ -117,10 +117,10 @@ twiggy top my.wasm --output-format json
 > **Emscripten** เรียก `wasm-opt` ของ Binaryen อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักตรวจ binary ด้วยเครื่องมือในบทนี้ก่อนเสมอ เพื่อคุม budget ของขนาด binary ให้อยู่ในเป้าที่ตั้งไว้
 
 export const quizInspecting = [
-  { q: "Which tool attributes each byte of a .wasm file to a specific function?", options: ["wasm-objdump", "wasm2wat", "twiggy", "wasm-validate"], answer: 2 },
-  { q: "What does wasm-objdump -x print?", options: ["Optimised binary output", "A full WAT disassembly", "Section headers, types, imports, and exports", "Only the code section"], answer: 2 },
-  { q: "Which section holds the actual instructions of each function?", options: ["Type section", "Export section", "Function section", "Code section"], answer: 3 },
-  { q: "What do you need in the binary to see readable function names in DevTools?", options: ["A data section", "A name section or DWARF section", "An import section", "A memory section"], answer: 1 },
+  { q: "tool ไหนที่ระบุได้ว่าแต่ละ byte ของไฟล์ .wasm เป็นของ function ไหน?", options: ["wasm-objdump", "wasm2wat", "twiggy", "wasm-validate"], answer: 2 },
+  { q: "wasm-objdump -x แสดงอะไรออกมา?", options: ["binary ที่ optimize แล้ว", "WAT disassembly แบบเต็ม", "section headers, types, imports และ exports", "เฉพาะ code section"], answer: 2 },
+  { q: "section ไหนที่เก็บ instructions จริงของแต่ละ function?", options: ["Type section", "Export section", "Function section", "Code section"], answer: 3 },
+  { q: "ต้องมีอะไรใน binary ถึงจะเห็นชื่อ function ที่อ่านได้ใน DevTools?", options: ["data section", "name section หรือ DWARF section", "import section", "memory section"], answer: 1 },
 ];
 
 <Quiz client:visible id="tooling/inspecting-wasm" questions={quizInspecting} />

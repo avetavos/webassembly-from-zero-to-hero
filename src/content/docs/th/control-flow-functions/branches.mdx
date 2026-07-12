@@ -111,7 +111,7 @@ console.log('relu(7)  =', instance.exports.relu(7),  '(expected 7)');`;
 
 > 💡 Real World Example
 >
-> Emscripten ใช้ relooper algorithm (มาจากงานของ rustc/LLVM toolchain) แปลง arbitrary control-flow graph จากโค้ด C/C++ ให้กลายเป็น structured `block`/`loop`/`br` ที่ Wasm ต้องการ เพราะ native code เต็มไปด้วย `goto` ที่ Wasm ไม่รองรับตรงๆ
+> Emscripten ใช้ relooper algorithm (อัลกอริทึมที่ Emscripten พัฒนาขึ้นเอง) แปลง arbitrary control-flow graph จากโค้ด C/C++ ให้กลายเป็น structured `block`/`loop`/`br` ที่ Wasm ต้องการ เพราะ native code เต็มไปด้วย `goto` ที่ Wasm ไม่รองรับตรงๆ
 
 export const quizBranches = [
   {

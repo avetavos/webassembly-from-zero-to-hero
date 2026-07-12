@@ -112,9 +112,9 @@ console.log('cube(3) =', instance.exports.cube(3));`;
 > Squoosh คอมไพล์ Wasm codec หลายตัวไว้ล่วงหน้าเพียงครั้งเดียว แล้ว instantiate ใหม่ทุกครั้งที่ผู้ใช้เลือกบีบอัดภาพด้วย codec นั้น เพื่อเลี่ยงต้นทุนการคอมไพล์ซ้ำซ้อนในทุก session
 
 export const quizInstantiate = [
-  { q: "What does WebAssembly.instantiate(bytes, {}) return?", options: ["A WebAssembly.Module", "A Promise<{module, instance}>", "A Uint8Array", "An ArrayBuffer"], answer: 1 },
-  { q: "Which property of the instantiation result holds callable exported functions?", options: ["result.module", "result.exports", "result.instance.exports", "result.wasm"], answer: 2 },
-  { q: "Can a compiled WebAssembly.Module be re-instantiated multiple times?", options: ["No — each compile produces one instance", "Yes — the Module is reusable", "Only in Node.js", "Only with streaming instantiation"], answer: 1 },
+  { q: "WebAssembly.instantiate(bytes, {}) คืนค่าอะไร?", options: ["WebAssembly.Module", "Promise<{module, instance}>", "Uint8Array", "ArrayBuffer"], answer: 1 },
+  { q: "property ไหนของผลลัพธ์จาก instantiation ที่เก็บ exported functions ที่เรียกใช้ได้?", options: ["result.module", "result.exports", "result.instance.exports", "result.wasm"], answer: 2 },
+  { q: "WebAssembly.Module ที่ compile แล้ว instantiate ซ้ำได้หลายครั้งไหม?", options: ["ไม่ได้ — แต่ละครั้งที่ compile ได้ instance เดียว", "ได้ — Module ใช้ซ้ำได้", "ได้เฉพาะใน Node.js", "ได้เฉพาะกับ streaming instantiation"], answer: 1 },
 ];
 
 <Quiz client:visible id="js-interop/instantiate" questions={quizInstantiate} />

@@ -90,10 +90,10 @@ wasm-tools strip add.wasm -o add.stripped.wasm
 </Callout>
 
 export const quizToolingIndex = [
-  { q: "Which tool converts a .wat text file into a .wasm binary?", options: ["wasm-opt", "wat2wasm", "wasm-tools validate", "wasm2wat"], answer: 1 },
-  { q: "Which tool family is primarily focused on size and speed optimisation?", options: ["wabt", "wasm-tools", "Binaryen (wasm-opt)", "wasm-validate"], answer: 2 },
-  { q: "Which organisation maintains the wasm-tools project?", options: ["Google", "Mozilla", "Bytecode Alliance", "WebAssembly CG"], answer: 2 },
-  { q: "What does wasm2wat do?", options: ["Compiles C to WebAssembly", "Optimises a .wasm binary", "Disassembles a .wasm binary back to WAT text", "Validates spec compliance"], answer: 2 },
+  { q: "tool ไหนแปลงไฟล์ .wat เป็น .wasm binary?", options: ["wasm-opt", "wat2wasm", "wasm-tools validate", "wasm2wat"], answer: 1 },
+  { q: "tool family ไหนที่เน้นเรื่อง size และ speed optimization เป็นหลัก?", options: ["wabt", "wasm-tools", "Binaryen (wasm-opt)", "wasm-validate"], answer: 2 },
+  { q: "องค์กรไหนดูแลโปรเจกต์ wasm-tools?", options: ["Google", "Mozilla", "Bytecode Alliance", "WebAssembly CG"], answer: 2 },
+  { q: "wasm2wat ทำอะไร?", options: ["คอมไพล์ C เป็น WebAssembly", "optimize ไฟล์ .wasm binary", "disassemble ไฟล์ .wasm binary กลับเป็น WAT text", "ตรวจสอบความถูกต้องตาม spec"], answer: 2 },
 ];
 
 <Quiz client:visible id="tooling/index" questions={quizToolingIndex} />

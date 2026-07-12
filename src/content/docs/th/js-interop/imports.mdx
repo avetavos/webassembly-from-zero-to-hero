@@ -115,9 +115,9 @@ namespace string (`"env"`) และ field name (`"log"`) ใน imports object 
 > AutoCAD Web พอร์ต engine C++ เดิมมาเป็น Wasm แล้ว import ฟังก์ชัน host จำนวนมาก (rendering, input handling, file I/O) เพื่อเชื่อม engine เข้ากับ browser APIs ให้ผู้ใช้โต้ตอบกับ CAD model ได้แบบ real-time
 
 export const quizImports = [
-  { q: 'In `(import "env" "log" ...)`, which is the module namespace?', options: ['"log"', '"env"', '"import"', '"func"'], answer: 1 },
-  { q: 'What is the shape of the imports object for `(import "env" "log" (func ...))`?', options: ['`{ log: fn }`', '`{ env: { log: fn } }`', '`{ env: fn }`', '`{ "env.log": fn }`'], answer: 1 },
-  { q: "What error is thrown when the imports object is missing a required import?", options: ["TypeError", "RangeError", "LinkError", "SyntaxError"], answer: 2 },
+  { q: 'ใน `(import "env" "log" ...)` ตัวไหนคือ module namespace?', options: ['"log"', '"env"', '"import"', '"func"'], answer: 1 },
+  { q: 'imports object สำหรับ `(import "env" "log" (func ...))` มีรูปร่างแบบไหน?', options: ['`{ log: fn }`', '`{ env: { log: fn } }`', '`{ env: fn }`', '`{ "env.log": fn }`'], answer: 1 },
+  { q: "error อะไรถูก throw เมื่อ imports object ขาด import ที่จำเป็น?", options: ["TypeError", "RangeError", "LinkError", "SyntaxError"], answer: 2 },
 ];
 
 <Quiz client:visible id="js-interop/imports" questions={quizImports} />
