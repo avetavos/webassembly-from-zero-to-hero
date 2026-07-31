@@ -11,7 +11,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-`loop` ใน WebAssembly **ไม่วนซ้ำอัตโนมัติ** มันเป็นเพียง labeled construct ที่จุดเริ่มต้นเป็น branch target การวนซ้ำจะเกิดขึ้นเมื่อวาง `br_if` ไว้ที่ท้าย body เพื่อกระโดดกลับไปที่ loop label เมื่อ condition ยังเป็นจริง
+`loop` ใน WebAssembly **ไม่วนซ้ำอัตโนมัติ** เป็นเพียง labeled construct ที่จุดเริ่มต้นเป็น branch target การวนซ้ำจะเกิดขึ้นเมื่อวาง `br_if` ไว้ที่ท้าย body เพื่อกระโดดกลับไปที่ loop label เมื่อ condition ยังเป็นจริง
 
 ## Loop construct
 
@@ -106,20 +106,20 @@ console.log('sumTo(10) =', instance.exports.sumTo(10), '(expected 55)');`;
 `loop` construct เพียงกำหนดจุดเริ่มต้นของ back-edge ที่อาจเกิดขึ้น ถ้าไม่มี `br_if` (หรือ `br`) ที่ชี้กลับไปที่ loop label body จะทำงานเพียงครั้งเดียวแล้ว fall through ผู้เขียนโปรแกรมต้องรับผิดชอบทั้งการสร้างและการหยุดการวนซ้ำ
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | `loop` + `br_if` (structured back-edge) | validate ได้ตั้งแต่ compile time และปลอดภัยกว่า arbitrary backward `goto` | ต้องเขียน exit condition เองทุกครั้ง ไม่มี built-in `for`/`while` ให้ engine จัดการให้ |
 | ไม่มี arbitrary jump ระหว่าง loop | engine ทำ loop compilation/JIT ได้เร็วเพราะรู้ boundary ของ loop ชัดเจน | portability ของ CFG ที่ซับซ้อนจาก native code ต้องแปลงผ่าน relooper ก่อนจะ map เข้า `loop`/`br` ได้ |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
-- เข้าใจผิดว่า `br_if` ใน `loop` ทำงานเหมือน `break` แต่จริงๆมันกระโดดกลับไปจุดเริ่มต้นของ `loop` (ทำงานคล้าย `continue` มากกว่า) ไม่ใช่ทางออกจาก loop
+- เข้าใจผิดว่า `br_if` ใน `loop` ทำงานเหมือน `break` แต่จริง ๆ แล้วกระโดดกลับไปที่จุดเริ่มต้นของ `loop` (ทำงานคล้าย `continue` มากกว่า) ไม่ใช่ทางออกจาก loop
 - ลืมใส่ exit condition ที่ถูกต้อง ทำให้ `br_if $again` เป็นจริงตลอดไปและ loop วนไม่รู้จบ (Wasm ไม่มี infinite-loop guard ให้อัตโนมัติ)
 - Off-by-one ใน exit condition เช่นใช้ `i <= n` ผิดเป็น `i < n` ทำให้ loop วนขาดหรือเกินไปหนึ่งรอบ อย่างในตัวอย่าง `sumTo`
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > Wasmtime ใช้ประโยชน์จาก structured `loop` construct ของ Wasm ในการ compile loop เป็น native machine code ที่มี back-edge ชัดเจน ทำให้ JIT ทำ loop optimization ได้เร็วและปลอดภัยกว่าการวิเคราะห์ arbitrary jump graph
 

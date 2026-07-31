@@ -10,7 +10,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-เมื่อ module WebAssembly export memory ของมัน JavaScript จะได้รับ `WebAssembly.Memory` object property `.buffer` ของมันคือ `ArrayBuffer` มาตรฐาน — ชนิดเดิมที่ใช้ทั่ว Web Platform ซึ่งหมายความว่าคุณสามารถวาง typed-array view ใดก็ได้ทับลงไปเพื่ออ่านและเขียน memory ได้อย่างมีประสิทธิภาพ
+เมื่อ module WebAssembly export memory ของตัวเอง JavaScript จะได้รับ `WebAssembly.Memory` object property `.buffer` ของตัวเองคือ `ArrayBuffer` มาตรฐาน — ชนิดเดิมที่ใช้ทั่ว Web Platform ซึ่งหมายความว่าคุณสามารถวาง typed-array view ใดก็ได้ทับลงไปเพื่ออ่านและเขียน memory ได้อย่างมีประสิทธิภาพ
 
 ## ArrayBuffer และ typed views
 
@@ -80,22 +80,22 @@ console.log('i32[2] =', i32[2]);          // 100 (at byte offset 8)`;
 WebAssembly memory ใช้ little-endian ซึ่งหมายความว่าเมื่อเก็บ `i32` byte ที่มีนัยสำคัญน้อยที่สุดจะอยู่ก่อน เมธอด `DataView` อย่าง `.getInt32(offset, true)` ช่วยให้กำหนด endianness ได้อย่างชัดเจน
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | ใช้ TypedArray view หลายชนิดทับ buffer เดียวกัน | อ่าน/เขียนแบบ zero-copy โดยไม่ต้อง copy ข้อมูลข้าม view | ต้องสร้าง view ใหม่ทุกครั้งหลัง `memory.grow` เพราะ ArrayBuffer เดิมถูก detach |
 | ตีความ byte เดียวกันด้วยหลาย type ตรงๆ (manual layout) | ยืดหยุ่น เข้าถึง field ขนาดต่างกันได้ตามต้องการ | ไม่มี type safety หรือ GC ช่วยตรวจ ผิด offset นิดเดียวก็อ่านค่าผิด type ทันที |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
-- สร้าง `Int32Array` หรือ `Float64Array` ที่ byte offset ซึ่งไม่ align กับขนาด element ของมัน (เช่น offset ที่ไม่ใช่ multiple ของ 4 สำหรับ `Int32Array`) ทำให้ constructor throw error
+- สร้าง `Int32Array` หรือ `Float64Array` ที่ byte offset ซึ่งไม่ align กับขนาด element ของตัวเอง (เช่น offset ที่ไม่ใช่ multiple ของ 4 สำหรับ `Int32Array`) ทำให้ constructor throw error
 - เก็บ view ที่สร้างไว้ก่อน `memory.grow` มาใช้ต่อ โดยลืมว่า ArrayBuffer เดิมถูก detach ไปแล้วหลัง grow ทำให้ view เก่าอ่านหรือเขียนค่าไม่ได้อีก
 - ลืมว่า WebAssembly memory เป็น little-endian เสมอ แล้วเผลอเรียก `DataView.getInt32(offset, false)` (big-endian) ทำให้ byte ถูกตีความสลับลำดับผิด
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
-> เครื่องมือแก้ไขภาพในเบราว์เซอร์สไตล์ Squoosh อ่าน raw pixel buffer เดียวกันผ่านทั้ง `Uint8ClampedArray` และ `Float32Array` view แล้วแต่ operation ที่กำลังทำ โดยไม่ต้อง copy ข้อมูลภาพไปมาระหว่าง view แต่ละแบบ
+> เครื่องมือแก้ไขภาพใน browser สไตล์ Squoosh อ่าน raw pixel buffer เดียวกันผ่านทั้ง `Uint8ClampedArray` และ `Float32Array` view แล้วแต่ operation ที่กำลังทำ โดยไม่ต้อง copy ข้อมูลภาพไปมาระหว่าง view แต่ละแบบ
 
 export const quizTypedArrayViews = [
   { q: "ถ้า element ของ Int32Array อยู่ที่ index 2 จะอยู่ที่ byte offset เท่าใด?", options: ["2", "4", "8", "16"], answer: 2 },

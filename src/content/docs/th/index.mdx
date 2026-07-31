@@ -1,9 +1,9 @@
 ---
 title: WebAssembly — From Zero to Hero
-description: เรียน WebAssembly ตั้งแต่พื้นฐาน — รูปแบบข้อความ WAT, JS interop, linear memory, การคอมไพล์ Rust/C/AssemblyScript, tooling และ WASI พร้อมตัวอย่างที่รันได้ในเบราว์เซอร์
+description: เรียน WebAssembly ตั้งแต่พื้นฐาน — รูปแบบข้อความ WAT, JS interop, linear memory, การคอมไพล์ Rust/C/AssemblyScript, tooling และ WASI พร้อมตัวอย่างที่รันได้ใน browser
 template: splash
 hero:
-  tagline: คอร์ส WebAssembly แบบ standalone ตั้งแต่ผู้เริ่มต้นจนถึงขั้นสูง เขียน WAT แล้วดูมันคอมไพล์และรันในเบราว์เซอร์ เชี่ยวชาญ JS interop และ linear memory แล้วคอมไพล์ภาษาจริงเป็น Wasm และก้าวข้ามเบราว์เซอร์ด้วย WASI
+  tagline: คอร์ส WebAssembly แบบ standalone ตั้งแต่ผู้เริ่มต้นจนถึงขั้นสูง เขียน WAT แล้วคอมไพล์และรันใน browser ได้ทันที เชี่ยวชาญ JS interop และ linear memory แล้วคอมไพล์ภาษาจริงเป็น Wasm และก้าวข้าม browser ด้วย WASI
   actions:
     - text: เริ่มที่นี่
       link: /webassembly/th/intro-what-is-wasm/
@@ -48,8 +48,8 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 ## คอร์สนี้ทำงานยังไง
 
 <CardGrid>
-  <Card title="รันในเบราว์เซอร์ของคุณ" icon="rocket">
-    เขียน WAT แล้วกด Run — มันคอมไพล์เป็น Wasm และรันตรงนี้เลยพร้อมผลลัพธ์จริง ไม่ต้องติดตั้ง
+  <Card title="รันใน browser ของคุณ" icon="rocket">
+    เขียน WAT แล้วกด Run — โค้ดจะคอมไพล์เป็น Wasm และรันตรงนี้เลยพร้อมผลลัพธ์จริง ไม่ต้องติดตั้ง
   </Card>
   <Card title="ไดอะแกรมที่อธิบายชัด" icon="puzzle">
     stack machine, flow การ compile→instantiate และ memory layout เป็นไดอะแกรม Mermaid

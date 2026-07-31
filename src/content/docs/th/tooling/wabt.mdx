@@ -12,11 +12,11 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
 นักพัฒนามักหยิบ WABT ขึ้นมาใช้เมื่อต้องแปลงไปมาระหว่าง `.wat` กับ `.wasm`, ตรวจสอบ binary ที่ compile มาจากเครื่องมืออื่นว่าเนื้อในมีอะไรบ้าง หรือ validate module ก่อน deploy จริง
 
-**wabt** — WebAssembly Binary Toolkit — คือ reference implementation ของ WAT text format งานแปลง ตรวจสอบ หรือ validate ใดก็ตามที่เกี่ยวข้องกับ text ↔ binary boundary จะผ่านหนึ่งในสี่โปรแกรมหลักของมัน
+**wabt** — WebAssembly Binary Toolkit — คือ reference implementation ของ WAT text format งานแปลง ตรวจสอบ หรือ validate ใดก็ตามที่เกี่ยวข้องกับ text ↔ binary boundary จะผ่านหนึ่งในสี่โปรแกรมหลักของตัวเอง
 
 ## wat2wasm
 
-`wat2wasm` คือ compiler หลัก มันแยกวิเคราะห์ต้นฉบับ `.wat`, type-check และ emit binary `.wasm` ที่ถูกต้อง flags ที่มีประโยชน์ได้แก่ `--debug-names` (เก็บ annotation `$name` ไว้ใน name section ของ binary) และ `--output` / `-o` เพื่อควบคุมไฟล์ output
+`wat2wasm` คือ compiler หลัก ทำหน้าที่แยกวิเคราะห์ต้นฉบับ `.wat`, type-check และ emit binary `.wasm` ที่ถูกต้อง flags ที่มีประโยชน์ได้แก่ `--debug-names` (เก็บ annotation `$name` ไว้ใน name section ของ binary) และ `--output` / `-o` เพื่อควบคุมไฟล์ output
 
 ```bash
 # การคอมไพล์พื้นฐาน
@@ -78,7 +78,7 @@ Code[1]:
 
 ## wasm-validate
 
-`wasm-validate` ตรวจสอบว่า binary เป็นไปตามข้อกำหนด WebAssembly มันออกด้วย code 0 เมื่อสำเร็จและแสดง diagnostic เมื่อล้มเหลว ใช้ใน CI เพื่อตรวจจับ module ที่เสียหายหรือไม่ถูกต้องก่อนที่จะถึง production
+`wasm-validate` ตรวจสอบว่า binary เป็นไปตามข้อกำหนด WebAssembly โดยจะออกด้วย code 0 เมื่อสำเร็จและแสดง diagnostic เมื่อล้มเหลว ใช้ใน CI เพื่อตรวจจับ module ที่เสียหายหรือไม่ถูกต้องก่อนที่จะถึง production
 
 ```bash
 # Validate โมดูล
@@ -112,20 +112,20 @@ console.log('Decoded magic:', String.fromCharCode(...bytes.slice(1, 4)));`;
 binary WebAssembly ทั้งหมดเริ่มต้นด้วย magic number สี่ไบต์ `00 61 73 6d` ตามด้วย version `01 00 00 00` เครื่องมือหรือ loader ใดก็ตามที่อ่านไฟล์ `.wasm` จะตรวจสอบไบต์เหล่านี้ก่อนเสมอ
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | `wasm-opt -Oz` (การ optimise เชิงรุกสุด หลัง `wat2wasm`) | ได้ size และ speed ที่ดีที่สุด | build time นานขึ้น และ binary ที่ได้ห่างไกลจาก `.wat` ต้นฉบับจน debug ยากขึ้น |
 | เก็บ `--debug-names` ไว้ตอน `wat2wasm` | `wasm2wat`/`wasm-objdump` แสดงชื่อฟังก์ชันที่อ่านออกได้ | เพิ่มขนาด binary ที่ต้อง ship ให้ผู้ใช้จริง |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - คอมไพล์ `.wat` เป็น `.wasm` แล้ว ship ตรงๆ โดยไม่ผ่าน `wasm-opt` เลย พลาดการลดขนาดที่ได้มาแทบฟรีๆ
 - รัน `wasm-validate` หลังจาก deploy ไปแล้ว แทนที่จะ validate ทุก module ใน CI ก่อน ship เสมอ
 - เปิด `--debug-names` ทิ้งไว้ใน production build โดยไม่คิดเรื่อง trade-off ของขนาด binary ที่เพิ่มขึ้น
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติหลังขั้นตอนที่เทียบเท่ากับ `wat2wasm` เมื่อ build ด้วย `-O2`/`-O3` ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักใช้ `wasm-validate` เป็นด่านบังคับใน CI ก่อน deploy ทุกครั้ง
 

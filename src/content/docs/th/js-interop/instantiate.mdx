@@ -10,11 +10,11 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-การโหลด WebAssembly module จาก JavaScript เป็น process สองขั้นตอน: **compile** ไบต์ให้กลายเป็น module artifact ที่ผ่านการตรวจสอบแล้ว จากนั้น **instantiate** module นั้นเพื่อให้ได้ instance ที่ทำงานได้จริงพร้อม exports ที่เรียกใช้ได้ ตัวแปรส่วนกลาง `WebAssembly` ของเบราว์เซอร์เปิดเผย API เฉพาะสำหรับทั้งสองขั้นตอน รวมถึง shortcut ที่สะดวกซึ่งทำทั้งสองอย่างในคราวเดียว
+การโหลด WebAssembly module จาก JavaScript เป็น process สองขั้นตอน: **compile** ไบต์ให้กลายเป็น module artifact ที่ผ่านการตรวจสอบแล้ว จากนั้น **instantiate** module นั้นเพื่อให้ได้ instance ที่ทำงานได้จริงพร้อม exports ที่เรียกใช้ได้ ตัวแปรส่วนกลาง `WebAssembly` ของ browser เปิดเผย API เฉพาะสำหรับทั้งสองขั้นตอน รวมถึง shortcut ที่สะดวกซึ่งทำทั้งสองอย่างในคราวเดียว
 
 ## WebAssembly.compile()
 
-`WebAssembly.compile(bufferSource)` รับ `BufferSource` ใดก็ได้ (เช่น `Uint8Array`, `ArrayBuffer` หรือรูปแบบที่คล้ายกัน) และคืนค่าเป็น `Promise<WebAssembly.Module>` ผลลัพธ์ `Module` ที่ได้คือ artifact ที่คอมไพล์และตรวจสอบแล้ว — เบราว์เซอร์ได้แยกวิเคราะห์และปรับแต่งไบต์แล้ว แต่ยังไม่มีการรันโค้ดใดเลย
+`WebAssembly.compile(bufferSource)` รับ `BufferSource` ใดก็ได้ (เช่น `Uint8Array`, `ArrayBuffer` หรือรูปแบบที่คล้ายกัน) และคืนค่าเป็น `Promise<WebAssembly.Module>` ผลลัพธ์ `Module` ที่ได้คือ artifact ที่คอมไพล์และตรวจสอบแล้ว — browser ได้แยกวิเคราะห์และปรับแต่งไบต์แล้ว แต่ยังไม่มีการรันโค้ดใดเลย
 
 ```js
 const response = await fetch('module.wasm');
@@ -42,7 +42,7 @@ Overload แรกเป็นจุดเริ่มต้นที่พบ�
 
 ## ออบเจกต์ instance.exports
 
-หลังจาก instantiation แล้ว `instance.exports` คือออบเจกต์ JavaScript ธรรมดา โดย key ของมันคือชื่อที่ประกาศไว้ในส่วน export ของ Wasm module ทุกฟังก์ชัน memory, global หรือ table ที่ export จะปรากฏเป็น property ฟังก์ชันที่ export ออกมาทำงานเหมือนฟังก์ชัน JS ทั่วไป — เรียกใช้ได้เลย ส่งตัวเลข JS เข้าไป และรับตัวเลข JS กลับมา
+หลังจาก instantiation แล้ว `instance.exports` คือออบเจกต์ JavaScript ธรรมดา โดย key ของตัวเองคือชื่อที่ประกาศไว้ในส่วน export ของ Wasm module ทุกฟังก์ชัน memory, global หรือ table ที่ export จะปรากฏเป็น property ฟังก์ชันที่ export ออกมาทำงานเหมือนฟังก์ชัน JS ทั่วไป — เรียกใช้ได้เลย ส่งตัวเลข JS เข้าไป และรับตัวเลข JS กลับมา
 
 ```js
 const { instance } = await WebAssembly.instantiate(bytes, {});
@@ -94,20 +94,20 @@ console.log('cube(3) =', instance.exports.cube(3));`;
 `WebAssembly.Module` คือ artifact ที่คอมไพล์แล้ว สามารถเก็บไว้ ส่งผ่าน `postMessage` หรือ instantiate ซ้ำได้หลายครั้งโดยไม่ต้องคอมไพล์ใหม่ แยกขั้นตอน compile และ instantiate ออกจากกันทุกครั้งที่ต้องการสร้างมากกว่าหนึ่ง instance ของ module เดียวกัน
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | `instantiateStreaming` | คอมไพล์ทับซ้อนกับการดาวน์โหลด ได้ instance พร้อมใช้เร็วที่สุด | ต้องการ `Content-Type: application/wasm` จาก server ถ้าผิดจะ reject ด้วย `TypeError` ทันที |
 | `compile` + `instantiate` แยกขั้นตอน | ควบคุมได้ละเอียด เช่น cache `Module` ไว้ใช้ instantiate ซ้ำหลายครั้งโดยไม่ต้องคอมไพล์ใหม่ | ต้องมี buffer เต็มไฟล์อยู่ในหน่วยความจำก่อนจึงจะเริ่มคอมไพล์ได้ |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - โหลดไฟล์ด้วย `arrayBuffer()` ก่อนเสมอแล้วค่อยเรียก `WebAssembly.instantiate()` ทั้งที่ควรใช้ `instantiateStreaming` เพื่อคอมไพล์ไปพร้อมกับดาวน์โหลด
 - คอมไพล์ module ใหม่ทุกครั้งที่ต้องการ instance เพิ่ม แทนที่จะแยก `WebAssembly.compile()` ออกมาครั้งเดียวแล้วเรียก `WebAssembly.instantiate(module, ...)` ซ้ำจาก `Module` เดิม
 - ลืมว่า export ที่เป็น `i64` จะกลับมาเป็น `BigInt` แล้วเอาไปบวก/คูณกับ `number` ตรงๆ โดยไม่แปลงชนิดก่อน ทำให้โค้ด throw error
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > Squoosh คอมไพล์ Wasm codec หลายตัวไว้ล่วงหน้าเพียงครั้งเดียว แล้ว instantiate ใหม่ทุกครั้งที่ผู้ใช้เลือกบีบอัดภาพด้วย codec นั้น เพื่อเลี่ยงต้นทุนการคอมไพล์ซ้ำซ้อนในทุก session
 

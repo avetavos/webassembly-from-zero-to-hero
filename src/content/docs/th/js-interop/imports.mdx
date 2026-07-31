@@ -10,11 +10,11 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-ไม่ใช่ทุก WebAssembly module จะพึ่งพาตัวเองได้ทั้งหมด เมื่อ module ต้องการเรียกฟังก์ชัน JavaScript, อ่านข้อมูลจาก shared memory หรือเข้าถึงค่า global ที่ host จัดการ มันจะประกาศ dependency เหล่านั้นด้วยคำสั่ง `(import ...)` ในระหว่าง instantiation JavaScript ต้องส่งค่าที่ตรงกันมาให้ — นี่คือสิ่งที่เรียกว่า **imports object**
+ไม่ใช่ทุก WebAssembly module จะพึ่งพาตัวเองได้ทั้งหมด เมื่อ module ต้องการเรียกฟังก์ชัน JavaScript, อ่านข้อมูลจาก shared memory หรือเข้าถึงค่า global ที่ host จัดการ จะประกาศ dependency เหล่านั้นด้วยคำสั่ง `(import ...)` ในระหว่าง instantiation JavaScript ต้องส่งค่าที่ตรงกันมาให้ — นี่คือสิ่งที่เรียกว่า **imports object**
 
 ## ไวยากรณ์การประกาศ import
 
-การประกาศ import จะระบุชื่อของสิ่งที่ต้องการนำเข้าและอธิบาย type ของมัน อาร์กิวเมนต์ string สองตัวแรกสร้าง namespace สองระดับ: **module name** (key ชั้นนอก) และ **field name** (key ชั้นใน):
+การประกาศ import จะระบุชื่อของสิ่งที่ต้องการนำเข้าและอธิบาย type ของตัวเอง อาร์กิวเมนต์ string สองตัวแรกสร้าง namespace สองระดับ: **module name** (key ชั้นนอก) และ **field name** (key ชั้นใน):
 
 ```wasm
 (module
@@ -97,20 +97,20 @@ const importObject = {
 namespace string (`"env"`) และ field name (`"log"`) ใน imports object ต้องตรงกับที่ WAT `(import ...)` ประกาศไว้ทุกอย่าง รวมถึงตัวพิมพ์ใหญ่-เล็กด้วย หากไม่ตรงจะเกิด `LinkError` ในระหว่าง instantiation
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | `instantiateStreaming` + imports object | ส่ง imports พร้อมเริ่ม stream compile ได้ทันที ลด latency ก่อนโค้ดที่ import ไว้จะเริ่มถูกเรียก | server ต้องตอบ `Content-Type: application/wasm` มิเช่นนั้น reject ด้วย `TypeError` ก่อนแม้แต่จะตรวจ imports |
 | `instantiate` จาก buffer เต็มไฟล์ | ไม่สนใจ MIME type ของ server ใช้ได้แน่นอนทุกกรณี | ต้องรอดาวน์โหลดครบไฟล์ก่อน ทำให้ host functions ที่ import ไว้พร้อมใช้ช้ากว่า |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - ส่ง field name หรือตัวพิมพ์ใหญ่-เล็กใน imports object ไม่ตรงกับที่ประกาศไว้ใน `(import ...)` พอดี เช่นพิมพ์ `Log` แทน `log` ทำให้เกิด `LinkError`
 - ส่ง string หรือ array ก้อนใหญ่เข้าไปทีละ argument ผ่านฟังก์ชันที่ import ไว้ แทนที่จะเขียนข้อมูลลง shared memory ที่ import เข้าไปครั้งเดียวแล้วส่งแค่ pointer/length
 - ลืมใช้ `BigInt` เมื่อฟังก์ชันที่ import ต้องรับพารามิเตอร์ชนิด `i64` จากฝั่ง Wasm ทำให้ JS callback ได้ค่าที่ไม่ตรงกับที่คาดไว้
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > AutoCAD Web พอร์ต engine C++ เดิมมาเป็น Wasm แล้ว import ฟังก์ชัน host จำนวนมาก (rendering, input handling, file I/O) เพื่อเชื่อม engine เข้ากับ browser APIs ให้ผู้ใช้โต้ตอบกับ CAD model ได้แบบ real-time
 

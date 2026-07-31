@@ -1,6 +1,6 @@
 ---
-title: 'ทำไมต้องใช้ Wasm? มันรันที่ไหนได้บ้าง?'
-description: 'ทำความเข้าใจ 4 เหตุผลในการใช้ WebAssembly ได้แก่ ความเร็ว, portability, การเลือกภาษา, ความปลอดภัย และที่ที่มันรันได้ในปัจจุบัน'
+title: 'ทำไมต้องใช้ Wasm? และรันที่ไหนได้บ้าง?'
+description: 'ทำความเข้าใจ 4 เหตุผลในการใช้ WebAssembly ได้แก่ ความเร็ว, portability, การเลือกภาษา, ความปลอดภัย และที่ที่รันได้ในปัจจุบัน'
 sidebar:
   order: 3
 ---
@@ -9,7 +9,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-WebAssembly ไม่ได้เกิดขึ้นโดยบังเอิญ มันถูกออกแบบมาเพื่อแก้ปัญหาเฉพาะกลุ่มที่ JavaScript เพียงอย่างเดียวไม่สามารถแก้ได้ การทำความเข้าใจ *ว่าทำไม* Wasm ถึงมีอยู่ และ *ที่ไหน* มันรัน จะให้ mental model ที่คุณต้องการในการตัดสินใจว่าเมื่อใดควรหยิบมันขึ้นมาใช้
+WebAssembly ไม่ได้เกิดขึ้นโดยบังเอิญ แต่ถูกออกแบบมาเพื่อแก้ปัญหาเฉพาะกลุ่มที่ JavaScript เพียงอย่างเดียวแก้ไม่ได้ การเข้าใจ *ว่าทำไม* Wasm ถึงมีอยู่ และ *ที่ไหน* ที่ Wasm รันได้ จะให้ mental model ที่คุณต้องใช้ตัดสินใจว่าเมื่อไหร่ควรหยิบ Wasm มาใช้
 
 ## 4 เหตุผลในการใช้ Wasm
 
@@ -29,7 +29,7 @@ Wasm คือ *target* สำหรับการคอมไพล์ ไม�
 - **C / C++** — native library ที่มีอยู่มานานหลายทศวรรษ, คอมไพล์ด้วย Emscripten
 - **Go** — รองรับ standard library ดี, ecosystem กำลังเติบโต
 - **AssemblyScript** — syntax คล้าย TypeScript ที่คอมไพล์ตรงไปยัง Wasm
-- **Python** — ผ่าน Pyodide ซึ่งเป็น CPython เต็มรูปแบบที่คอมไพล์เป็น Wasm รันใน browser
+- **Python** — ผ่าน Pyodide ที่เป็น CPython เต็มรูปแบบที่คอมไพล์เป็น Wasm รันใน browser
 
 ### 4. ความปลอดภัย
 
@@ -39,7 +39,7 @@ Wasm รันใน sandbox ที่เข้มงวด module ไม่ส�
 
 ### ใน Browser
 
-บ้านหลักของ Wasm คือ browser ผ่าน WebAssembly JavaScript API หน้าเว็บโหลดไฟล์ `.wasm` binary, instantiate มันด้วย `WebAssembly.instantiate` และเรียกฟังก์ชันที่ export มาโดยตรงจาก JavaScript
+บ้านหลักของ Wasm คือ browser ผ่าน WebAssembly JavaScript API หน้าเว็บโหลดไฟล์ `.wasm` binary, instantiate ด้วย `WebAssembly.instantiate` และเรียกฟังก์ชันที่ export มาโดยตรงจาก JavaScript
 
 ```js
 const response = await fetch('module.wasm');
@@ -60,7 +60,7 @@ Node.js เปิดเผย `WebAssembly.*` API เดียวกับ brows
 
 ### ในระบบ Plugin
 
-Sandboxing ของ Wasm ทำให้มันเหมาะสำหรับ plugin architecture อย่างยิ่ง เครื่องมืออย่าง **Extism** และ embedded `wasmtime` ให้แอปพลิเคชันโหลด Wasm plugin ที่ไม่น่าไว้ใจ, expose API surface ที่ควบคุมได้ และบังคับใช้ข้อจำกัด memory และ capability ที่เข้มงวด ทั้งหมดนี้โดยไม่ต้องเปิด process แยกต่างหาก
+Sandboxing ของ Wasm ทำให้เหมาะกับ plugin architecture อย่างยิ่ง เครื่องมืออย่าง **Extism** และ embedded `wasmtime` ให้แอปพลิเคชันโหลด Wasm plugin ที่ไม่น่าไว้ใจ, expose API surface ที่ควบคุมได้ และบังคับใช้ข้อจำกัด memory และ capability ที่เข้มงวด ทั้งหมดนี้โดยไม่ต้องเปิด process แยกต่างหาก
 
 ## Wasm เสริม JavaScript
 
@@ -70,20 +70,20 @@ Wasm ไม่ได้แทน JavaScript DOM, event handling, fetch และ
   ใน browser, Wasm โดดเด่นสำหรับงาน CPU หนัก เช่น codec, cryptography, image/audio processing, physics engine, game ส่วน DOM manipulation, event handling และ network IO เก็บไว้ใน JavaScript ทั้งสองทำงานร่วมกันได้ดีที่สุด
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | ใช้ Wasm สำหรับ compute path | ความเร็วใกล้ native, portable ไปได้ทั้ง browser, server, edge, WASI runtime โดยไม่ต้อง recompile | เพิ่ม bundle size จาก binary + JS glue code สำหรับ marshal ข้อมูลข้าม boundary |
 | ใช้ JavaScript ล้วนทุกที่ | debugging tooling mature เต็มที่ (breakpoint, source map, profiler) และ ecosystem ใหญ่ | ไม่ portable เท่าในแง่ raw compute performance และไม่มี sandbox ระดับ memory แบบ Wasm |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
-- เห็นว่า Wasm "เร็วกว่า native เกือบเท่า" แล้วสรุปว่ามันเร็วกว่า JavaScript เสมอในทุก workload ทั้งที่ JS engine สมัยใหม่ optimize hot loop ได้ดีมากเช่นกัน
+- เห็นว่า Wasm "เร็วกว่า native เกือบเท่า" แล้วสรุปว่าเร็วกว่า JavaScript เสมอในทุก workload ทั้งที่ JS engine สมัยใหม่ optimize hot loop ได้ดีมากเช่นกัน
 - เลือกคอมไพล์ทั้งแอปพลิเคชันไปเป็น Wasm ตั้งแต่ต้น แทนที่จะดูจาก 4 เหตุผล (ความเร็ว, portability, การเลือกภาษา, ความปลอดภัย) ว่าจริงๆ แล้วมีแค่บาง module เช่น codec หรือ physics engine ที่ควรเป็น Wasm
 - deploy Wasm module เล็กๆ ไปยัง edge หรือ WASI runtime โดยไม่คำนึงถึง cold-start cost ของการ compile และ instantiate ซึ่งอาจสำคัญมากกว่าความเร็วในการ execute เมื่อ module ถูกเรียกไม่บ่อย
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > Adobe ใช้ Wasm พอร์ต Photoshop C++ codebase ทั้งก้อนมารันใน browser เป็น Photoshop Web โดยยังคง algorithm การประมวลผลภาพเดิมไว้ทั้งหมด
 >
@@ -115,7 +115,7 @@ export const quizWhyAndWhere = [
     options: [
       'Wasm แทน JavaScript ทั้งหมด',
       'JavaScript แทน Wasm สำหรับทุกงาน',
-      'Wasm จัดการงาน CPU หนักในขณะที่ JS จัดการ DOM และ IO',
+      'Wasm จัดการงาน CPU หนัก ส่วน JS จัดการ DOM และ IO',
       'ทั้งสองไม่สามารถใช้ในหน้าเดียวกันได้',
     ],
     answer: 2,

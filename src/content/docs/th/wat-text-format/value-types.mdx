@@ -10,7 +10,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-WebAssembly เป็น stack machine แบบมีชนิด (typed) ค่าทุกตัวบน stack มีชนิดที่ชัดเจน และฟังก์ชันทุกตัวประกาศอย่างแน่ชัดว่ามันรับและผลิตชนิดใดบ้าง แต่ต่างจากภาษาส่วนใหญ่ Wasm มีชุดของชนิดให้เลือกที่เล็กมาก
+WebAssembly เป็น stack machine แบบมีชนิด (typed) ค่าทุกตัวบน stack มีชนิดที่ชัดเจน และฟังก์ชันทุกตัวประกาศอย่างแน่ชัดว่ารับและผลิตชนิดใดบ้าง แต่ต่างจากภาษาส่วนใหญ่ Wasm มีชุดของชนิดให้เลือกที่เล็กมาก
 
 ## ชนิดของค่าทั้งสี่
 
@@ -74,20 +74,20 @@ console.log('bignum is BigInt:', typeof instance.exports.bignum() === 'bigint');
   WebAssembly มีชนิดของค่าทั้งหมดสี่ชนิดพอดี: `i32`, `i64`, `f32` และ `f64` ไม่มีสตริง บูลีน หรืออ็อบเจกต์ เมื่อฟังก์ชันคืนค่า `i64` JavaScript จะได้รับ `BigInt` — ไม่ใช่ number ปกติ
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | เขียน WAT เอง | เห็นชัดว่าทุกค่าบน stack มีชนิดกำกับตายตัว (`i32`, `i64`, `f32`, `f64`) ช่วยให้เข้าใจ type system ของ Wasm อย่างละเอียด | ต้องเลือก `const`/instruction ให้ตรงชนิดเองทุกครั้ง ผิดชนิดแล้ว validation ไม่ผ่านทันที |
 | ปล่อยให้ compiler generate Wasm (Rust/AssemblyScript) | compiler แปลงชนิดจากภาษาต้นทางไปเป็น i32/i64/f32/f64 ให้อัตโนมัติ ลดโอกาสพลาดเรื่อง type | ต้องเชื่อใจ compiler ในการแปลงชนิด เช่น `i64` เป็น `BigInt` โดยไม่รู้รายละเอียดว่าเกิดอะไรขึ้นตรงกลาง |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - push ค่าด้วย instruction ผิดชนิด เช่นใช้ `i32.const` ตอนที่ฟังก์ชันประกาศ `(result i64)` ทำให้ค่าที่ค้างอยู่บน stack ตอนจบฟังก์ชันมีชนิดไม่ตรงกับ signature และ validation ไม่ผ่าน
 - สลับลำดับ operand ตอน push ค่าคงที่ขึ้น stack ก่อนเรียกคำสั่งคำนวณ ทำให้ผลลัพธ์ผิดทั้งที่ทุกค่าที่ push มีชนิดถูกต้องแล้ว
 - ลืมว่าฝั่ง JavaScript ต้องรับค่า `i64` เป็น `BigInt` ไม่ใช่ `number` แล้วเอาไปเปรียบเทียบหรือคำนวณต่อแบบ mix กับ number ตรง ๆ ทำให้เกิด TypeError ตอน runtime
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > ชุด test suite ของ WABT (WebAssembly Binary Toolkit) มีไฟล์ `.wat` ที่เขียนมือจำนวนมากซึ่งครอบคลุมทุกชนิดค่า (`i32`, `i64`, `f32`, `f64`) เพื่อยืนยันว่า encoder/decoder ตีความแต่ละชนิดตรงตาม spec รวมถึงกรณี `i64` ที่ฝั่ง JavaScript ต้องแปลงเป็น `BigInt`
 

@@ -11,7 +11,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-WebAssembly ไม่มี `goto` ไม่มี raw jump address และไม่มี unstructured branch ทุกการถ่ายโอน control จะเกิดขึ้นภายใน labeled construct โดยที่ `br` ชี้ไปที่ label นั้น — ไม่ใช่ memory address หรือหมายเลขบรรทัด การออกแบบนี้ทำให้ Wasm program ตรวจสอบความถูกต้องได้ในการอ่านเดียว และคอมไพล์ได้อย่างมีประสิทธิภาพบนเบราว์เซอร์
+WebAssembly ไม่มี `goto` ไม่มี raw jump address และไม่มี unstructured branch ทุกการถ่ายโอน control จะเกิดขึ้นภายใน labeled construct โดยที่ `br` ชี้ไปที่ label นั้น — ไม่ใช่ memory address หรือหมายเลขบรรทัด การออกแบบนี้ทำให้ Wasm program ตรวจสอบความถูกต้องได้ในการอ่านเดียว และคอมไพล์ได้อย่างมีประสิทธิภาพบน browser
 
 ## Structured constructs
 

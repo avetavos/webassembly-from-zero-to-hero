@@ -12,7 +12,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
 ทุกการเดินทาง Wasm เริ่มต้นด้วย loop เดียวกัน: **เขียน** module ใน WebAssembly Text format (WAT), **คอมไพล์** เป็น bytes, **instantiate** และ **เรียก** ฟังก์ชันที่ export บทเรียนนี้พาคุณเดิน loop นั้นตั้งแต่ต้นจนจบด้วยตัวอย่างที่เล็กที่สุดเท่าที่จะเป็นไปได้ ฟังก์ชัน `double` ที่คูณ argument ด้วยสอง
 
-เมื่อจบบทเรียนนี้ คุณจะได้เขียน WAT จริง, คอมไพล์มัน live ใน browser และเรียกมันจาก JavaScript
+เมื่อจบบทเรียนนี้ คุณจะได้เขียน WAT จริง, คอมไพล์ live ใน browser และเรียกใช้จาก JavaScript
 
 ## การเขียน WAT Module
 
@@ -30,7 +30,7 @@ WAT คือการแสดงข้อความที่มนุษย�
 
 - **`(module ...)`** — wrapper ระดับบนสุด ทุกไฟล์ `.wasm` มี module เดียว
 - **`(func (export "double") ...)`** — ประกาศฟังก์ชันและทำให้ host มองเห็นได้ในชื่อ `"double"` ทันที ชื่อ export คือสิ่งที่ JavaScript เห็นบน `instance.exports`
-- **`(param $n i32)`** — ประกาศ parameter หนึ่งตัวชื่อ `$n` ประเภท `i32` (32-bit signed integer) label `$n` เป็นความสะดวกของ WAT ที่ระดับ binary มันเป็นแค่ index
+- **`(param $n i32)`** — ประกาศ parameter หนึ่งตัวชื่อ `$n` ประเภท `i32` (32-bit signed integer) label `$n` เป็นความสะดวกของ WAT ที่ระดับ binary เป็นแค่ index
 - **`(result i32)`** — ประกาศว่าฟังก์ชันนี้ return `i32` หนึ่งตัว
 - **`local.get $n`** — push ค่าปัจจุบันของ `$n` ลงบน operand stack
 - **`i32.const 2`** — push ค่าคงที่ `2` ลงบน stack
@@ -40,7 +40,7 @@ WAT คือการแสดงข้อความที่มนุษย�
 
 ## คอมไพล์: WAT Bytes ด้วย `compileWat`
 
-sandbox เปิดเผยฟังก์ชัน global `compileWat(watString)` ที่ขับเคลื่อนด้วย WABT library มันรับ WAT source string ของคุณและคืน `Promise<Uint8Array>` ซึ่งคือ `.wasm` bytes ดิบที่ปกติคุณจะได้จากไฟล์บน disk หรือ network fetch
+sandbox เปิดเผยฟังก์ชัน global `compileWat(watString)` ที่ขับเคลื่อนด้วย WABT library ฟังก์ชันนี้รับ WAT source string ของคุณแล้วคืน `Promise<Uint8Array>` ซึ่งคือ `.wasm` bytes ดิบที่ปกติคุณจะได้จากไฟล์บน disk หรือ network fetch
 
 ```js
 const bytes = await compileWat(wat);
@@ -48,12 +48,12 @@ const bytes = await compileWat(wat);
 
 ## Instantiate: `WebAssembly.instantiate`
 
-`WebAssembly.instantiate(bytes, importObject)` คือ standard browser API สำหรับสร้าง Wasm instance ที่รันได้ มันคืน `Promise` ที่ resolve เป็นคู่ `{ instance, module }`:
+`WebAssembly.instantiate(bytes, importObject)` คือ standard browser API สำหรับสร้าง Wasm instance ที่รันได้ โดยคืน `Promise` ที่ resolve เป็นคู่ `{ instance, module }`:
 
-- **`instance`** — object ที่ live และรันได้ property `.exports` ของมันมีฟังก์ชันและ memory ทั้งหมดที่ module export ออกมา
+- **`instance`** — object ที่ live และรันได้ property `.exports` ของตัวเองมีฟังก์ชันและ memory ทั้งหมดที่ module export ออกมา
 - **`module`** — `WebAssembly.Module` ที่คอมไพล์แล้วแต่ไม่มีชีวิต คุณสามารถแชร์และ instantiate ซ้ำได้โดยไม่ต้องคอมไพล์ใหม่
 
-argument ที่สองคือ **import object** ซึ่งเป็น nested object ของฟังก์ชัน, memory และ global ที่คุณ provide ให้ module จาก JavaScript เนื่องจากฟังก์ชัน `double` ของเราไม่ import อะไรจาก host เราจึงส่ง `{}`
+argument ที่สองคือ **import object** ที่เป็น nested object ของฟังก์ชัน, memory และ global ที่คุณ provide ให้ module จาก JavaScript เนื่องจากฟังก์ชัน `double` ของเราไม่ import อะไรจาก host เราจึงส่ง `{}`
 
 ```js
 const { instance } = await WebAssembly.instantiate(bytes, {});
@@ -71,7 +71,7 @@ JavaScript number ถูกแปลงอัตโนมัติไปเป�
 
 ## ลองรัน Live
 
-runner ด้านล่างคอมไพล์ WAT, instantiate และเรียก `double` ด้วย input ที่แตกต่างกันสามค่า รันมันและดูผลลัพธ์ใน console
+runner ด้านล่างคอมไพล์ WAT, instantiate และเรียก `double` ด้วย input ที่แตกต่างกันสามค่า ลองรันแล้วดูผลลัพธ์ใน console
 
 export const firstModuleCode = `const wat = \`(module
   (func (export "double") (param $n i32) (result i32)
@@ -89,23 +89,23 @@ console.log('double(100) =', instance.exports.double(100));`;
 <WasmRunner client:visible code={firstModuleCode} />
 
 <Callout title="Loop คอมไพล์–instantiate–เรียก">
-  ทุก Wasm module ทำตาม pattern เดิม: คอมไพล์เป็น bytes, instantiate ด้วย `WebAssembly.instantiate` แล้วเรียก export argument ที่สองของ `instantiate` คือ import object ซึ่งเป็นฟังก์ชันและ memory ที่คุณ provide ให้ module จาก JavaScript ตอนนี้มันว่าง แต่บทเรียนหลังๆ จะเพิ่มเติม
+  ทุก Wasm module ทำตาม pattern เดิม: คอมไพล์เป็น bytes, instantiate ด้วย `WebAssembly.instantiate` แล้วเรียก export argument ที่สองของ `instantiate` คือ import object ที่เป็นฟังก์ชันและ memory ที่คุณ provide ให้ module จาก JavaScript ตอนนี้ยังว่างอยู่ แต่บทเรียนหลัง ๆ จะเพิ่มเข้ามา
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | เรียกฟังก์ชันผ่าน Wasm module | ความเร็วใกล้ native เมื่อ workload หนัก, ผลลัพธ์ deterministic | ต้องผ่าน loop compile → instantiate → call ทุกครั้งที่โหลด module ใหม่ ซึ่งมี overhead ที่ JS function ธรรมดาไม่มี |
 | เรียกฟังก์ชัน JavaScript ตรงๆ | เรียกได้ทันทีไม่ต้อง compile/instantiate, debug ง่ายด้วย devtools | ไม่ได้ความเร็วระดับ native และไม่มี sandbox guarantee แบบ Wasm |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - เขียนฟังก์ชันง่ายๆ อย่าง `double` เป็น Wasm module แล้วคาดหวังว่าจะเร็วกว่า JS เสมอ ทั้งที่ function เล็กขนาดนี้ JS JIT compile ให้เร็วพอๆ กันอยู่แล้ว ความต่างจะเห็นชัดก็ต่อเมื่อ workload หนักจริง
 - ลืมว่า `WebAssembly.instantiate` ต้องรันทุกครั้งก่อนเรียก export ได้ แล้วพยายาม migrate ทั้งแอปไปเป็น Wasm module ย่อยจำนวนมาก ทำให้ต้อง compile/instantiate ซ้ำๆ โดยไม่จำเป็น
 - ไม่ cache `WebAssembly.Module` ที่ compile ไว้แล้วเมื่อต้อง instantiate module เดิมซ้ำหลายครั้ง ทำให้เสีย cost ของ compile step ไปโดยเปล่าประโยชน์ โดยเฉพาะกับ module เล็กที่ถูกเรียกไม่บ่อย
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > Figma ใช้ compile-instantiate-call loop แบบเดียวกับในบทนี้ (แต่ในสเกลใหญ่กว่ามาก) เพื่อรัน rendering engine ที่คอมไพล์จาก C++ เป็น Wasm ทำให้โหลดไฟล์ design เร็วขึ้นราว 3 เท่าเทียบกับตอนที่ยังเป็น pure JavaScript
 
@@ -124,7 +124,7 @@ export const quizYourFirstModule = [
     q: 'object ว่าง `{}` ใน `WebAssembly.instantiate(bytes, {})` หมายถึงอะไร?',
     options: [
       'result buffer ว่าง',
-      'import object ซึ่งเป็นฟังก์ชัน/memory ที่ host provide ให้ module',
+      'import object ที่เป็นฟังก์ชัน/memory ที่ host provide ให้ module',
       'debug options bag',
       'Wasm globals table',
     ],

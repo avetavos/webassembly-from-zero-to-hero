@@ -75,20 +75,20 @@ console.log('add(0, 0)   =', instance.exports.add(0, 0));`;
   Wasm ไม่มี named registers ทุกการคำนวณไหลผ่าน implicit operand stack แบบนี้ ทำให้ validation ง่าย (ตรวจ type บน stack) และคอมไพล์เป็น native code ได้ตรงไปตรงมา (backend จัดการ map stack slot เป็น hardware register ให้)
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | Stack-based bytecode (Wasm) | encode กะทัดรัด, type checker walk stack แบบ static ได้ง่าย, คอมไพล์เป็น native เร็ว | ต้องมี compile step ก่อนรัน เพิ่ม instantiation overhead เทียบกับ JS ที่ parse แล้วรันได้เลย |
 | Register-based bytecode (เช่น Dalvik) | ลดจำนวน push/pop instruction, บาง workload รันเร็วกว่าในระดับ interpreter | encode ซับซ้อนกว่า, verifier ต้อง track register state แทนที่จะ walk stack ตรงไปตรงมา |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - คิดว่า stack machine model แปลว่า Wasm รันช้ากว่า native เพราะ "ต้อง push/pop ตลอด" — จริงๆ compiler แปลง stack operation เป็น register-based machine code ก่อนรันเสมอ ไม่มี interpreter overhead แบบที่คิด
 - เขียนทุกฟังก์ชันในแอปเป็น Wasm module ทั้งที่ควร profile หา hot path ที่ CPU-bound จริงๆ ก่อน แล้วค่อยย้ายเฉพาะส่วนนั้น
 - มองข้าม cost ของการ compile และ instantiate module เล็กๆ ที่ถูกเรียกไม่บ่อย — ถ้า module มีขนาดเล็กและเรียกไม่กี่ครั้ง overhead ของ fetch + compile + instantiate อาจมากกว่าเวลาที่ประหยัดได้จาก stack machine execution
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > Figma เขียน rendering engine ใหม่จาก C++ เป็น Wasm ทำให้เวลาโหลดไฟล์เร็วขึ้นประมาณ 3 เท่า เพราะ Wasm module ถูก validate เป็น stack-based bytecode แล้วคอมไพล์เป็น native code ได้เกือบทันที
 >

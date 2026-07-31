@@ -15,7 +15,7 @@ WebAssembly เป็น stack machine ไม่มี register file เหม�
 
 ## Value stack
 
-ทุกคำสั่งทำงานบนยอดสุดของ stack คำสั่งหนึ่งจะ pop อินพุตของมันและ push เอาต์พุตของมัน ตัวอย่างเช่น `i32.add` จะ pop ค่า `i32` สองค่าและ push ผลลัพธ์ `i32` หนึ่งค่า
+ทุกคำสั่งทำงานบนยอดสุดของ stack คำสั่งหนึ่งจะ pop อินพุตของตัวเองและ push เอาต์พุตของตัวเอง ตัวอย่างเช่น `i32.add` จะ pop ค่า `i32` สองค่าและ push ผลลัพธ์ `i32` หนึ่งค่า
 
 export const stackDiagram = `flowchart LR
   A["Stack: []\\ni32.const 10"] --> B["Stack: [10]\\ni32.const 3"]
@@ -41,11 +41,11 @@ export const stackDiagram = `flowchart LR
     local.get $tmp)) ;; push $tmp back
 ```
 
-พารามิเตอร์ก็เป็น local เช่นกัน — คุณสามารถอ่านมันด้วย `local.get` ได้เหมือน local ที่ประกาศไว้ แต่มันถูกกำหนดค่าเริ่มต้นด้วยอาร์กิวเมนต์ที่ถูกเรียก
+พารามิเตอร์ก็เป็น local เช่นกัน — คุณอ่านค่าด้วย `local.get` ได้เหมือน local ที่ประกาศไว้ แต่ถูกกำหนดค่าเริ่มต้นด้วยอาร์กิวเมนต์ที่ถูกเรียก
 
 ## local.tee: เก็บค่าแล้วเก็บไว้บน stack
 
-`local.tee` คล้ายกับ `local.set` แต่มันทิ้งสำเนาของค่าไว้บน stack หลังจากเก็บแล้ว มันมีประโยชน์เมื่อคุณต้องการทั้งบันทึกค่าและใช้มันทันที:
+`local.tee` คล้ายกับ `local.set` แต่ทิ้งสำเนาของค่าไว้บน stack หลังจากเก็บแล้ว มีประโยชน์เมื่อคุณต้องการทั้งบันทึกค่าและใช้ค่านั้นทันที:
 
 ```wasm
 (module
@@ -57,7 +57,7 @@ export const stackDiagram = `flowchart LR
     i32.mul))         ;; doubles the value that tee left behind
 ```
 
-หากไม่มี `local.tee` คุณจะต้องใช้ `local.set` ตามด้วย `local.get` ซึ่งเป็นสองคำสั่งแทนที่จะเป็นหนึ่ง
+หากไม่มี `local.tee` คุณจะต้องใช้ `local.set` ตามด้วย `local.get` ที่เป็นสองคำสั่งแทนที่จะเป็นหนึ่ง
 
 export const localsCode = `const wat = \`(module
   (func (export "doubleSum") (param $a i32) (param $b i32) (result i32)
@@ -76,23 +76,23 @@ console.log('doubleSum(3, 4) =', instance.exports.doubleSum(3, 4));`;
 <WasmRunner client:visible code={localsCode} />
 
 <Callout title="Wasm เป็น stack machine">
-  แต่ละคำสั่งจะ pop ตัวถูกดำเนินการ (operand) ของมันออกจาก value stack และ push ผลลัพธ์ของมัน `local.get` จะ push ค่าของตัวแปร local; `local.set` จะ pop แล้วเก็บมัน; `local.tee` จะ pop เก็บ แล้ว push ค่ากลับไป — มีประโยชน์เมื่อคุณต้องการทั้งบันทึกและใช้ค่า
+  แต่ละคำสั่งจะ pop ตัวถูกดำเนินการ (operand) ของตัวเองออกจาก value stack และ push ผลลัพธ์ของตัวเอง `local.get` จะ push ค่าของตัวแปร local; `local.set` จะ pop แล้วเก็บค่า; `local.tee` จะ pop เก็บ แล้ว push ค่ากลับไป — มีประโยชน์เมื่อคุณต้องการทั้งบันทึกและใช้ค่า
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | เขียน WAT เอง | บังคับให้เข้าใจ value stack และ local จริง ๆ เพราะไม่มี syntax sugar มาบัง เหมาะมากสำหรับเรียนรู้ | ต้อง track stack depth เองตลอด แค่ลืม `local.set` หนึ่งบรรทัดก็ทำให้ validation พังได้ |
 | ให้ compiler generate Wasm | compiler จัดการ stack allocation และ register-to-local mapping ให้อัตโนมัติ productive กว่ามากสำหรับแอปจริง | ควบคุม lifetime ของ local แบบละเอียดเองไม่ได้ ต้องเชื่อใจ compiler |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - จบ block หรือฟังก์ชันโดยมีค่าค้างอยู่บน stack มากกว่าที่ signature ประกาศไว้ เช่นลืม pop ค่าที่ push ไว้ระหว่างทาง ทำให้ module validation ไม่ผ่าน
 - ใช้ `local.tee` ทั้งที่ตั้งใจจะใช้ `local.set` ทำให้ค่าที่ไม่ต้องการค้างอยู่บน stack เกินมาโดยไม่รู้ตัว
 - ลืมว่า branch อย่าง `br`/`br_if` ที่กระโดดออกจาก block ต้องทิ้ง stack ไว้ในสภาพที่ target ของ branch คาดหวังพอดี ไม่ใช่แค่ปล่อยให้ไหลไปตามลำดับปกติ
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > วิศวกรที่ debug production `.wasm` blob ที่บริษัทอย่าง Cloudflare Workers มักใช้ `wasm2wat` แปลง binary กลับเป็น WAT ที่อ่านได้ เพื่อไล่ดู stack ทีละคำสั่งตอนหา bug ที่ compiler สร้างโค้ดผิดพลาด
 
@@ -100,9 +100,9 @@ export const quizLocalsAndStack = [
   {
     q: "`local.tee $x` ทำอะไร?",
     options: [
-      "Pop ค่าหนึ่งและเก็บไว้ใน $x โดยทิ้งมันไป",
-      "Push ค่าปัจจุบันของ $x โดยไม่บริโภคมัน",
-      "Pop ค่าหนึ่ง เก็บไว้ใน $x และ push มันกลับขึ้นไปบน stack",
+      "Pop ค่าหนึ่งและเก็บไว้ใน $x โดยไม่เหลือค่าไว้บน stack",
+      "Push ค่าปัจจุบันของ $x โดยไม่ทำให้ค่าเดิมหายไป",
+      "Pop ค่าหนึ่ง เก็บไว้ใน $x แล้ว push ค่านั้นกลับขึ้น stack",
       "สลับค่าสองค่าบนยอดสุดของ stack"
     ],
     answer: 2
@@ -110,10 +110,10 @@ export const quizLocalsAndStack = [
   {
     q: "ใน stack machine จะเกิดอะไรขึ้นเมื่อ `i32.add` ทำงาน?",
     options: [
-      "มันอ่าน global สองตัวและ push ผลรวมของมัน",
-      "มัน pop ค่า i32 สองค่าและ push ผลรวมของมัน",
-      "มัน push ค่า i32 สองค่าและรอการ pop",
-      "มันบวกค่าบนยอดสุดเข้ากับตัวแปร local"
+      "อ่าน global สองตัวและ push ผลรวมของตัวเอง",
+      "pop ค่า i32 สองค่าและ push ผลรวมของตัวเอง",
+      "push ค่า i32 สองค่าและรอการ pop",
+      "บวกค่าบนยอดสุดเข้ากับตัวแปร local"
     ],
     answer: 1
   },

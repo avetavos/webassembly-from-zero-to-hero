@@ -10,7 +10,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-`if` construct ใน WebAssembly ทำหน้าที่ทั้ง control-flow branch และ expression มันจะ pop ค่า `i32` condition จาก stack แล้วรัน arm ใด arm หนึ่ง — และถ้ามี result type มันจะฝากค่าไว้บน stack ทำให้ `if` รู้สึกเหมือน ternary operator มากกว่า `if` statement แบบดั้งเดิม
+`if` construct ใน WebAssembly ทำหน้าที่ทั้ง control-flow branch และ expression จะ pop ค่า `i32` condition จาก stack แล้วรัน arm ใด arm หนึ่ง — และถ้ามี result type จะฝากค่าไว้บน stack ทำให้ `if` รู้สึกเหมือน ternary operator มากกว่า `if` statement แบบดั้งเดิม
 
 ## If construct
 
@@ -48,11 +48,11 @@ Annotation `(result i32)` ระบุว่า `if` expression จะฝาก�
     local.get $x))
 ```
 
-ในกรณีนี้ `if` ไม่มี result มันเพียง conditionally update local
+ในกรณีนี้ `if` ไม่มี result แค่ conditionally update local
 
 ## select: branchless ternary
 
-`select` เป็นทางเลือกที่กระชับกว่า `if` สำหรับการเลือกค่าง่ายๆ มันจะ pop สามค่า: `condition`, `val_if_false`, `val_if_true` (ตามลำดับ push: push true-val, push false-val, push condition) แล้ว push ค่าที่ถูกเลือก ไม่มีการ branch — CPU ประเมินทั้งสองค่าก่อน select
+`select` เป็นทางเลือกที่กระชับกว่า `if` สำหรับการเลือกค่าง่ายๆ จะ pop สามค่า: `condition`, `val_if_false`, `val_if_true` (ตามลำดับ push: push true-val, push false-val, push condition) แล้ว push ค่าที่ถูกเลือก ไม่มีการ branch — CPU ประเมินทั้งสองค่าก่อน select
 
 ```wasm
 (module
@@ -101,20 +101,20 @@ console.log('abs(3)     =', instance.exports.abs(3),     '(expected 3)');`;
 `if (result i32)` construct ฝากค่าบน stack — ทำงานเหมือน ternary operator ไม่ใช่ statement ทั้ง `then` และ `else` arm ต้องสร้าง stack shape เดียวกัน `select` เป็นทางเลือกที่ถูกกว่าแบบ branchless เมื่อทั้งสองค่าสามารถคำนวณได้ล่วงหน้า
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | `if`/`else` แบบ structured expression | validate ได้ว่าทั้งสอง arm ฝากค่าชนิดและจำนวนเท่ากันตั้งแต่ compile time ปลอดภัยกว่า arbitrary `goto` | เขียน conditional ที่ซับซ้อนมากๆ (เช่นหลาย branch ไขว้กัน) ต้องซ้อน `if` หรือใช้ `block` ช่วย แทนการกระโดดตรงจุด |
 | `select` (branchless) | ไม่มี branch เลย เหมาะกับ hot path ที่ predict ยาก | ต้องคำนวณทั้งสองค่าล่วงหน้าเสมอ แม้บาง arm จะไม่ได้ใช้จริง สิ้นเปลืองกว่าถ้าค่าใดค่าหนึ่งคำนวณแพง |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - ลืมให้ `then` และ `else` arm ฝากค่าชนิดและจำนวนเท่ากันตาม `(result i32)` ที่ประกาศไว้ ทำให้ module validate ไม่ผ่าน
 - ใช้ `select` แล้วคาดหวัง short-circuit เหมือน ternary ใน JavaScript ทั้งที่จริง engine ประเมิน (หรืออย่างน้อย push) ทั้งสองค่าเสมอก่อนเลือก
-- สับสน `br_if` กับ `if` — `br_if` ไม่มี else arm ในตัวเอง มันแค่ conditionally branch ออกจาก block เดียว ไม่ใช่ two-way conditional แบบ `if`/`else`
+- สับสน `br_if` กับ `if` — `br_if` ไม่มี else arm ในตัวเอง แค่ conditionally branch ออกจาก block เดียว ไม่ใช่ two-way conditional แบบ `if`/`else`
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > เวลา Emscripten คอมไพล์ C/C++ ที่มี ternary หรือ if-else ซับซ้อน relooper algorithm (อัลกอริทึมที่ Emscripten พัฒนาขึ้นเอง) จะ reconstruct โครงสร้าง `if`/`else` ที่ validate ได้ให้ตรงกับ arbitrary control-flow graph ของโค้ดต้นฉบับ
 

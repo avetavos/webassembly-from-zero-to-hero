@@ -90,7 +90,7 @@ fn run_plugin(wasm_bytes: &[u8]) -> anyhow::Result<()> {
 }
 ```
 
-pattern นี้คือวิธีที่ระบบ plugin ทำงาน: host application โหลดไฟล์ `.wasm` ตามอำเภอใจขณะ runtime และเรียก exported function ในขณะที่ sandbox บังคับ isolation อย่างเข้มงวด
+pattern นี้คือวิธีที่ระบบ plugin ทำงาน: host application โหลดไฟล์ `.wasm` ตามอำเภอใจขณะ runtime และเรียก exported function โดยมี sandbox บังคับ isolation อย่างเข้มงวด
 
 export const embedDiagram = `sequenceDiagram
   participant Host as Host App (Rust)
@@ -110,20 +110,20 @@ export const embedDiagram = `sequenceDiagram
 ทั้ง wasmtime และ wasmer รองรับ ahead-of-time (AOT) compilation: `wasmtime compile app.wasm -o app.cwasm` สร้าง artifact ที่ pre-compiled แล้ว โหลด `.cwasm` เมื่อ startup เพื่อข้าม JIT latency บน hot path
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | WASI capability-based security (`--dir`/`--env`) | ปลอดภัยกว่ามาก — module ที่ wasmtime/wasmer รันได้เฉพาะสิทธิ์ที่ flag ระบุไว้อย่างชัดเจน | ยังไม่ compatible กับ POSIX เต็มรูปแบบ binary ที่ port มาจาก native code ซึ่ง assume ambient access จะรันไม่ได้ตรง ๆ |
 | Embed wasmtime/wasmer สำหรับ edge/serverless | Cold-start ระดับ microsecond เมื่อเทียบกับการ spin container ใหม่ทุกครั้ง | Container ecosystem ยังมี tooling, orchestration และ library support ที่ mature และกว้างกว่า |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - ลืมส่ง `--dir` หรือ `--env` ตอนรัน แล้วแปลกใจว่าทำไม module เข้าถึง filesystem หรือ environment variable ไม่ได้ — ต้อง grant capability ให้ runtime อย่างชัดเจนเสมอ
 - คิดว่า SIMD หรือ threads proposal รองรับเหมือนกันทุก runtime — wasmtime และ wasmer อาจ support level ต่างกัน ต้อง check ความสามารถของ runtime version ที่ใช้ก่อน deploy
 - Embed wasmtime version เก่าเข้ากับ component ที่ build ด้วย Component Model รุ่นใหม่กว่า — WIT interface ที่ยังพัฒนาอยู่ทำให้ binding code เก่าพังตอน link หรือ instantiate
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > Fermyon Spin build บน wasmtime เพื่อ embed และรัน serverless Wasm module ส่วน Fastly Compute@Edge และ Cloudflare Workers ใช้หลักการ embedding และ sandboxing แบบเดียวกันเพื่อ isolate tenant code ด้วย cold-start ที่ต่ำมาก
 

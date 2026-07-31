@@ -10,7 +10,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-WebAssembly ไม่ใช่ค้อนที่มองหาตะปู มันโดดเด่นในสถานการณ์เฉพาะและเพิ่มความซับซ้อนโดยไม่จำเป็นในสถานการณ์อื่น บทเรียนนี้ map use case จริงและให้ decision framework แก่คุณ
+WebAssembly ไม่ใช่ค้อนที่มองหาตะปู แต่โดดเด่นในสถานการณ์เฉพาะและเพิ่มความซับซ้อนโดยไม่จำเป็นในสถานการณ์อื่น บทเรียนนี้ map use case จริงและให้ decision framework แก่คุณ
 
 ## Use case 1: ระบบ Plugin
 
@@ -90,23 +90,23 @@ export const decisionDiagram = `flowchart TD
 | Script และ glue code | Bash / Python — startup overhead ของ Wasm ไม่คุ้มค่า |
 
 <Callout title="Wasm ชนะด้านความปลอดภัย + portability ไม่ใช่ throughput ล้วน ๆ">
-อย่าใช้ Wasm เพราะมัน "เร็ว" ใช้มันเพราะคุณต้องการ sandbox ที่ปลอดภัย, binary ที่พกพาได้ หรือ plugin interface ที่ไม่ขึ้นกับภาษา Throughput ล้วน ๆ บนเซิร์ฟเวอร์มักได้ประโยชน์จาก native binary มากกว่า
+อย่าใช้ Wasm เพราะ "เร็ว" แต่ให้ใช้เพราะคุณต้องการ sandbox ที่ปลอดภัย, binary ที่พกพาได้ หรือ plugin interface ที่ไม่ขึ้นกับภาษา Throughput ล้วน ๆ บนเซิร์ฟเวอร์มักได้ประโยชน์จาก native binary มากกว่า
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | WASI capability-based security | ปลอดภัยกว่ามาก — plugin หรือ sandboxed code ได้สิทธิ์เฉพาะที่ grant อย่างชัดเจน ไม่มี ambient access | ยังไม่ compatible กับ POSIX เต็มรูปแบบ native library บางตัวที่ assume ambient filesystem/network access จะ port เข้ามาไม่ราบรื่น |
 | Edge/serverless (Wasm) vs container | Cold-start ระดับ microsecond และ footprint เล็กกว่า container มาก เหมาะกับ edge PoP | Container ecosystem ยังมี tooling และ battle-tested orchestration กว้างกว่า รวมถึง library support ที่ครบกว่า |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - คาดหวังว่า filesystem หรือ network จะ "ใช้งานได้เลย" โดยไม่ grant capability ให้ WASI runtime อย่างชัดเจน — code จะ fail แบบเงียบ ๆ หรือโยน permission error
 - เลือกใช้ Wasm เป็นตัวแทน container ในทุกกรณีโดยไม่ตระหนักว่า tooling, orchestration และ library support ของ container ยัง mature กว่ามาก
 - Deploy ไป edge platform โดยไม่ตรวจสอบก่อนว่า runtime ปลายทางรองรับ SIMD หรือ threads proposal จริงหรือไม่ — feature เหล่านี้ยัง opt-in และไม่ universal
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > Cloudflare Workers และ Fastly Compute@Edge ใช้ Wasm sandboxing เพื่อ isolate tenant code นับพันตัวบน edge network เดียวกัน โดยได้ cold-start ระดับ microsecond ที่ container ทำไม่ได้
 

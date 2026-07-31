@@ -9,7 +9,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-Emscripten คือ Toolchain คลาสสิกสำหรับนำโค้ด C และ C++ มาใช้บนเว็บ มันคอมไพล์ไปยัง WebAssembly (หรือ asm.js สำหรับ Fallback รุ่นเก่า), จำลอง POSIX API และสามารถสร้าง JavaScript Loader ที่ช่วยจัดการ Instantiation ให้คุณโดยอัตโนมัติ
+Emscripten คือ Toolchain คลาสสิกสำหรับนำโค้ด C และ C++ มาใช้บนเว็บ โดยคอมไพล์ไปยัง WebAssembly (หรือ asm.js สำหรับ Fallback รุ่นเก่า), จำลอง POSIX API และสามารถสร้าง JavaScript Loader ที่ช่วยจัดการ Instantiation ให้คุณโดยอัตโนมัติ
 
 ## ติดตั้ง Emscripten
 
@@ -107,7 +107,7 @@ emcc math.c \
   -O2
 ```
 
-เปิด `math.html` ในเบราว์เซอร์และ Terminal Canvas ของ Emscripten จะปรากฏขึ้น ทุกการเรียก `printf` ใน C จะแสดงผลที่นั่นโดยอัตโนมัติ
+เปิด `math.html` ใน browser และ Terminal Canvas ของ Emscripten จะปรากฏขึ้น ทุกการเรียก `printf` ใน C จะแสดงผลที่นั่นโดยอัตโนมัติ
 
 ## การใช้ malloc และ String
 
@@ -146,28 +146,28 @@ Module.onRuntimeInitialized = function () {
 ```
 
 <Callout title="Emscripten คือเครื่องมือ Port ทุกอย่าง">
-หากคุณมีโค้ด C หรือ C++ ที่ทำงานได้บน Desktop อยู่แล้ว Emscripten มักจะสามารถคอมไพล์ไปยัง Wasm ได้โดยแก้ไขน้อยมาก มันจำลอง `printf`, `malloc`, File I/O และแม้แต่ OpenGL (ผ่าน WebGL) สำหรับโค้ดใหม่ ควรเลือก Rust หรือ AssemblyScript เพื่อ Output ที่กระชับกว่า
+หากคุณมีโค้ด C หรือ C++ ที่ทำงานได้บน Desktop อยู่แล้ว Emscripten มักจะสามารถคอมไพล์ไปยัง Wasm ได้โดยแก้ไขน้อยมาก เพราะจำลอง `printf`, `malloc`, File I/O และแม้แต่ OpenGL (ผ่าน WebGL) สำหรับโค้ดใหม่ ควรเลือก Rust หรือ AssemblyScript เพื่อ Output ที่กระชับกว่า
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | C/C++ + Emscripten | Port Codebase C/C++ ที่มีอยู่แล้วได้เกือบทันที เข้าถึง Ecosystem C/C++ มหาศาลที่สะสมมาหลายสิบปี | Glue Code และ POSIX Emulation Layer เพิ่ม Runtime Overhead ทำให้ Binary ใหญ่กว่า Toolchain อื่นอย่างชัดเจน |
 | Rust + wasm-bindgen | Binary เล็กกว่ามาก ไม่มี POSIX Emulation ให้แบก | ต้อง Rewrite โค้ดเดิมทั้งหมดเป็น Rust ไม่สามารถ Port ตรงๆ ได้ |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - Ship Build ที่ไม่ Optimise — ไม่ Strip POSIX Emulation Layer และไม่ใช้ Flag อย่าง `-O3` หรือ `-sMINIMAL_RUNTIME` ทำให้ Bundle บวมโดยไม่จำเป็น
 - เลือก Emscripten เพียงเพราะทีมถนัด C แม้โปรเจกต์เป็น Module เล็กๆ ที่ไม่มี Codebase เดิมให้ Port ทำให้ต้อง Ship Runtime ใหญ่เกินความจำเป็นทั้งที่ Rust หรือ AssemblyScript เหมาะกว่า
 - ลืม `Module._free()` Pointer ที่ Allocate ด้วย `malloc` หรือ `allocateUTF8` ทำให้เกิด Memory Leak สะสมในหน้าเว็บที่รันนาน
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > Figma คอมไพล์ C++ Rendering Engine ของตัวเองด้วย Emscripten เพื่อรันบนเว็บแอป ทำให้ได้ Performance ระดับ Desktop โดยไม่ต้อง Rewrite Engine ทั้งหมดเป็นภาษาอื่น
 
 export const quizCEmscripten = [
-  { q: "ทำไม Entry ใน EXPORTED_FUNCTIONS จึงต้องขึ้นต้นด้วย Underscore (เช่น '_hypotenuse')?", options: ["มันทำเครื่องหมายฟังก์ชันว่าเป็น Private", "ชื่อ Symbol ของ C จะถูกเติม _ ตามธรรมเนียมของ Emscripten", "Underscore เปิดใช้งานการ Optimise SIMD", "มันป้องกัน Name Mangling ใน C++"], answer: 1 },
+  { q: "ทำไม Entry ใน EXPORTED_FUNCTIONS จึงต้องขึ้นต้นด้วย Underscore (เช่น '_hypotenuse')?", options: ["ทำเครื่องหมายฟังก์ชันว่าเป็น Private", "ชื่อ Symbol ของ C จะถูกเติม _ ตามธรรมเนียมของ Emscripten", "Underscore เปิดใช้งานการ Optimise SIMD", "ป้องกัน Name Mangling ใน C++"], answer: 1 },
   { q: "Module.cwrap คืนค่าอะไร?", options: ["Promise ที่ Resolve เป็นผลลัพธ์ของฟังก์ชัน", "ฟังก์ชัน JavaScript ที่ใช้ Wrapper สำหรับฟังก์ชัน C และนำกลับมาใช้ซ้ำได้", "Pointer ไปยังฟังก์ชัน C ใน Linear Memory", "WebAssembly.Function Object"], answer: 1 },
   { q: "Flag ของ emcc ใดที่ระบุฟังก์ชันที่ควรเข้าถึงได้จาก JavaScript?", options: ["-sEXPORTED_RUNTIME_METHODS", "-sEXPORTED_FUNCTIONS", "-sALLOW_MEMORY_GROWTH", "-sENVIRONMENT"], answer: 1 },
   { q: "ต้องทำอะไรหลังจาก Allocate String Pointer ด้วย allocateUTF8?", options: ["เรียก Module.sync()", "เรียก Module._free() บน Pointer เมื่อใช้เสร็จ", "แปลงด้วย encodeURIComponent", "ไม่ต้องทำอะไร — Emscripten Free ให้อัตโนมัติ"], answer: 1 },

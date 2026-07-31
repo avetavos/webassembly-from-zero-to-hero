@@ -83,20 +83,20 @@ console.log('round-trip:', decoded);`;
 ฟังก์ชัน WebAssembly ไม่สามารถรับ JavaScript string โดยตรงได้ รูปแบบมาตรฐานคือเขียน UTF-8 byte ลง memory แล้วส่ง integer pointer และ integer length ไปยังฟังก์ชัน Wasm
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | ส่ง (ptr, len) ผ่าน linear memory แทน string โดยตรง | zero-copy อ่าน/เขียน byte ได้เร็ว ไม่ต้อง serialize ซ้ำผ่าน host boundary | ต้อง encode/decode UTF-8 เองและคำนวณ byte length ให้ถูกต้องทุกครั้ง |
 | กำหนด address คงที่สำหรับเขียน string (manual layout) | เรียบง่าย ไม่ต้องมี allocator หรือ runtime เพิ่ม | ไม่มี GC คอยเตือนเมื่อ string ใหม่ยาวเกินพื้นที่เดิม ต้องเผื่อขนาด buffer เอง |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - ใช้ `str.length` (จำนวน character) แทน `encoded.length` (จำนวน byte จริงหลัง UTF-8 encode) ตอนคำนวณ length ที่จะส่งให้ Wasm ทำให้ string ที่มีอักขระหลาย byte เช่น emoji หรือภาษาไทยถูก truncate หรือ decode ผิด
 - เขียน byte ที่ offset คงที่ (เช่น 256) โดยไม่เผื่อพื้นที่ให้พอกับ string ที่ยาวขึ้นเรื่อยๆ ทำให้ข้อมูลใหม่ทับ region อื่นที่ยังใช้งานอยู่
 - เก็บ typed-array view ไว้ใช้ซ้ำข้าม call แล้วลืมว่าถ้ามี `memory.grow` เกิดขึ้นระหว่างทาง view เก่าจะถูก detach ทำให้เขียนหรืออ่าน string ผิดตำแหน่ง
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > FFmpeg.wasm ส่ง filename และ metadata string ผ่านรูปแบบ (ptr, len) เดียวกันนี้ข้าม linear memory เพื่อสั่งงาน decoder ที่คอมไพล์มาจาก C โดยไม่ต้องแปลง string ผ่าน glue code ที่ช้าลง
 

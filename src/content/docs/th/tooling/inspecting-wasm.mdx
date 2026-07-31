@@ -29,7 +29,7 @@ export const sectionsDiagram = `flowchart TD
 
 ## wasm2wat — human-readable disassembly
 
-วิธีที่เร็วที่สุดในการอ่าน binary ใดก็ตามคือ `wasm2wat` มันสร้าง WAT text representation ขึ้นมาใหม่ รวมถึงชื่อฟังก์ชันหาก name section มีอยู่
+วิธีที่เร็วที่สุดในการอ่าน binary ใดก็ตามคือ `wasm2wat` ซึ่งสร้าง WAT text representation ขึ้นมาใหม่ รวมถึงชื่อฟังก์ชันหาก name section มีอยู่
 
 ```bash
 # Dump WAT ทั้งหมดไปยัง stdout
@@ -44,7 +44,7 @@ wasm2wat add.wasm --generate-names
 
 ## wasm-objdump — การตรวจสอบทีละ section
 
-`wasm-objdump -x` แสดงสรุปที่มีโครงสร้างของทุก section: type signatures, imports, exports และ function indices มันเร็วกว่า full disassembly เมื่อคุณต้องการแค่ public API ของ module
+`wasm-objdump -x` แสดงสรุปที่มีโครงสร้างของทุก section: type signatures, imports, exports และ function indices เร็วกว่า full disassembly เมื่อคุณต้องการแค่ public API ของ module
 
 ```bash
 # สรุป section ทั้งหมด
@@ -60,7 +60,7 @@ wasm-objdump -j import my.wasm
 
 ## twiggy — size profiling
 
-`twiggy` คือ code-size profiler ที่กำหนดทุก byte ใน binary `.wasm` ให้กับฟังก์ชันหรือ section มันคือวิธีที่เร็วที่สุดในการตอบคำถาม "ฟังก์ชันใดทำให้ binary ใหญ่?"
+`twiggy` คือ code-size profiler ที่กำหนดทุก byte ใน binary `.wasm` ให้กับฟังก์ชันหรือ section เป็นวิธีที่เร็วที่สุดในการตอบคำถาม "ฟังก์ชันใดทำให้ binary ใหญ่?"
 
 ```bash
 # ติดตั้ง
@@ -88,7 +88,7 @@ twiggy top my.wasm --output-format json
 
 ## Browser DevTools
 
-เบราว์เซอร์สมัยใหม่มาพร้อมกับการสนับสนุน WebAssembly debugging โดยตรงใน DevTools ใน Chrome และ Firefox คุณสามารถเปิด **Sources → wasm** เพื่อดู disassembly ของทุก module ที่ instantiate แล้ว ตั้ง breakpoints บนคำสั่งแต่ละตัว และตรวจสอบ local variables และ value stack ที่แต่ละ breakpoint
+browser สมัยใหม่มาพร้อมกับการสนับสนุน WebAssembly debugging โดยตรงใน DevTools ใน Chrome และ Firefox คุณสามารถเปิด **Sources → wasm** เพื่อดู disassembly ของทุก module ที่ instantiate แล้ว ตั้ง breakpoints บนคำสั่งแต่ละตัว และตรวจสอบ local variables และ value stack ที่แต่ละ breakpoint
 
 เพื่อให้ได้ชื่อฟังก์ชันที่อ่านได้ใน DevTools คุณต้องการ:
 
@@ -99,20 +99,20 @@ twiggy top my.wasm --output-format json
 ใช้ `wasm-objdump -x` สำหรับภาพรวมเร็วของ section layout และ exports ใช้ `twiggy top` เมื่อต้องการระบุฟังก์ชันที่ทำให้ binary ขยายใหญ่ ใช้ `wasm2wat` เมื่อต้องการอ่านคำสั่งจริงๆ
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | `wasm-opt -Oz` (การ optimise เชิงรุกสุด) | ได้ size และ speed ที่ดีที่สุดหลัง optimise | build time นานขึ้น และผลลัพธ์ที่เห็นใน `wasm2wat`/`wasm-objdump` ห่างไกลจาก source เดิมจนอ่านยากขึ้น |
 | เก็บ name section (`--debug-names`) ไว้ | DevTools และ `wasm2wat` แสดงชื่อฟังก์ชันที่อ่านได้ | เพิ่มขนาด binary ที่ต้อง ship จริง |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - ข้าม inspection step แล้วเดาว่าอะไรทำให้ binary ใหญ่ แทนที่จะใช้ `twiggy top` หาตัวการจริงๆ
 - เปิด `wasm-opt` เชิงรุกไปก่อนที่จะรู้จริงๆ ว่า section หรือฟังก์ชันไหนใหญ่หรือช้า
 - ลบ name section ทิ้งตั้งแต่แรก ทำให้ `wasm-objdump`, `wasm2wat` และ DevTools อ่าน stack trace ไม่ออกเลย
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > **Emscripten** เรียก `wasm-opt` ของ Binaryen อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักตรวจ binary ด้วยเครื่องมือในบทนี้ก่อนเสมอ เพื่อคุม budget ของขนาด binary ให้อยู่ในเป้าที่ตั้งไว้
 

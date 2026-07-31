@@ -14,7 +14,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
 ## instantiateStreaming เทียบกับ instantiate
 
-`WebAssembly.instantiate` ต้องการให้ byte buffer ทั้งหมดอยู่ในหน่วยความจำก่อนจึงจะเริ่มคอมไพล์ได้ สำหรับ module ขนาดใหญ่ หมายความว่าเบราว์เซอร์จะนั่งรอระหว่างการดาวน์โหลด แล้วค่อยจ่ายต้นทุนการคอมไพล์ทั้งหมดในครั้งเดียว
+`WebAssembly.instantiate` ต้องการให้ byte buffer ทั้งหมดอยู่ในหน่วยความจำก่อนจึงจะเริ่มคอมไพล์ได้ สำหรับ module ขนาดใหญ่ หมายความว่า browser จะนั่งรอระหว่างการดาวน์โหลด แล้วค่อยจ่ายต้นทุนการคอมไพล์ทั้งหมดในครั้งเดียว
 
 `WebAssembly.instantiateStreaming` ส่ง bytes ให้คอมไพเลอร์ขณะที่กำลัง stream มาจากเครือข่าย การคอมไพล์และการดาวน์โหลดทับซ้อนกัน ทำให้ module พร้อมใช้งานได้เร็วขึ้น — ซึ่งเห็นได้ชัดโดยเฉพาะเมื่อการเชื่อมต่อช้าหรือสำหรับ module ที่มีขนาดหลายร้อยกิโลไบต์ขึ้นไป
 
@@ -57,7 +57,7 @@ async function loadWasm(url, imports) {
 
 ## การส่ง Imports
 
-imports object ทำงานเหมือนกับที่ใช้ใน `WebAssembly.instantiate` ทุกประการ — มันคือ argument ที่สอง และโครงสร้างต้องตรงกับ import section ของ module อย่างแม่นยำ
+imports object ทำงานเหมือนกับที่ใช้ใน `WebAssembly.instantiate` ทุกประการ — เป็น argument ที่สอง และโครงสร้างต้องตรงกับ import section ของ module อย่างแม่นยำ
 
 ```js
 const result = await WebAssembly.instantiateStreaming(
@@ -81,7 +81,7 @@ const { module, instance } = await WebAssembly.instantiateStreaming(
 
 ## ลองรันดู
 
-Sandbox นี้ไม่มี server ให้ fetch ดังนั้นจึงไม่สามารถใช้ `fetch()` ได้ ตัวรันด้านล่างใช้ `compileWat()` เพื่อสร้าง compiled bytes แล้วเรียก `WebAssembly.instantiate` โดยตรง — ซึ่งเป็นเส้นทางเดียวกับที่ streaming fallback จะใช้หลังจากได้รับ bytes แล้ว
+Sandbox นี้ไม่มี server ให้ fetch ดังนั้นจึงไม่สามารถใช้ `fetch()` ได้ ตัวรันด้านล่างใช้ `compileWat()` เพื่อสร้าง compiled bytes แล้วเรียก `WebAssembly.instantiate` โดยตรง — ที่เป็นเส้นทางเดียวกับที่ streaming fallback จะใช้หลังจากได้รับ bytes แล้ว
 
 export const streamingCode = `const wat = \`(module
   (func (export "greet") (result i32)
@@ -100,25 +100,25 @@ console.log('(In production: replace compileWat with instantiateStreaming + fetc
 `WebAssembly.instantiateStreaming` จะ reject ด้วย `TypeError` หาก MIME type ของ response ไม่ใช่ `application/wasm` ตั้งค่า web server ของคุณ (nginx, Express ฯลฯ) ให้แมป `.wasm` → `application/wasm`
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | `instantiateStreaming` | เริ่มคอมไพล์ทันทีที่ bytes แรกมาถึง ลด time-to-interactive ได้ชัดเจนสำหรับ module ขนาดใหญ่ | ต้องพึ่ง server ส่ง header `Content-Type: application/wasm` ให้ถูกต้อง มิเช่นนั้น reject ด้วย `TypeError` |
 | fallback ด้วย `arrayBuffer()` + `instantiate` | ทำงานได้แน่นอนแม้ควบคุม MIME type ของ server ไม่ได้ | เสียเวลารอดาวน์โหลดครบไฟล์ก่อนเริ่มคอมไพล์ ทำให้ startup ช้าลง |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - เรียก `fetch()` แล้ว `await response.arrayBuffer()` ก่อนเสมอโดยไม่ลอง `instantiateStreaming` ก่อน ทั้งที่ควรใช้ streaming เป็นค่าเริ่มต้นแล้ว fallback เฉพาะตอนจับ `TypeError`
 - ลืมตั้งค่า server (nginx, Express ฯลฯ) ให้ map นามสกุล `.wasm` เป็น `application/wasm` ทำให้ `instantiateStreaming` reject ทุกครั้งโดยไม่รู้สาเหตุ
 - ส่งข้อมูลก้อนใหญ่กลับไปมาผ่าน exports/imports ทีละ call หลัง instantiate สำเร็จ แทนที่จะใช้ shared linear memory เขียน-อ่านครั้งเดียว ทำให้เสีย throughput ที่ streaming ช่วยประหยัดมาไปเปล่าๆ
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > Squoosh ใช้ `instantiateStreaming` โหลด codec แต่ละตัวเพื่อให้ startup เร็วที่สุด ส่วน AutoCAD Web ก็อาศัย streaming instantiation ในการโหลด engine ขนาดใหญ่ ควบคู่กับ interop ที่มีประสิทธิภาพระหว่าง JS กับ Wasm เพื่อให้ผู้ใช้โต้ตอบกับโมเดล CAD ได้แบบ real-time
 
 export const quizStreamingAndFetch = [
-  { q: "เหตุใด instantiateStreaming จึงเหมาะสมกว่า instantiate สำหรับ production?", options: ["มันข้ามการตรวจสอบ", "มันคอมไพล์ขณะที่ bytes stream เข้ามา ลด latency", "มันทำงานได้โดยไม่ต้องมี server", "มันรองรับ Wasm features มากกว่า"], answer: 1 },
+  { q: "เหตุใด instantiateStreaming จึงเหมาะสมกว่า instantiate สำหรับ production?", options: ["ข้ามขั้นตอนการตรวจสอบ", "คอมไพล์ไปพร้อมกับที่ bytes stream เข้ามา ลด latency", "ทำงานได้โดยไม่ต้องมี server", "รองรับ Wasm features มากกว่า"], answer: 1 },
   { q: "Server ต้องใช้ MIME type อะไรเมื่อให้บริการไฟล์ .wasm สำหรับ instantiateStreaming?", options: ["`application/octet-stream`", "`text/wasm`", "`application/wasm`", "`binary/wasm`"], answer: 2 },
   { q: "instantiateStreaming จะ throw error อะไรหาก MIME type ไม่ถูกต้อง?", options: ["LinkError", "SyntaxError", "TypeError", "RangeError"], answer: 2 },
 ];

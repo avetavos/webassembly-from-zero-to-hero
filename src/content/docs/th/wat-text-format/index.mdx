@@ -11,7 +11,7 @@ import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
 import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
-WebAssembly มีอยู่สองรูปแบบ: binary format ที่กระชับ (`.wasm`) ที่เบราว์เซอร์เอ็กซิคิวต์ และรูปแบบข้อความที่มนุษย์อ่านได้เรียกว่า **WAT** — **WebAssembly Text format** ทั้งสองรูปแบบเทียบเท่ากันแบบ 1:1 ทุกโครงสร้างใน WAT มีคู่เทียบใน binary ที่ตรงกันเป๊ะ
+WebAssembly มีอยู่สองรูปแบบ: binary format ที่กระชับ (`.wasm`) ที่ browser เอ็กซิคิวต์ และรูปแบบข้อความที่มนุษย์อ่านได้เรียกว่า **WAT** — **WebAssembly Text format** ทั้งสองรูปแบบเทียบเท่ากันแบบ 1:1 ทุกโครงสร้างใน WAT มีคู่เทียบใน binary ที่ตรงกันเป๊ะ
 
 คุณแทบจะไม่เคยเขียน WAT ในงาน production คอมไพเลอร์สำหรับ C, Rust, Go และภาษาอื่น ๆ จะสร้าง `.wasm` ออกมาโดยตรง แต่การอ่านและเขียน WAT ด้วยมือเป็นวิธีที่เร็วที่สุดในการสร้างแบบจำลองทางความคิดที่แม่นยำว่า WebAssembly ทำงานอย่างไรจริง ๆ
 
@@ -34,7 +34,7 @@ export const watFlowDiagram = `flowchart LR
 
 ## module WAT ที่เล็กที่สุด
 
-นี่คือโปรแกรม WAT ที่เล็กที่สุดที่มีประโยชน์ — ฟังก์ชัน `add` ที่รับจำนวนเต็ม 32 บิตสองตัวและคืนค่าผลรวมของมัน:
+นี่คือโปรแกรม WAT ที่เล็กที่สุดที่มีประโยชน์ — ฟังก์ชัน `add` ที่รับจำนวนเต็ม 32 บิตสองตัวและคืนค่าผลรวมของตัวเอง:
 
 ```wasm
 (module
@@ -50,9 +50,9 @@ export const watFlowDiagram = `flowchart LR
 - `(func ...)` ประกาศฟังก์ชัน แอตทริบิวต์ `(export "add")` ทำให้เรียกได้จาก JavaScript
 - `(param $a i32)` และ `(param $b i32)` ประกาศพารามิเตอร์ที่มีชื่อสองตัวชนิด `i32` (จำนวนเต็ม 32 บิต)
 - `(result i32)` ประกาศชนิดของค่าที่คืนกลับ
-- ตัวบอดี้เป็นลำดับของคำสั่งแบบ stack `local.get $a` จะ push ค่าของ `$a`, `local.get $b` จะ push `$b`, และ `i32.add` จะ pop ทั้งสองค่าแล้ว push ผลรวมของมัน
+- ตัวบอดี้เป็นลำดับของคำสั่งแบบ stack `local.get $a` จะ push ค่าของ `$a`, `local.get $b` จะ push `$b`, และ `i32.add` จะ pop ทั้งสองค่าแล้ว push ผลรวมของตัวเอง
 
-WebAssembly ใช้แบบจำลอง **stack machine** คำสั่งจะ pop อินพุตของมันออกจาก stack แล้ว push ผลลัพธ์กลับไป เมื่อสิ้นสุดฟังก์ชัน ค่าตัวเดียวที่เหลืออยู่บน stack คือค่าที่คืนกลับ
+WebAssembly ใช้แบบจำลอง **stack machine** คำสั่งจะ pop อินพุตของตัวเองออกจาก stack แล้ว push ผลลัพธ์กลับไป เมื่อสิ้นสุดฟังก์ชัน ค่าตัวเดียวที่เหลืออยู่บน stack คือค่าที่คืนกลับ
 
 ## ลองรันดู
 
@@ -70,7 +70,7 @@ console.log('add(2, 3) =', instance.exports.add(2, 3));`;
 <WasmRunner client:visible code={addCode} />
 
 <Callout title="WAT คือรูปแบบที่อ่านได้ของ binary">
-WAT คือรูปแบบข้อความที่อ่านได้ของ binary format `.wasm` มันเหมาะมากสำหรับการเรียนรู้แบบจำลองการเอ็กซิคิวต์ของ Wasm ในงาน production คุณแทบจะคอมไพล์จากภาษาระดับสูงกว่าเสมอ
+WAT คือรูปแบบข้อความที่อ่านได้ของ binary format `.wasm` เหมาะมากสำหรับการเรียนรู้แบบจำลองการเอ็กซิคิวต์ของ Wasm ในงาน production คุณแทบจะคอมไพล์จากภาษาระดับสูงกว่าเสมอ
 </Callout>
 
 export const quizWatIndex = [

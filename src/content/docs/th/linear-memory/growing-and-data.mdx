@@ -81,20 +81,20 @@ console.log('after grow - size (pages):', mem.buffer.byteLength / 65536);`;
 หลังจาก `memory.grow` ArrayBuffer เดิมจะถูก detach และ typed-array views ที่ชี้ไปยัง buffer นั้นจะหยุดทำงาน ต้องสร้าง views ใหม่จาก `mem.buffer` ทันทีหลังจาก grow
 </Callout>
 
-## Trade-offs
+## ข้อแลกเปลี่ยน
 
 | ตัวเลือก | Benefit | Cost |
 |---|---|---|
 | TypedArray view ที่สร้างจาก `mem.buffer` | เข้าถึง byte แบบ zero-copy รวดเร็ว ไม่มี overhead จากการ copy | ต้องสร้าง view ใหม่ทุกครั้งหลัง `memory.grow` เพราะ buffer เดิมถูก detach ไปแล้ว |
 | จัดการ growth และ layout ของ memory เอง | คุมได้ว่าจะขยายเมื่อไหร่ ขนาดเท่าไหร่ | ไม่มี GC ช่วยตรวจ ต้อง track เองว่า pointer หรือ view ตัวไหนยังใช้งานได้อยู่หลัง grow |
 
-## Common Mistakes
+## ข้อผิดพลาดที่พบบ่อย
 
 - Cache typed-array view ไว้ก่อนเรียก `memory.grow` แล้วลืมสร้างใหม่ ทำให้ view ชี้ไปยัง buffer ที่ถูก detach ไปแล้ว อ่านหรือเขียนค่าผิดแบบเงียบๆ โดยไม่มี error เตือน
-- คิดว่า `memory.grow(n)` รับจำนวน byte ทั้งที่จริงมันรับจำนวน page (แต่ละ page 64 KiB) ทำให้เผลอขอ memory เกินความจำเป็นไปมาก
+- คิดว่า `memory.grow(n)` รับจำนวน byte ทั้งที่จริงรับเป็นจำนวน page (แต่ละ page 64 KiB) ทำให้เผลอขอ memory เกินความจำเป็นไปมาก
 - วาง `(data ...)` segment ที่ offset overlap กับพื้นที่ที่ JavaScript จะเขียนทับภายหลัง ทำให้ข้อมูลเริ่มต้นถูกเขียนทับโดยไม่ตั้งใจ
 
-> 💡 Real World Example
+> 💡 ตัวอย่างจากของจริง
 >
 > FFmpeg.wasm ใช้ linear memory buffer ที่ขยายได้ (`memory.grow`) เพื่อ stream เฟรมวิดีโอที่ decode แล้วระหว่าง JavaScript กับ Wasm โดยตรง โดยไม่ต้อง copy เฟรมทั้งหมดกลับไปมาทุกครั้งที่หน่วยความจำไม่พอ
 
