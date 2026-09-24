@@ -89,6 +89,23 @@ echo "After:  $(wc -c < output.wasm) bytes"
 If you use Emscripten, wasm-pack, or AssemblyScript, `wasm-opt` is already part of the release pipeline. Only run it manually when you consume a pre-compiled binary from a third party, or when you are hand-writing WAT and want to squeeze out every byte.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| `wasm-opt -Oz` (most aggressive optimization) | Best combination of size and speed | Longer build times, and the mapping between source and output drifts further apart, making debugging harder |
+| Keeping `--debug-names` | Readable stack traces, much easier debugging | Increases the size of the binary you ship to users |
+
+## Common mistakes
+
+- Skipping `wasm-opt` entirely and shipping the `.wasm` straight out of the compiler, missing size/speed gains that are nearly free
+- Reaching for `-O3` or `-Oz` at random without measuring before and after, so you never learn which flag actually helped or by how much
+- Stripping `--debug-names` from dev builds too, so when a real crash needs debugging there's no readable stack trace left
+
+> 💡 Real-world example
+>
+> Emscripten automatically invokes Binaryen's `wasm-opt` when you build with `-O2`/`-O3` ([Emscripten optimization docs](https://emscripten.org/docs/optimizing/Optimizing-Code.html)) — you don't have to call it yourself in that pipeline.
+
 export const quizBinaryen = [
   { q: "Which wasm-opt flag maximises binary size reduction?", options: ["-O3", "-Os", "-Oz", "-O2"], answer: 2 },
   { q: "Do you need the original source code to run wasm-opt?", options: ["Yes, wasm-opt needs the C/Rust source", "Yes, wasm-opt needs the WAT source", "No, wasm-opt works on the binary alone", "Only if you use -O3 or higher"], answer: 2 },

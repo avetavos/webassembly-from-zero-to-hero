@@ -5,6 +5,7 @@ sidebar:
   order: 1
 ---
 
+import WasmRunner from '../../../../components/WasmRunner.tsx';
 import Mermaid from '../../../../components/Mermaid.astro';
 import Callout from '../../../../components/Callout.astro';
 import Quiz from '../../../../components/Quiz.tsx';
@@ -39,6 +40,17 @@ export const sourceDiagram = `flowchart LR
   C --> E["Server / Edge\n(Node.js / WASI)"]`;
 
 <Mermaid code={sourceDiagram} title="ภาษาต้นทาง → คอมไพเลอร์ → ไฟล์ .wasm binary → runtime" />
+
+## ลองรันเลย
+
+แม้จะเป็นบทเรียนแรกสุด คุณก็สามารถรัน WebAssembly จริงได้แล้ว ตัวรันด้านล่างจะคอมไพล์ WAT module เล็กๆ ที่คืนค่าคำตอบของชีวิต จักรวาล และทุกสิ่ง
+
+export const introIndexCode = `const wat = \`(module (func (export "answer") (result i32) i32.const 42))\`;
+const bytes = await compileWat(wat);
+const { instance } = await WebAssembly.instantiate(bytes, {});
+console.log('answer() =', instance.exports.answer());`;
+
+<WasmRunner client:visible code={introIndexCode} />
 
 <Callout title="Wasm คือ compilation target">
   คุณแทบไม่เคยเขียน Wasm ด้วยมือในการใช้งานจริง แต่คุณเขียน Rust, C, C++, AssemblyScript (หรือ WAT เพื่อการเรียนรู้) แล้วคอมไพล์เป็นไฟล์ `.wasm` binary กะทัดรัด browser หรือ server โหลด binary นั้นโดยตรง

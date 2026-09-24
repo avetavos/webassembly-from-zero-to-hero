@@ -94,7 +94,7 @@ console.log('doubleSum(3, 4) =', instance.exports.doubleSum(3, 4));`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> วิศวกรที่ debug production `.wasm` blob ที่บริษัทอย่าง Cloudflare Workers มักใช้ `wasm2wat` แปลง binary กลับเป็น WAT ที่อ่านได้ เพื่อไล่ดู stack ทีละคำสั่งตอนหา bug ที่ compiler สร้างโค้ดผิดพลาด
+> วิศวกรที่ debug production `.wasm` blob บน platform ที่รัน Wasm แบบไหนก็ตาม มักใช้ `wasm2wat` แปลง binary กลับเป็น WAT ที่อ่านได้ เพื่อไล่ดู stack ทีละคำสั่งตอนหา bug ที่ compiler สร้างโค้ดผิดพลาด
 
 export const quizLocalsAndStack = [
   {

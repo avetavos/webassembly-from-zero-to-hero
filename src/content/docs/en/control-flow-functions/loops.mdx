@@ -106,6 +106,23 @@ console.log('sumTo(10) =', instance.exports.sumTo(10), '(expected 55)');`;
 A `loop` construct only marks the start of a potential back-edge. Without a `br_if` (or `br`) pointing back to the loop label, the body executes exactly once and falls through. The programmer is fully responsible for creating — and terminating — the iteration.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| `loop` + `br_if` (structured back-edge) | Validatable at compile time and safer than an arbitrary backward `goto` | You have to write the exit condition yourself every time — there's no built-in `for`/`while` for the engine to manage |
+| No arbitrary jumps between loops | The loop's boundaries are unambiguous to the engine, which simplifies compiling/optimizing it | A complex CFG from native code has to go through a relooper-style pass before it can map onto `loop`/`br` |
+
+## Common mistakes
+
+- Assuming `br_if` inside a `loop` behaves like `break` — it actually jumps back to the start of the `loop` (closer to `continue`), not an exit from the loop
+- Forgetting a correct exit condition, so `br_if $again` is always true and the loop never ends (Wasm has no automatic infinite-loop guard)
+- An off-by-one in the exit condition — e.g. using `i <= n` where `i < n` was intended — causing the loop to run one iteration too few or too many, as in the `sumTo` example
+
+> 💡 Real-world example
+>
+> Because a Wasm `loop`'s back-edge is structured and explicit, an engine's JIT can identify loop boundaries directly at compile time — without first having to reconstruct them from an arbitrary jump graph, the way a native-code JIT sometimes must.
+
 export const quizLoops = [
   {
     q: "In WAT, what does `br $l` do when `$l` is a `loop` label?",

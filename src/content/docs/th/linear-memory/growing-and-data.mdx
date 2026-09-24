@@ -96,7 +96,7 @@ console.log('after grow - size (pages):', mem.buffer.byteLength / 65536);`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> FFmpeg.wasm ใช้ linear memory buffer ที่ขยายได้ (`memory.grow`) เพื่อ stream เฟรมวิดีโอที่ decode แล้วระหว่าง JavaScript กับ Wasm โดยตรง โดยไม่ต้อง copy เฟรมทั้งหมดกลับไปมาทุกครั้งที่หน่วยความจำไม่พอ
+> [FFmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) ใช้ linear memory buffer ที่ขยายได้ (`memory.grow`) เพื่อ stream เฟรมวิดีโอที่ decode แล้วระหว่าง JavaScript กับ Wasm โดยตรง โดยไม่ต้อง copy เฟรมทั้งหมดกลับไปมาทุกครั้งที่หน่วยความจำไม่พอ
 
 export const quizGrowingAndData = [
   { q: "คำสั่ง memory.grow คืนค่าอะไร?", options: ["จำนวน page ทั้งหมดหลัง grow", "จำนวน bytes ที่เพิ่ม", "จำนวน page เดิมก่อน grow หรือ -1 เมื่อล้มเหลว", "0 เมื่อสำเร็จ"], answer: 2 },

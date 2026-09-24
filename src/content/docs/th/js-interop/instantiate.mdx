@@ -34,7 +34,7 @@ const module = await WebAssembly.compile(bytes);
 const { module, instance } = await WebAssembly.instantiate(bytes, importObject);
 
 // Overload 2 — pass an already-compiled Module: instantiates only
-const instance = await WebAssembly.instantiate(module, importObject);
+const instanceOnly = await WebAssembly.instantiate(module, importObject);
 // Note: this overload returns a WebAssembly.Instance directly, not {module, instance}
 ```
 
@@ -109,7 +109,7 @@ console.log('cube(3) =', instance.exports.cube(3));`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Squoosh คอมไพล์ Wasm codec หลายตัวไว้ล่วงหน้าเพียงครั้งเดียว แล้ว instantiate ใหม่ทุกครั้งที่ผู้ใช้เลือกบีบอัดภาพด้วย codec นั้น เพื่อเลี่ยงต้นทุนการคอมไพล์ซ้ำซ้อนในทุก session
+> [Squoosh](https://github.com/GoogleChromeLabs/squoosh) คอมไพล์ Wasm codec หลายตัวไว้ล่วงหน้าเพียงครั้งเดียว แล้ว instantiate ใหม่ทุกครั้งที่ผู้ใช้เลือกบีบอัดภาพด้วย codec นั้น เพื่อเลี่ยงต้นทุนการคอมไพล์ซ้ำซ้อนในทุก session
 
 export const quizInstantiate = [
   { q: "WebAssembly.instantiate(bytes, {}) คืนค่าอะไร?", options: ["WebAssembly.Module", "Promise<{module, instance}>", "Uint8Array", "ArrayBuffer"], answer: 1 },

@@ -82,6 +82,23 @@ console.log('add(0, 0)   =', instance.exports.add(0, 0));`;
   Wasm has no named registers. All computation flows through the implicit operand stack. This design makes validation simple (type-check the stack) and makes compilation to native code straightforward (the backend maps stack slots to hardware registers for you).
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Stack-based bytecode (Wasm) | Compact encoding, the type checker can walk the stack statically, compiles to native quickly | Needs a compile step before running — more instantiation overhead than JS, which can parse-and-go |
+| Register-based bytecode (e.g. Dalvik) | Fewer push/pop instructions; some workloads run faster at the interpreter level | More complex to encode; the verifier has to track register state instead of just walking a stack |
+
+## Common mistakes
+
+- Assuming the stack machine model makes Wasm slower than native because it "has to push/pop all the time" — the compiler always turns stack operations into register-based machine code before running; there's no interpreter overhead like that in practice
+- Compiling every function in an app into a Wasm module instead of profiling first to find the actually CPU-bound hot path, then moving only that
+- Overlooking the cost of compiling and instantiating small modules that aren't called often — for a tiny, infrequently-invoked module, the fetch+compile+instantiate overhead can outweigh whatever the stack-machine execution saved
+
+> 💡 Real-world example
+>
+> Figma rewrote its C++ rendering engine to compile to WebAssembly and measured **more than a 3x improvement in load time** across document sizes, in large part because a Wasm module is validated as stack-based bytecode and then compiled to native code almost immediately ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/)).
+
 export const quizStackMachine = [
   {
     q: 'What does `i32.add` do on the Wasm operand stack?',

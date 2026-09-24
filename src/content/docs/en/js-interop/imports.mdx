@@ -97,6 +97,23 @@ A `WebAssembly.Memory` import lets JavaScript and Wasm share the same `ArrayBuff
 The namespace string (`"env"`) and field name (`"log"`) in the imports object must match what the WAT `(import ...)` declaration specifies — including capitalisation. A mismatch throws a `LinkError` at instantiation time.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| `instantiateStreaming` + imports object | Imports can be supplied as the stream compile starts, cutting latency before imported code is first called | The server must respond with `Content-Type: application/wasm`, or it rejects with a `TypeError` before imports are even checked |
+| `instantiate` on a full buffer | Ignores the server's MIME type entirely, so it always works | Has to wait for the full download first, so imported host functions are ready later |
+
+## Common mistakes
+
+- A field name or capitalization in the imports object that doesn't exactly match the `(import ...)` declaration — e.g. `Log` instead of `log` — causing a `LinkError`
+- Passing a large string or array to an imported function one argument at a time, instead of writing it into shared memory once and passing just a pointer/length
+- Forgetting to use `BigInt` when an imported function must receive an `i64` parameter from the Wasm side, so the JS callback receives an unexpected value
+
+> 💡 Real-world example
+>
+> Applications that port a large existing native engine (CAD tools, game engines, physics simulators) to run in the browser typically `import` dozens of host functions — for rendering, input handling, and file I/O — to bridge the ported engine to browser APIs.
+
 export const quizImports = [
   { q: 'In `(import "env" "log" ...)`, which is the module namespace?', options: ['"log"', '"env"', '"import"', '"func"'], answer: 1 },
   { q: 'What is the shape of the imports object for `(import "env" "log" (func ...))`?', options: ['`{ log: fn }`', '`{ env: { log: fn } }`', '`{ env: fn }`', '`{ "env.log": fn }`'], answer: 1 },

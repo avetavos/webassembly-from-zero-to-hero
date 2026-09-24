@@ -76,9 +76,9 @@ console.log('answer() =', instance.exports.answer());`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Figma รีไรท์ C++ rendering engine เดิมให้คอมไพล์เป็น Wasm binary แล้วรันใน sandbox ของ browser ได้โดยตรง ทำให้โหลดไฟล์ design ที่ซับซ้อนเร็วขึ้นมากโดยไม่ต้อง rewrite เป็น JavaScript
+> Figma รีไรท์ C++ rendering engine เดิมให้คอมไพล์เป็น Wasm binary แล้วรันใน sandbox ของ browser ได้โดยตรง ทำให้โหลดไฟล์ design ที่ซับซ้อนเร็วขึ้นอย่างวัดผลได้ โดยไม่ต้อง rewrite เป็น JavaScript ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/))
 >
-> Adobe พอร์ต Photoshop desktop codebase (C++) มาเป็น Photoshop บนเว็บ โดยอาศัย Wasm binary format และ deterministic execution เพื่อให้ image processing algorithm เดิมทำงานถูกต้องเหมือนบน desktop
+> Adobe พอร์ต Photoshop desktop codebase (C++) มาเป็น Photoshop บนเว็บ โดยใช้ WebAssembly (ผ่าน Emscripten) เพื่อให้ image processing algorithm เดิมทำงานในเบราว์เซอร์ได้โดยไม่ต้อง rewrite ใหม่ ([web.dev case study](https://web.dev/ps-on-the-web/))
 
 export const quizWhatIsWasm = [
   {

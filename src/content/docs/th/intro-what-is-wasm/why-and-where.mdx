@@ -85,9 +85,7 @@ Wasm ไม่ได้แทน JavaScript DOM, event handling, fetch และ
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Adobe ใช้ Wasm พอร์ต Photoshop C++ codebase ทั้งก้อนมารันใน browser เป็น Photoshop Web โดยยังคง algorithm การประมวลผลภาพเดิมไว้ทั้งหมด
->
-> Google Earth ใช้ Wasm รัน C++ rendering engine เดิมใน browser ได้โดยไม่ต้องเขียนใหม่เป็น JavaScript ตรงกับเหตุผลเรื่อง portability และความเร็วที่กล่าวถึงในบทนี้
+> Adobe ใช้ WebAssembly พอร์ต Photoshop C++ codebase ทั้งก้อนมารันใน browser เป็น Photoshop บนเว็บ โดยยังคง algorithm การประมวลผลภาพเดิมไว้ทั้งหมด ([web.dev case study](https://web.dev/ps-on-the-web/))
 
 export const quizWhyAndWhere = [
   {

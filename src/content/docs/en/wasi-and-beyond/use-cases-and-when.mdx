@@ -93,6 +93,23 @@ export const decisionDiagram = `flowchart TD
 Do not use Wasm because it is "fast." Use it because you need a safe sandbox, a portable binary, or a language-agnostic plugin interface. Raw throughput on the server is often better served by native binaries.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| WASI capability-based security | Much safer — a plugin or sandboxed piece of code only gets what's explicitly granted, no ambient access | Not fully POSIX-compatible; some native libraries that assume ambient filesystem/network access don't port in smoothly |
+| Edge/serverless Wasm vs. containers | Microsecond-scale cold starts and a much smaller footprint than containers — a good fit for edge PoPs | The container ecosystem still has broader tooling, more battle-tested orchestration, and wider library support |
+
+## Common mistakes
+
+- Expecting filesystem or network access to "just work" without explicitly granting the capability to the WASI runtime — code fails silently or throws a permission error
+- Reaching for Wasm as a container replacement in every case, without recognizing container tooling, orchestration, and library support are still more mature
+- Deploying to an edge platform without first checking whether the target runtime actually supports the SIMD or threads proposal being used — these are still opt-in, not universal
+
+> 💡 Real-world example
+>
+> [Cloudflare Workers](https://developers.cloudflare.com/workers/runtime-apis/webassembly/) and [Fastly Compute](https://www.fastly.com/products/edge-compute) both use Wasm sandboxing to isolate thousands of tenants' code on the same edge network, achieving cold starts on the order of microseconds — something a container can't match.
+
 export const quizUseCasesAndWhen = [
   { q: "Which property makes Wasm especially attractive for edge/serverless platforms?", options: ["Large memory footprint", "Microsecond cold starts with strong per-request isolation", "Native GPU access", "Built-in HTTP server"], answer: 1 },
   { q: "Which real-world project uses Wasm for extensible filter plugins?", options: ["Nginx", "Envoy", "HAProxy", "Caddy"], answer: 1 },

@@ -81,6 +81,23 @@ console.log('after grow - size (pages):', mem.buffer.byteLength / 65536);`;
 After `memory.grow`, the previous `ArrayBuffer` is detached and any typed-array views pointing to it stop working. Always re-create your views from `mem.buffer` immediately after a grow.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| A typed-array view built from `mem.buffer` | Fast, zero-copy byte access, no copy overhead | Must be recreated every time after `memory.grow`, since the old buffer is detached |
+| Managing memory growth and layout yourself | You control exactly when and how much to grow | No GC to help — you have to track which pointers/views are still valid after a grow |
+
+## Common mistakes
+
+- Caching a typed-array view before calling `memory.grow` and forgetting to recreate it, so the view silently points at a detached buffer and reads/writes go wrong with no warning
+- Assuming `memory.grow(n)` takes a byte count, when it actually takes a page count (each page is 64 KiB) — leading to accidentally requesting far more memory than intended
+- Placing a `(data ...)` segment at an offset that overlaps memory JavaScript will later write to, silently overwriting the initial data
+
+> 💡 Real-world example
+>
+> [FFmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) uses a growable linear-memory buffer (`memory.grow`) to stream decoded video frames directly between JavaScript and Wasm, without copying entire frames back and forth every time more memory is needed.
+
 export const quizGrowingAndData = [
   { q: "What does the memory.grow instruction return?", options: ["The new total number of pages", "The number of bytes added", "The old size in pages, or -1 on failure", "0 on success"], answer: 2 },
   { q: "What happens to existing typed-array views when WebAssembly memory grows?", options: ["They automatically resize", "They become detached and stop working — you must re-create them", "They are garbage collected", "They reflect the new size after one tick"], answer: 1 },

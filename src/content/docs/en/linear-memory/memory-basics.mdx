@@ -86,6 +86,23 @@ console.log('byte at offset 100:', view[100]);`;
 Each page is exactly 65 536 bytes. A minimal module with `(memory 1)` has 65 536 bytes available, all initialised to zero.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| A typed-array view directly over `mem.buffer` | Zero-copy byte read/write, no extra allocation | Must be recreated every time memory grows, or the old view points at a detached buffer |
+| Managing the memory layout yourself (computing addresses by hand) | Full control over memory, no runtime overhead | No garbage collector or bounds-checking like JavaScript — you own the lifetime of the data |
+
+## Common mistakes
+
+- Writing past the boundary of the reserved pages (e.g. reserving `(memory 1)` but storing at an offset past 65,536), causing a trap because WebAssembly has no garbage collector or JavaScript-style bounds-checking layer
+- Forgetting that `(memory N)` can only grow a whole page (64 KiB) at a time — you can't reserve just a few bytes, so it's easy to over-allocate
+- Forgetting to export memory with `(memory (export "mem") 1)` and then wondering why JavaScript can't reach `instance.exports.mem`
+
+> 💡 Real-world example
+>
+> Browser-based image editors in the style of [Squoosh](https://github.com/GoogleChromeLabs/squoosh) keep raw pixel buffers directly in linear memory instead of copying image data back and forth between JavaScript and Wasm on every operation, making resizing or compressing large images much faster.
+
 export const quizMemoryBasics = [
   { q: "How many bytes are in one WebAssembly memory page?", options: ["4 096", "65 536", "1 048 576", "512"], answer: 1 },
   { q: "Which instruction writes a 4-byte integer to linear memory?", options: ["i32.set", "mem.store", "i32.store", "memory.put"], answer: 2 },

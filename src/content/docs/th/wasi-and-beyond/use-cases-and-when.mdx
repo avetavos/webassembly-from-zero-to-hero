@@ -33,7 +33,7 @@ Projects ที่ใช้ pattern นี้: **Envoy** (filter plugin), **Zell
 - **Footprint เล็ก** — Wasm module มีขนาด kilobyte ไม่ใช่ megabyte
 
 ```bash
-# Deploy Rust function ไปยัง Fermyon Spin
+# Deploy a Rust function to Fermyon Spin
 spin new --template http-rust my-api
 cd my-api
 spin build
@@ -57,10 +57,10 @@ Sandboxed memory model ของ Wasm รับประกัน:
 Binary `.wasm` ที่คอมไพล์สำหรับ WASI คือ portable executable ที่รันบน OS ใดก็ได้ที่มี WASI runtime — ไม่ต้องใช้ cross-compilation matrix
 
 ```bash
-# แจกจ่าย CLI tool เป็น .wasm binary
+# Distribute a CLI tool as a .wasm binary
 wasmtime my-tool.wasm -- --input file.csv --output result.json
 
-# หรือ package ด้วย wasmer สำหรับ one-liner install
+# Or package it with wasmer for one-liner install
 wasmer publish && wasmer run yourname/my-tool -- --help
 ```
 
@@ -108,7 +108,7 @@ export const decisionDiagram = `flowchart TD
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Cloudflare Workers และ Fastly Compute@Edge ใช้ Wasm sandboxing เพื่อ isolate tenant code นับพันตัวบน edge network เดียวกัน โดยได้ cold-start ระดับ microsecond ที่ container ทำไม่ได้
+> ทั้ง [Cloudflare Workers](https://developers.cloudflare.com/workers/runtime-apis/webassembly/) และ [Fastly Compute](https://www.fastly.com/products/edge-compute) ใช้ Wasm sandboxing เพื่อ isolate tenant code นับพันตัวบน edge network เดียวกัน โดยได้ cold-start ระดับ microsecond ที่ container ทำไม่ได้
 
 export const quizUseCasesAndWhen = [
   { q: "คุณสมบัติใดที่ทำให้ Wasm น่าสนใจเป็นพิเศษสำหรับแพลตฟอร์ม edge/serverless?", options: ["Memory footprint ขนาดใหญ่", "Cold start เป็น microsecond พร้อม isolation ที่แข็งแกร่งต่อ request", "GPU access แบบ native", "HTTP server ในตัว"], answer: 1 },

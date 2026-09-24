@@ -14,18 +14,18 @@ Emscripten คือ Toolchain คลาสสิกสำหรับนำโ�
 ## ติดตั้ง Emscripten
 
 ```bash
-# Clone Emscripten SDK
+# Clone the Emscripten SDK
 git clone https://github.com/emscripten-core/emsdk.git
 cd emsdk
 
-# ติดตั้งและ Activate Release ล่าสุด
+# Install and activate the latest release
 ./emsdk install latest
 ./emsdk activate latest
 
-# เพิ่ม emcc เข้า PATH (รันนี้ทุกครั้งที่เปิด Shell ใหม่ หรือเพิ่มใน Profile)
+# Add emcc to PATH (run this in every new shell, or add to your profile)
 source ./emsdk_env.sh
 
-# ตรวจสอบ
+# Verify
 emcc --version
 ```
 
@@ -36,12 +36,12 @@ emcc --version
 ```c
 #include <math.h>
 
-// คำนวณ Hypotenuse: sqrt(a*a + b*b)
+// Compute the hypotenuse: sqrt(a*a + b*b)
 double hypotenuse(double a, double b) {
     return sqrt(a * a + b * b);
 }
 
-// Fibonacci (แบบ Iterative)
+// Fibonacci (iterative)
 int fibonacci(int n) {
     if (n <= 1) return n;
     int a = 0, b = 1;
@@ -75,20 +75,20 @@ emcc math.c \
 ## เรียกใช้จาก JavaScript ด้วย ccall / cwrap
 
 ```js
-// ในเบราว์เซอร์: โหลด JS Loader ที่ Emscripten สร้างก่อน
+// In a browser: load the Emscripten-generated JS loader first
 // <script src="math.js"></script>
 
 Module.onRuntimeInitialized = function () {
-  // ccall — เรียกครั้งเดียว: (ชื่อ, ประเภทคืนค่า, ประเภทอาร์กิวเมนต์, อาร์กิวเมนต์)
+  // ccall — one-shot call: (name, returnType, argTypes, args)
   const h = Module.ccall(
-    'hypotenuse',    // ชื่อฟังก์ชัน C (ไม่มี _ นำหน้า)
-    'number',        // ประเภทคืนค่า
-    ['number', 'number'],  // ประเภทอาร์กิวเมนต์
-    [3.0, 4.0]       // ค่าอาร์กิวเมนต์
+    'hypotenuse',    // C function name (without leading _)
+    'number',        // return type
+    ['number', 'number'],  // argument types
+    [3.0, 4.0]       // argument values
   );
   console.log('hypotenuse(3, 4) =', h);  // 5
 
-  // cwrap — สร้างฟังก์ชัน JS ที่นำกลับมาใช้ซ้ำได้
+  // cwrap — create a reusable JS function
   const fib = Module.cwrap('fibonacci', 'number', ['number']);
   console.log('fibonacci(10) =', fib(10));  // 55
   console.log('fibonacci(20) =', fib(20));  // 6765
@@ -117,7 +117,7 @@ emcc math.c \
 #include <string.h>
 #include <stdlib.h>
 
-// คืน Copy ของ Input บน Heap ที่เป็น Upper-case
+// Returns a heap-allocated copy of the input in upper-case
 char* to_upper(const char* s) {
     int len = strlen(s);
     char* out = malloc(len + 1);
@@ -164,7 +164,7 @@ Module.onRuntimeInitialized = function () {
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Figma คอมไพล์ C++ Rendering Engine ของตัวเองด้วย Emscripten เพื่อรันบนเว็บแอป ทำให้ได้ Performance ระดับ Desktop โดยไม่ต้อง Rewrite Engine ทั้งหมดเป็นภาษาอื่น
+> Figma คอมไพล์ C++ Rendering Engine ของตัวเองด้วย Emscripten เพื่อรันบนเว็บแอป ทำให้ได้ Performance ระดับ Desktop โดยไม่ต้อง Rewrite Engine ทั้งหมดเป็นภาษาอื่น — บริษัทวัดผลได้ว่าเวลาโหลด **เร็วขึ้นมากกว่า 3 เท่า** หลังเปลี่ยนมาใช้ Wasm ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/))
 
 export const quizCEmscripten = [
   { q: "ทำไม Entry ใน EXPORTED_FUNCTIONS จึงต้องขึ้นต้นด้วย Underscore (เช่น '_hypotenuse')?", options: ["ทำเครื่องหมายฟังก์ชันว่าเป็น Private", "ชื่อ Symbol ของ C จะถูกเติม _ ตามธรรมเนียมของ Emscripten", "Underscore เปิดใช้งานการ Optimise SIMD", "ป้องกัน Name Mangling ใน C++"], answer: 1 },

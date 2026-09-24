@@ -99,6 +99,23 @@ To get readable function names in DevTools you need either:
 Use `wasm-objdump -x` for a fast overview of section layout and exports. Use `twiggy top` when you need to pinpoint which function is bloating the binary. Use `wasm2wat` when you need to read the actual instructions.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| `wasm-opt -Oz` (most aggressive optimization) | Best size and speed after optimizing | Longer build times, and what you see in `wasm2wat`/`wasm-objdump` drifts far from the original source, harder to read |
+| Keeping the name section (`--debug-names`) | DevTools and `wasm2wat` show readable function names | Increases the size of the binary you actually ship |
+
+## Common mistakes
+
+- Skipping the inspection step and guessing what's making a binary large, instead of using `twiggy top` to find the real culprit
+- Turning on aggressive `wasm-opt` before actually knowing which section or function is large or slow
+- Stripping the name section from the start, so `wasm-objdump`, `wasm2wat`, and DevTools can't show any readable stack trace at all
+
+> 💡 Real-world example
+>
+> Emscripten automatically invokes Binaryen's `wasm-opt` when you build with `-O2`/`-O3` ([Emscripten optimization docs](https://emscripten.org/docs/optimizing/Optimizing-Code.html)); the tools in this lesson (`wasm-objdump`, `twiggy`, `wasm2wat`) are what you reach for afterward when you need to know exactly what that optimized binary contains.
+
 export const quizInspecting = [
   { q: "Which tool attributes each byte of a .wasm file to a specific function?", options: ["wasm-objdump", "wasm2wat", "twiggy", "wasm-validate"], answer: 2 },
   { q: "What does wasm-objdump -x print?", options: ["Optimised binary output", "A full WAT disassembly", "Section headers, types, imports, and exports", "Only the code section"], answer: 2 },

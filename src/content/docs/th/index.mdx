@@ -61,3 +61,19 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     ภาษาอังกฤษและไทย, แบบทดสอบที่บันทึกความคืบหน้า และโหมดอ่านแบบไร้สิ่งรบกวน
   </Card>
 </CardGrid>
+
+## ตรวจสอบโดยอ้างอิงจาก
+
+ข้อเท็จจริง โค้ด และ claim ที่เกี่ยวกับเวอร์ชันในคอร์สนี้ ถูกตรวจสอบครั้งล่าสุดกับ toolchain จริงและเอกสารทางการเมื่อเดือนกันยายน 2026:
+
+| เครื่องมือ | เวอร์ชันที่ตรวจสอบ |
+|---|---|
+| Rust / Cargo | 1.96.1 |
+| `wasm-bindgen-cli` | 0.2.128 |
+| `wasm-pack` (ยัง maintain อยู่ภายใต้ rustwasm) | 0.13.1 |
+| Wasmtime | 49.0.0 |
+| WABT (`wat2wasm`, `wasm2wat`) | 1.0.42 |
+| Binaryen (`wasm-opt`) | version 133 |
+| Node.js | 24.13.0 |
+
+ถ้าบทเรียนไหนระบุ standardization phase ของ proposal ใดๆ (เช่น Component Model, Threads) หรือเวอร์ชัน WASI preview ก็อ้างอิงตาม [WebAssembly/proposals](https://github.com/WebAssembly/proposals) และ repo [WASI](https://github.com/WebAssembly/WASI) ณ วันที่เดียวกัน — ถ้าคุณอ่านบทความนี้หลังจากนั้นนานมาก ให้เช็คของจริงอีกครั้ง เพราะ phase เปลี่ยนได้เสมอ

@@ -113,6 +113,23 @@ A regression in any of these three metrics after a dependency update is a signal
 The biggest gains usually come from a single oversized function or an unused import pulled in by a dependency. `twiggy top` finds that function in seconds. Fix the root cause rather than blindly reaching for `-Oz`.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| `wasm-opt -Oz` (most aggressive optimization) | Cuts binary size and boosts speed the most, across every step of this playbook | Longer build times, and debugging gets harder because the code is reordered far from the original source |
+| Keeping debug info / `--debug-names` | Lets you symbolicate crash reports and debug production issues | Increases the size of the binary users actually download — working against this lesson's goal |
+
+## Common mistakes
+
+- Shipping the `.wasm` straight from the compiler without ever running `wasm-opt`, missing the size/speed reduction that step 1 gets almost for free
+- Jumping straight to `-Oz` or other aggressive flags without profiling first to see what's actually big or slow, fixing the wrong thing
+- Stripping debug info from every build, including ones actually used for debugging, so a production crash is hard to trace because the stack trace has no names
+
+> 💡 Real-world example
+>
+> Emscripten already runs Binaryen's `wasm-opt` automatically at `-O2`/`-O3` ([Emscripten optimization docs](https://emscripten.org/docs/optimizing/Optimizing-Code.html)) — this playbook's five steps are what to run explicitly in CI for toolchains that don't do that for you, or when hand-optimizing a WAT-authored or third-party binary.
+
 export const quizOptimizing = [
   { q: "Which wasm-opt flag minimises binary size most aggressively?", options: ["-O3", "-Os", "-O2", "-Oz"], answer: 3 },
   { q: "What is the benefit of WebAssembly.instantiateStreaming over instantiate?", options: ["It supports SIMD instructions", "It avoids the need for a MIME type", "The browser compiles while downloading, reducing startup time", "It works without a server"], answer: 2 },

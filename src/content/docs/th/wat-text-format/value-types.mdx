@@ -89,7 +89,7 @@ console.log('bignum is BigInt:', typeof instance.exports.bignum() === 'bigint');
 
 > 💡 ตัวอย่างจากของจริง
 >
-> ชุด test suite ของ WABT (WebAssembly Binary Toolkit) มีไฟล์ `.wat` ที่เขียนมือจำนวนมากซึ่งครอบคลุมทุกชนิดค่า (`i32`, `i64`, `f32`, `f64`) เพื่อยืนยันว่า encoder/decoder ตีความแต่ละชนิดตรงตาม spec รวมถึงกรณี `i64` ที่ฝั่ง JavaScript ต้องแปลงเป็น `BigInt`
+> [ชุด test อย่างเป็นทางการของ WebAssembly spec](https://github.com/WebAssembly/spec/tree/main/test/core) — ซึ่งเครื่องมืออย่าง WABT นำไป mirror ไว้ให้ใช้งานสะดวก — มีไฟล์ `.wat` ที่เขียนมือจำนวนมากซึ่งครอบคลุมทุกชนิดค่า (`i32`, `i64`, `f32`, `f64`) เพื่อยืนยันว่า encoder/decoder ตีความแต่ละชนิดตรงตาม spec รวมถึงกรณี `i64` ที่ฝั่ง JavaScript ต้องแปลงเป็น `BigInt`
 
 export const quizValueTypes = [
   {

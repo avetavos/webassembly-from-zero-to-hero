@@ -22,10 +22,10 @@ In a real application you do not have WAT source at runtime — you fetch a comp
 // instantiate — waits for full download before compiling
 const response = await fetch('/module.wasm');
 const bytes = await response.arrayBuffer();
-const { instance } = await WebAssembly.instantiate(bytes, {});
+const { instance: instanceA } = await WebAssembly.instantiate(bytes, {});
 
 // instantiateStreaming — compiles while bytes arrive
-const { instance } = await WebAssembly.instantiateStreaming(
+const { instance: instanceB } = await WebAssembly.instantiateStreaming(
   fetch('/module.wasm'),
   {}
 );
@@ -99,6 +99,23 @@ console.log('(In production: replace compileWat with instantiateStreaming + fetc
 <Callout title="Always serve .wasm as application/wasm">
 `WebAssembly.instantiateStreaming` rejects with a `TypeError` if the response MIME type is not `application/wasm`. Configure your web server (nginx, Express, etc.) to map `.wasm` → `application/wasm`.
 </Callout>
+
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| `instantiateStreaming` | Starts compiling the moment the first bytes arrive, clearly cutting time-to-interactive for large modules | Depends on the server sending the correct `Content-Type: application/wasm` header, or it rejects with a `TypeError` |
+| Fallback via `arrayBuffer()` + `instantiate` | Works reliably even without control over the server's MIME type | Waits for the full download before compiling starts, slowing down startup |
+
+## Common mistakes
+
+- Always calling `fetch()` then `await response.arrayBuffer()` without trying `instantiateStreaming` first — streaming should be the default, with a fallback only on a caught `TypeError`
+- Forgetting to configure the server (nginx, Express, etc.) to map the `.wasm` extension to `application/wasm`, so `instantiateStreaming` rejects every time for no obvious reason
+- Passing large chunks of data back and forth through exports/imports one call at a time after a successful instantiation, instead of writing/reading shared linear memory once — losing the throughput that streaming was meant to buy
+
+> 💡 Real-world example
+>
+> [Squoosh](https://github.com/GoogleChromeLabs/squoosh) uses `instantiateStreaming` to load each codec for the fastest possible startup.
 
 export const quizStreamingAndFetch = [
   { q: "Why is instantiateStreaming preferred over instantiate for production?", options: ["It skips validation", "It compiles while bytes stream in, reducing latency", "It works without a server", "It supports more Wasm features"], answer: 1 },

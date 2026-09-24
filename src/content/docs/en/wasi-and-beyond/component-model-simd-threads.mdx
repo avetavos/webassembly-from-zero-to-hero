@@ -122,6 +122,27 @@ RUSTFLAGS="-C target-feature=+atomics,+bulk-memory" \
 The Component Model replaces ad-hoc FFI glue between Wasm modules. With WIT you define typed interfaces once; `cargo-component` and `wasm-tools` generate all the binding code in both directions.
 </Callout>
 
+<Callout title="Standardization phase vs. tooling maturity">
+As of late 2026, the Component Model proposal itself is still listed at **Phase 1** in the WebAssembly community group's process ([WebAssembly/proposals](https://github.com/WebAssembly/proposals)) — it has not yet been formally ratified. In practice, though, its tooling (`wasm-tools`, `cargo-component`, `wit-bindgen`, `jco`) and the WASI 0.2 interfaces built on top of it are already stable and used in production, so "early proposal phase" and "usable today" are both true at once. The Threads proposal used later in this lesson is further along, at Phase 4.
+</Callout>
+
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| WASI capability-based security | Much safer than the old model — a component only gets the exact capabilities the host explicitly grants | Not fully POSIX-compatible; native code that assumes ambient filesystem/network access doesn't port into a component smoothly |
+| Server-side Wasm (edge/serverless) | Microsecond-scale cold starts, a great fit for deploying components at the edge or in serverless | The ecosystem is less mature than containers — tooling around the Component Model and orchestration hasn't been battle-tested as long |
+
+## Common mistakes
+
+- Assuming SIMD or multi-threading work on every Wasm runtime — both are opt-in features that need a specific compile target/flag; not every runtime supports them the same way
+- Overlooking how early-stage the Component Model still is — WIT interfaces can change in breaking ways between versions; committing to it in production today means being ready for that churn
+- Forgetting that a component importing a WASI interface still needs an explicit capability grant from the host — successfully composing components doesn't automatically mean access to the filesystem or network
+
+> 💡 Real-world example
+>
+> [Fermyon Spin](https://github.com/fermyon/spin) is built on the Component Model and Wasmtime to build and deploy serverless Wasm microservices, while [Fastly Compute](https://www.fastly.com/products/edge-compute) runs untrusted customer code as sandboxed Wasm modules with WASI-style capability control on its own edge network.
+
 export const quizComponentModelSimdThreads = [
   { q: "What language is used to define Component Model interface contracts?", options: ["WAT", "WIT", "WASM-IDL", "Protobuf"], answer: 1 },
   { q: "What is the single new value type introduced by the SIMD proposal?", options: ["f128", "simd256", "v128", "i128"], answer: 2 },

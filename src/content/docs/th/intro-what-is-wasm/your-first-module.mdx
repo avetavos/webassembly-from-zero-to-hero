@@ -107,7 +107,7 @@ console.log('double(100) =', instance.exports.double(100));`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Figma ใช้ compile-instantiate-call loop แบบเดียวกับในบทนี้ (แต่ในสเกลใหญ่กว่ามาก) เพื่อรัน rendering engine ที่คอมไพล์จาก C++ เป็น Wasm ทำให้โหลดไฟล์ design เร็วขึ้นราว 3 เท่าเทียบกับตอนที่ยังเป็น pure JavaScript
+> Figma ใช้ compile-instantiate-call loop แบบเดียวกับในบทนี้ (แต่ในสเกลใหญ่กว่ามาก) เพื่อรัน rendering engine ที่คอมไพล์จาก C++ เป็น Wasm ทำให้โหลดไฟล์ design เร็วขึ้นอย่างวัดผลได้เทียบกับตอนที่ยังเป็น pure JavaScript ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/))
 
 export const quizYourFirstModule = [
   {

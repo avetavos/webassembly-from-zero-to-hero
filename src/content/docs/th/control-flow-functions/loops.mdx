@@ -121,7 +121,7 @@ console.log('sumTo(10) =', instance.exports.sumTo(10), '(expected 55)');`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Wasmtime ใช้ประโยชน์จาก structured `loop` construct ของ Wasm ในการ compile loop เป็น native machine code ที่มี back-edge ชัดเจน ทำให้ JIT ทำ loop optimization ได้เร็วและปลอดภัยกว่าการวิเคราะห์ arbitrary jump graph
+> เพราะ back-edge ของ `loop` ใน Wasm เป็น structured และ explicit เสมอ JIT ของ engine จึงระบุขอบเขตของ loop ได้ตรงๆ ตั้งแต่ compile time โดยไม่ต้อง reconstruct จาก arbitrary jump graph ก่อน เหมือนที่ native-code JIT บางตัวยังต้องทำ
 
 export const quizLoops = [
   {

@@ -35,7 +35,7 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 
 ```bash
 wasm-pack build --target web
-# → pkg/ พร้อม npm publish
+# → pkg/ ready to npm publish
 ```
 
 ## C / C++ กับ Emscripten — เมื่อใดควรเลือก
@@ -99,7 +99,7 @@ AssemblyScript คือวิธีที่เร็วที่สุดใ�
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Figma เลือก C++ กับ Emscripten สำหรับ Rendering Engine ที่ Port มาจาก Desktop ส่วน 1Password ใช้ Rust คอมไพล์เป็น Wasm สำหรับ Core Cryptography และ Vault Logic ที่รันใน browser ขณะที่ Shopify Functions ให้ Merchant เขียน Custom Checkout Logic ด้วย Rust หรือ AssemblyScript แล้วคอมไพล์เป็น Wasm — สามตัวอย่างที่เลือกภาษาต่างกันตาม Requirement ของตัวเอง
+> Figma เลือก C++ กับ Emscripten สำหรับ Rendering Engine ที่ Port มาจาก Desktop และวัดผลได้ว่าเวลาโหลด **เร็วขึ้นมากกว่า 3 เท่า** หลังเปลี่ยนมาใช้ Wasm ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/)) ในทางกลับกัน Shopify Functions ให้ Merchant เขียน Custom Checkout Logic ที่คอมไพล์เป็น Wasm ได้ — ปัจจุบันรองรับ **Rust หรือ JavaScript** ([เอกสาร Shopify Functions](https://shopify.dev/docs/apps/build/functions)) — สองตัวอย่างที่เลือกภาษาต่างกันตาม Requirement ของตัวเอง
 
 export const quizChoosingLang = [
   { q: "Toolchain ใดเหมาะที่สุดเมื่อต้อง Port ไลบรารี C ที่มีอยู่ซึ่งใช้ printf และ malloc?", options: ["wasm-pack (Rust)", "Emscripten (emcc)", "asc (AssemblyScript)", "tinygo"], answer: 1 },

@@ -36,17 +36,17 @@ WASI ผ่านการแก้ไขหลักสองครั้ง:
 | **Networking** | ไม่อยู่ใน core (vendor extension) | `wasi:sockets` อยู่ใน core |
 | **Toolchain** | Rust stable, WASI SDK | `cargo component`, `wasm-tools` |
 
-สำหรับงาน production ส่วนใหญ่ในปัจจุบัน Preview 1 (`wasm32-wasip1`) คือค่าเริ่มต้นที่ปลอดภัย Preview 2 คืออนาคต และ tooling กำลังพัฒนาอย่างรวดเร็ว
+สำหรับงาน production ส่วนใหญ่ในปัจจุบัน Preview 1 (`wasm32-wasip1`) ยังเป็นค่าเริ่มต้นที่ปลอดภัยและไม่มีอะไรน่าตกใจ แต่ Preview 2 (`wasm32-wasip2`) ก็ไม่ใช่ tooling ใหม่เอี่ยมแล้วเช่นกัน — ใน Rust compiler ทั้ง `wasm32-wasip1` และ `wasm32-wasip2` เป็น Tier 2 target เท่ากันในปัจจุบัน และ WASI 0.2 ก็เป็น stable release มาตั้งแต่มกราคม 2024 ตอนนี้มี **WASI 0.3 (Preview 3)** อยู่ในสถานะ preview แล้ว ซึ่งแทนที่โมเดล polling/streams แบบ explicit ของ 0.2 ด้วย `async` แบบ native ผ่าน `future`/`stream` type ของ Component Model — แต่ยังไม่ใช่ stable release ดังนั้นถ้าเจอ claim เรื่อง "0.3" ที่ไหน ให้มองว่าเป็นเรื่องอนาคต ยังไม่ได้ ship จริง
 
 ## การคอมไพล์ Rust ไป WASI
 
 เพิ่ม target หนึ่งครั้ง แล้ว build ตามปกติ:
 
 ```bash
-# ติดตั้ง WASI target
+# Install the WASI target
 rustup target add wasm32-wasip1
 
-# Build release binary
+# Build a release binary
 cargo build --target wasm32-wasip1 --release
 # Output: target/wasm32-wasip1/release/my_app.wasm
 ```
@@ -110,7 +110,7 @@ WASI บังคับใช้ least privilege โดยค่าเริ่�
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Fastly Compute@Edge รัน untrusted customer code เป็น Wasm module พร้อม capability sandboxing แบบ WASI บนเครือข่าย edge ของตัวเอง ทำให้แต่ละ request ได้ sandbox ที่ปลอดภัยโดยไม่ต้องพึ่ง container isolation
+> [Fastly Compute](https://www.fastly.com/products/edge-compute) รัน untrusted customer code เป็น Wasm module พร้อม capability sandboxing แบบ WASI บนเครือข่าย edge ของตัวเอง ทำให้แต่ละ request ได้ sandbox ที่ปลอดภัยโดยไม่ต้องพึ่ง container isolation
 
 export const quizWasi = [
   { q: "ใน WASI โมดูลจะได้รับสิทธิ์เข้าถึง directory บน host filesystem อย่างไร?", options: ["เรียก open() ด้วย absolute path", "รันไทม์ pre-open directory และส่ง file descriptor", "WASI ให้สิทธิ์อ่านทุก directory โดยค่าเริ่มต้น", "โมดูลอ่าน /etc/fstab"], answer: 1 },

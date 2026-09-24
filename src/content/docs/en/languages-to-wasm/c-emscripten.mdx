@@ -149,6 +149,23 @@ Module.onRuntimeInitialized = function () {
 If you have C or C++ code that already works on the desktop, Emscripten can often compile it to Wasm with minimal changes. It emulates `printf`, `malloc`, file I/O, and even OpenGL (via WebGL). For brand-new code, prefer Rust or AssemblyScript for a leaner output.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| C/C++ + Emscripten | Port an existing C/C++ codebase almost immediately, reaching decades of accumulated C/C++ ecosystem | Glue code and the POSIX emulation layer add runtime overhead, producing a noticeably larger binary than other toolchains |
+| Rust + wasm-bindgen | Much smaller binary, no POSIX emulation to carry | Requires rewriting the existing code in Rust — there's no direct port path |
+
+## Common mistakes
+
+- Shipping an unoptimized build — not stripping the POSIX emulation layer and not using flags like `-O3` or `-sMINIMAL_RUNTIME` — so the bundle is needlessly bloated
+- Choosing Emscripten just because the team knows C, even for a small module with no existing codebase to port, shipping a runtime far bigger than necessary when Rust or AssemblyScript would fit better
+- Forgetting to `Module._free()` a pointer allocated with `malloc` or `allocateUTF8`, causing a memory leak that accumulates on a long-running page
+
+> 💡 Real-world example
+>
+> Figma compiles its own C++ rendering engine with Emscripten to run it in the web app, getting desktop-class performance without rewriting the engine in another language — the company measured **more than a 3x improvement in load time** after the switch ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/)).
+
 export const quizCEmscripten = [
   { q: "Why do EXPORTED_FUNCTIONS entries start with an underscore (e.g. '_hypotenuse')?", options: ["It marks the function as private", "C symbol names are prefixed with _ by Emscripten convention", "The underscore enables SIMD optimisations", "It prevents name mangling in C++"], answer: 1 },
   { q: "What does Module.cwrap return?", options: ["A promise that resolves to the function result", "A reusable JavaScript wrapper function for a C function", "A pointer to the C function in linear memory", "A WebAssembly.Function object"], answer: 1 },

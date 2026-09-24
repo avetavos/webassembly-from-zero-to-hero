@@ -117,12 +117,12 @@ console.log('factorial(10) =', instance.exports.factorial(10), '(expected 362880
 ## ข้อผิดพลาดที่พบบ่อย
 
 - เขียน recursive function โดยไม่มี base case ที่ครอบคลุมครบ (เช่นลืมเช็ค `n < 0`) ทำให้ recursion ไม่มีวันจบ
-- คาดหวังว่า Wasm จะทำ tail-call optimization ให้อัตโนมัติเหมือนบางภาษา แต่ทุก `call` เพิ่ม frame เข้า call stack เสมอ ทำให้ recursion ลึกๆ เสี่ยง stack exhaustion
+- คาดหวังว่า Wasm จะทำ tail-call optimization ให้อัตโนมัติเหมือนบางภาษา แต่ทุก `call` เพิ่ม frame เข้า call stack เสมอ ทำให้ recursion ลึกๆ เสี่ยง stack exhaustion ([tail-call proposal](https://github.com/WebAssembly/tail-call) เข้าเป็นส่วนหนึ่งของ Wasm 3.0 แล้วในรูปคำสั่ง `return_call`/`return_call_indirect` แบบ explicit — compiler ต้องเจาะจงใช้คำสั่งนี้เอง `call` ธรรมดาไม่ถูกแปลงให้อัตโนมัติ)
 - push argument ผิดลำดับก่อน `call` (WAT ไม่มี named argument) ทำให้ parameter ไปผูกกับตำแหน่งผิดโดยไม่มี error ตอน compile
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Wasmtime ใช้ structured call stack ของ Wasm ในการ verify และ compile function call ให้เร็วโดยไม่ต้องวิเคราะห์ arbitrary jump และยัง enforce stack size limit เพื่อจับ unbounded recursion ก่อนที่จะ crash process จริง
+> Wasm spec บังคับให้ทุก engine ที่ conform ต้องจำกัด call-stack ไว้ระดับหนึ่งเสมอ: recursion ที่ไม่มีขอบเขตจะ trap ด้วย runtime error ที่มีนิยามชัดเจน แทนที่จะทำให้ host process crash แบบ native stack overflow ที่ไม่มีการป้องกัน การรับประกันนี้ตาม spec คือส่วนหนึ่งที่ทำให้การรัน Wasm ที่ไม่น่าเชื่อถือ (untrusted) ปลอดภัยได้ตั้งแต่ต้น
 
 export const quizCallsRecursion = [
   {

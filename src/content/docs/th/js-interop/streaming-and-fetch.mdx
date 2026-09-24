@@ -22,10 +22,10 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 // instantiate — waits for full download before compiling
 const response = await fetch('/module.wasm');
 const bytes = await response.arrayBuffer();
-const { instance } = await WebAssembly.instantiate(bytes, {});
+const { instance: instanceA } = await WebAssembly.instantiate(bytes, {});
 
 // instantiateStreaming — compiles while bytes arrive
-const { instance } = await WebAssembly.instantiateStreaming(
+const { instance: instanceB } = await WebAssembly.instantiateStreaming(
   fetch('/module.wasm'),
   {}
 );
@@ -115,7 +115,7 @@ console.log('(In production: replace compileWat with instantiateStreaming + fetc
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Squoosh ใช้ `instantiateStreaming` โหลด codec แต่ละตัวเพื่อให้ startup เร็วที่สุด ส่วน AutoCAD Web ก็อาศัย streaming instantiation ในการโหลด engine ขนาดใหญ่ ควบคู่กับ interop ที่มีประสิทธิภาพระหว่าง JS กับ Wasm เพื่อให้ผู้ใช้โต้ตอบกับโมเดล CAD ได้แบบ real-time
+> [Squoosh](https://github.com/GoogleChromeLabs/squoosh) ใช้ `instantiateStreaming` โหลด codec แต่ละตัวเพื่อให้ startup เร็วที่สุด
 
 export const quizStreamingAndFetch = [
   { q: "เหตุใด instantiateStreaming จึงเหมาะสมกว่า instantiate สำหรับ production?", options: ["ข้ามขั้นตอนการตรวจสอบ", "คอมไพล์ไปพร้อมกับที่ bytes stream เข้ามา ลด latency", "ทำงานได้โดยไม่ต้องมี server", "รองรับ Wasm features มากกว่า"], answer: 1 },

@@ -80,6 +80,23 @@ console.log('i32[2] =', i32[2]);          // 100 (at byte offset 8)`;
 WebAssembly memory is little-endian. When you store an `i32`, the least-significant byte comes first. `DataView` methods like `.getInt32(offset, true)` let you choose endianness explicitly.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Multiple typed-array views over the same buffer | Zero-copy read/write, no copying data between views | Must be recreated every time after `memory.grow`, since the old `ArrayBuffer` is detached |
+| Interpreting the same bytes as several types directly (manual layout) | Flexible — reach differently-sized fields however you need | No type safety or GC to help — a single wrong offset reads the wrong type immediately |
+
+## Common mistakes
+
+- Creating an `Int32Array` or `Float64Array` at a byte offset that isn't aligned to its own element size (e.g. an offset that isn't a multiple of 4 for `Int32Array`), which throws in the constructor
+- Reusing a view created before a `memory.grow`, forgetting the old `ArrayBuffer` is detached afterward, so the stale view can no longer be read or written
+- Forgetting WebAssembly memory is always little-endian, then accidentally calling `DataView.getInt32(offset, false)` (big-endian), reading the bytes in the wrong order
+
+> 💡 Real-world example
+>
+> Browser-based image editors in the style of [Squoosh](https://github.com/GoogleChromeLabs/squoosh) read the same raw pixel buffer through both a `Uint8ClampedArray` and a `Float32Array` view depending on the operation, without copying image data between the views.
+
 export const quizTypedArrayViews = [
   { q: "If an Int32Array element is at index 2, what is its byte offset?", options: ["2", "4", "8", "16"], answer: 2 },
   { q: "How are multi-byte integers laid out in WebAssembly linear memory?", options: ["Big-endian (most significant byte first)", "Little-endian (least significant byte first)", "Platform-dependent", "Packed BCD"], answer: 1 },

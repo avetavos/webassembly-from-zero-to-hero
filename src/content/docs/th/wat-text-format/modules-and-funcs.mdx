@@ -113,7 +113,7 @@ console.log('multiply(3, 4) =', instance.exports.multiply(3, 4));`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> ทีมที่ debug production `.wasm` ที่บริษัทอย่าง Cloudflare Workers มักใช้ `wasm2wat` แปลง binary module กลับมาเป็น WAT ที่อ่านได้ เพื่อตรวจสอบว่าฟังก์ชันที่ export ออกไปมี signature และ body ตรงกับที่ต้องการจริงหรือไม่
+> ทีมที่ debug production `.wasm` บน platform ที่รัน Wasm แบบไหนก็ตาม มักใช้ `wasm2wat` แปลง binary module กลับมาเป็น WAT ที่อ่านได้ เพื่อตรวจสอบว่าฟังก์ชันที่ export ออกไปมี signature และ body ตรงกับที่ต้องการจริงหรือไม่
 
 export const quizModulesAndFuncs = [
   { q: "ไวยากรณ์ใดที่ export ฟังก์ชันจากโมดูล WAT?", options: ['`(export "name" (func $f))`', '`(public func $f)`', '`export default func $f`', '`module.exports.f = $f`'], answer: 0 },

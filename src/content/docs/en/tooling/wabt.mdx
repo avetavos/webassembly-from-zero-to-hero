@@ -110,6 +110,23 @@ console.log('Decoded magic:', String.fromCharCode(...bytes.slice(1, 4)));`;
 All WebAssembly binaries begin with the four-byte magic number `00 61 73 6d` followed by the version `01 00 00 00`. Any tool or loader that reads a `.wasm` file checks for these bytes first.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| `wasm-opt -Oz` (most aggressive optimization, after `wat2wasm`) | Best size and speed | Longer build times, and the resulting binary drifts far from the original `.wat`, harder to debug |
+| Keeping `--debug-names` during `wat2wasm` | `wasm2wat`/`wasm-objdump` show readable function names | Increases the size of the binary you ship to users |
+
+## Common mistakes
+
+- Compiling `.wat` to `.wasm` and shipping it directly without ever running `wasm-opt`, missing a nearly-free size reduction
+- Running `wasm-validate` only after deploying, instead of validating every module in CI before shipping
+- Leaving `--debug-names` on in production builds without weighing the size trade-off it introduces
+
+> 💡 Real-world example
+>
+> After a step equivalent to `wat2wasm`, Emscripten automatically invokes Binaryen's `wasm-opt` when building with `-O2`/`-O3` ([Emscripten optimization docs](https://emscripten.org/docs/optimizing/Optimizing-Code.html)) — the same optimization principle this lesson's WABT-based pipeline applies by hand.
+
 export const quizWabt = [
   { q: "Which flag tells wat2wasm to keep $name annotations in the output binary?", options: ["--keep-names", "--debug-names", "--names=true", "--preserve-symbols"], answer: 1 },
   { q: "What are the first four bytes of every valid .wasm file?", options: ["ff fe 00 00", "00 61 73 6d", "77 61 73 6d", "01 00 00 00"], answer: 1 },

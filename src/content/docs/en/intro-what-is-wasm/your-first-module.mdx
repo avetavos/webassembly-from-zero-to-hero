@@ -92,6 +92,23 @@ console.log('double(100) =', instance.exports.double(100));`;
   Every Wasm module follows the same pattern: compile to bytes, instantiate with `WebAssembly.instantiate`, then call an export. The second argument to `instantiate` is the import object — functions and memory you provide to the module from JavaScript. For now it is empty, but later lessons will fill it in.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Call a function through a Wasm module | Near-native speed under heavy workloads, deterministic results | Every fresh load pays for compile → instantiate → call, overhead a plain JS function doesn't have |
+| Call a plain JavaScript function | Runs immediately, no compile/instantiate step, easy to debug with devtools | No native-level speed guarantee and no Wasm-style sandbox |
+
+## Common mistakes
+
+- Writing a trivial function like `double` as a Wasm module and expecting it to always beat JS — for something this small, the JS JIT compiles it just as fast; the difference only shows up under real workloads
+- Forgetting that `WebAssembly.instantiate` must run before any export can be called, then trying to migrate an entire app into many small Wasm modules, which forces repeated, unnecessary compile/instantiate cycles
+- Not caching an already-compiled `WebAssembly.Module` when the same module needs to be instantiated many times, wasting the compile step's cost — especially wasteful for a small module that isn't called often
+
+> 💡 Real-world example
+>
+> Figma runs the same compile-instantiate-call loop shown in this lesson — at much larger scale — to run a rendering engine compiled from C++ to Wasm, which measurably sped up loading design files compared to pure JavaScript ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/)).
+
 export const quizYourFirstModule = [
   {
     q: 'What does `WebAssembly.instantiate(bytes, {})` return?',

@@ -18,10 +18,10 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 `wasm-opt` ใช้ลำดับของ compiler passes: dead-code elimination, constant folding, function inlining, local CSE และอื่นๆ อีกมาก ทำงานในระดับ binary ทั้งหมด — ไม่จำเป็นต้องมีต้นฉบับหรือ metadata ใดๆ
 
 ```bash
-# ติดตั้งทั่วโลกผ่าน npm
+# Install globally via npm
 npm install -g binaryen
 
-# หรือติดตั้งผ่าน Homebrew บน macOS
+# Or install via Homebrew on macOS
 brew install binaryen
 ```
 
@@ -30,19 +30,19 @@ brew install binaryen
 `wasm-opt` ใช้ flags ระดับเดียวกับ Clang/GCC:
 
 ```bash
-# -O1  — การ optimise เบา (build รวดเร็ว)
+# -O1  — light optimisation (fast build)
 wasm-opt -O1 input.wasm -o output.wasm
 
-# -O2  — สมดุล (เหมือนกับ release builds ในส่วนใหญ่ของ toolchains)
+# -O2  — balanced (same as release builds in most toolchains)
 wasm-opt -O2 input.wasm -o output.wasm
 
-# -O3  — เชิงรุก (เพิ่มความเร็วสูงสุด, code อาจใหญ่ขึ้น)
+# -O3  — aggressive (maximise speed, larger code possible)
 wasm-opt -O3 input.wasm -o output.wasm
 
-# -Os  — optimise เพื่อขนาด (ความเร็วรอง)
+# -Os  — optimise for size (speed is secondary)
 wasm-opt -Os input.wasm -o output.wasm
 
-# -Oz  — ลดขนาดสูงสุด (การ optimise ช้าที่สุด)
+# -Oz  — maximise size reduction (slowest optimisation)
 wasm-opt -Oz input.wasm -o output.wasm
 ```
 
@@ -64,16 +64,16 @@ wasm-opt -Oz input.wasm -o output.wasm
 ## Flags เพิ่มเติมที่มีประโยชน์
 
 ```bash
-# ลบ DWARF debug section (ลดขนาด สูญเสีย stack traces)
+# Strip the DWARF debug section (reduces size, loses stack traces)
 wasm-opt -Oz --strip-dwarf input.wasm -o output.wasm
 
-# ลบ custom sections ทั้งหมด
+# Strip all custom sections
 wasm-opt -Oz --strip-producers input.wasm -o output.wasm
 
-# แสดงสถิติโมดูลก่อนและหลัง
+# Print module statistics before and after
 wasm-opt -Oz --print-stats input.wasm -o output.wasm
 
-# เก็บ name section สำหรับ stack traces ที่อ่านได้
+# Keep a name section for readable stack traces
 wasm-opt -Oz --debuginfo input.wasm -o output.wasm
 ```
 
@@ -106,7 +106,7 @@ echo "After:  $(wc -c < output.wasm) bytes"
 
 > 💡 ตัวอย่างจากของจริง
 >
-> **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักให้ความสำคัญกับ budget ของขนาด binary เป็นพิเศษ จึงนิยมใช้ `wasm-opt -Oz` กันเป็นมาตรฐาน
+> **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` ([เอกสาร Emscripten](https://emscripten.org/docs/optimizing/Optimizing-Code.html)) — ไม่ต้องเรียกเองเลยใน pipeline นั้น
 
 export const quizBinaryen = [
   { q: "wasm-opt flag ไหนลด binary size ได้มากที่สุด?", options: ["-O3", "-Os", "-Oz", "-O2"], answer: 2 },

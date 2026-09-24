@@ -98,7 +98,7 @@ console.log('round-trip:', decoded);`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> FFmpeg.wasm ส่ง filename และ metadata string ผ่านรูปแบบ (ptr, len) เดียวกันนี้ข้าม linear memory เพื่อสั่งงาน decoder ที่คอมไพล์มาจาก C โดยไม่ต้องแปลง string ผ่าน glue code ที่ช้าลง
+> [FFmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) ส่ง filename และ metadata string ผ่านรูปแบบ (ptr, len) เดียวกันนี้ข้าม linear memory เพื่อสั่งงาน decoder ที่คอมไพล์มาจาก C โดยไม่ต้องแปลง string ผ่าน glue code ที่ช้าลง
 
 export const quizPassingStrings = [
   { q: "วิธีส่ง JavaScript string ไปยังฟังก์ชัน WebAssembly คือ?", options: ["ส่งโดยตรงเป็น parameter", "เขียน UTF-8 bytes ลง memory แล้วส่ง (ptr, len)", "แปลงเป็นตัวเลขก่อน", "ใช้ postMessage"], answer: 1 },

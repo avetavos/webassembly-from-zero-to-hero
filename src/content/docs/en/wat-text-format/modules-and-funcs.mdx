@@ -98,6 +98,23 @@ console.log('multiply(3, 4) =', instance.exports.multiply(3, 4));`;
 Every WebAssembly function, global, memory, and table lives inside a `(module ...)` wrapper. JavaScript can only call functions the module explicitly exports.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Writing WAT by hand | You see the `(module ...)` and `(func ...)` structure directly, and understand exactly how exports work at the binary-format level | You write all the boilerplate yourself, with no high-level type system checking it before compiling |
+| Letting a compiler generate Wasm (Rust/C/AssemblyScript) | Memory layout and imports/exports are managed automatically — well suited to large codebases | Reading the resulting `.wasm` directly is hard; you need a tool to convert it back to WAT to debug |
+
+## Common mistakes
+
+- Declaring `(result i32)` but ending the function body without exactly one `i32` left on the stack — e.g. branching out midway without pushing a return value — so the module fails to validate
+- Pushing operands in the wrong order before an instruction inside a `func` body, producing a wrong exported result even though the syntax is completely valid
+- Using `br`/`br_if` to jump out of a block inside a function without considering what the branch's target expects on the stack, so the `func` signature and the actual stack state don't match
+
+> 💡 Real-world example
+>
+> Teams debugging a production `.wasm` on any Wasm-hosting platform commonly use `wasm2wat` to turn the binary module back into readable WAT, to verify that an exported function's signature and body actually match what was intended.
+
 export const quizModulesAndFuncs = [
   { q: "Which syntax exports a function from a WAT module?", options: ['`(export "name" (func $f))`', '`(public func $f)`', '`export default func $f`', '`module.exports.f = $f`'], answer: 0 },
   { q: "Can JavaScript call a function that is defined but not exported?", options: ["Yes, using WebAssembly.Module.exports()", "Yes, by index", "No — only exported functions are accessible from JS", "Yes, if the function has a name starting with $"], answer: 2 },

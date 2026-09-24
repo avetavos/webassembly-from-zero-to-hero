@@ -83,6 +83,24 @@ Note: TinyGo does not support the full Go standard library. Packages that use `n
 AssemblyScript is the fastest way to ship a first Wasm module. If you later need lower-level control or richer JS bindings, migrating to Rust is straightforward because both produce the same `.wasm` interface — your JavaScript caller does not change.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Rust + wasm-bindgen | Memory safety from the ownership model, very small binaries, no GC | Steeper learning curve than the others — you need to understand ownership/borrowing |
+| C/C++ + Emscripten | Huge C/C++ ecosystem, port an existing codebase almost immediately | Glue code and the POSIX emulation layer add runtime overhead, producing a larger binary |
+| AssemblyScript | Familiar syntax for a TypeScript team, fastest to get started | Much smaller ecosystem, and **not semantically identical to TypeScript** — the type system differs |
+
+## Common mistakes
+
+- Choosing a language purely by team familiarity without checking the resulting binary size — e.g. using Emscripten for a small module with no existing codebase to port, shipping a runtime far bigger than needed
+- Shipping an unoptimized Emscripten build — not stripping the POSIX emulation layer and not using flags like `-O3` or `-sMINIMAL_RUNTIME` — so the bundle bloats
+- Treating AssemblyScript as if it were all of TypeScript, then using syntax or semantics `asc` doesn't support, hitting a compile error or a hard-to-track bug
+
+> 💡 Real-world example
+>
+> Figma chose C++ with Emscripten for the rendering engine it ported from desktop, measuring **more than a 3x improvement in load time** after the switch ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/)). Shopify Functions, by contrast, lets merchants write custom checkout logic that compiles to Wasm — currently in **Rust or JavaScript** ([Shopify Functions docs](https://shopify.dev/docs/apps/build/functions)) — two examples that picked different languages for different requirements.
+
 export const quizChoosingLang = [
   { q: "Which toolchain is the best choice when porting an existing C library that uses printf and malloc?", options: ["wasm-pack (Rust)", "Emscripten (emcc)", "asc (AssemblyScript)", "tinygo"], answer: 1 },
   { q: "Which two toolchains produce the smallest Wasm binaries because they have no garbage collector or runtime heap?", options: ["Emscripten and TinyGo", "Rust and AssemblyScript", "AssemblyScript and TinyGo", "Rust and Emscripten"], answer: 1 },

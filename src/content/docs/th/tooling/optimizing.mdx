@@ -16,11 +16,11 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 ไม่ว่าจะใช้ toolchain ใด ให้เปิดใช้ flag การ optimise ขนาดสูงสุด:
 
 ```bash
-# wasm-opt (standalone หรือ post-compile)
+# wasm-opt (standalone or post-compile)
 wasm-opt -Oz input.wasm -o output.wasm
 
-# Rust ผ่าน wasm-pack
-wasm-pack build --release   # wasm-opt -Oz ทำงานโดยอัตโนมัติ
+# Rust via wasm-pack
+wasm-pack build --release   # wasm-opt -Oz runs automatically
 
 # Emscripten
 emcc -Oz source.c -o output.wasm
@@ -34,13 +34,13 @@ tinygo build -opt=z -target wasm -o output.wasm ./main.go
 ข้อมูล debug (DWARF, name sections, producer metadata) อาจเพิ่มขนาด binary ได้ถึงสองเท่า ลบออกสำหรับ production
 
 ```bash
-# ลบ custom sections ทั้งหมดด้วย wasm-opt
+# Strip all custom sections with wasm-opt
 wasm-opt -Oz --strip-debug --strip-producers output.wasm -o output.stripped.wasm
 
-# หรือด้วย wasm-tools
+# Or with wasm-tools
 wasm-tools strip output.wasm -o output.stripped.wasm
 
-# วัดผล
+# Measure the effect
 wc -c output.wasm output.stripped.wasm
 ```
 
@@ -55,11 +55,11 @@ wc -c output.wasm output.stripped.wasm
 [dependencies]
 wee_alloc = "0.4"
 
-# lib.rs — แทนที่ global allocator
+# lib.rs — replace the global allocator
 ```
 
 ```bash
-# Build (wasm-pack จัดการส่วนที่เหลือ)
+# Build (wasm-pack handles the rest)
 wasm-pack build --release --target web
 ```
 
@@ -70,20 +70,20 @@ wasm-pack build --release --target web
 browser สามารถเริ่มคอมไพล์ไฟล์ `.wasm` ขณะที่ยังดาวน์โหลดอยู่ถ้าคุณใช้ `WebAssembly.instantiateStreaming` ซึ่งเร็วกว่าการ fetch ก่อนแล้วค่อยคอมไพล์เสมอ
 
 ```bash
-# Serve ด้วย MIME type ที่ถูกต้อง
+# Serve with the correct MIME type
 # Content-Type: application/wasm
 ```
 
 ใน JavaScript:
 
 ```bash
-// Streaming (แนะนำ)
+// Streaming (recommended)
 const { instance } = await WebAssembly.instantiateStreaming(
   fetch('/module.wasm'),
   importObject
 );
 
-// Non-streaming (fallback สำหรับ server ที่ไม่มี MIME type ที่ถูกต้อง)
+// Non-streaming (fallback for servers without correct MIME type)
 const bytes = await fetch('/module.wasm').then(r => r.arrayBuffer());
 const { instance } = await WebAssembly.instantiate(bytes, importObject);
 ```
@@ -95,14 +95,14 @@ const { instance } = await WebAssembly.instantiate(bytes, importObject);
 การ optimise โดยไม่มีการวัดผลคือการเดาสุ่ม เก็บ metrics สามอย่างนี้ใน CI pipeline ของคุณ:
 
 ```bash
-# 1. ขนาด binary (raw และ gzip)
+# 1. Binary size (raw and gzip)
 wc -c output.wasm
 gzip -c output.wasm | wc -c
 
-# 2. การแจกแจงขนาดตามฟังก์ชัน
+# 2. Size breakdown by function
 twiggy top output.wasm | head -20
 
-# 3. Validate binary ที่ optimise แล้วว่าไม่เสียหาย
+# 3. Validate the optimised binary has not been broken
 wasm-validate output.wasm
 wasm-tools validate output.wasm
 ```
@@ -128,7 +128,7 @@ wasm-tools validate output.wasm
 
 > 💡 ตัวอย่างจากของจริง
 >
-> **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` อยู่แล้ว ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักตั้ง budget ของขนาด binary ไว้ชัดเจน แล้วรัน playbook นี้ทั้งห้าขั้นตอนใน CI ก่อน deploy ทุกครั้ง
+> **Emscripten** เรียก `wasm-opt` ของ Binaryen ให้อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` อยู่แล้ว ([เอกสาร Emscripten](https://emscripten.org/docs/optimizing/Optimizing-Code.html)) — playbook ทั้งห้าขั้นตอนในบทนี้คือสิ่งที่ต้องรันเองใน CI สำหรับ toolchain ที่ไม่ได้ทำให้อัตโนมัติแบบนั้น หรือตอน optimize WAT ที่เขียนมือ/binary จากบุคคลที่สาม
 
 export const quizOptimizing = [
   { q: "wasm-opt flag ไหนที่ลด binary size ได้มากที่สุด?", options: ["-O3", "-Os", "-O2", "-Oz"], answer: 3 },

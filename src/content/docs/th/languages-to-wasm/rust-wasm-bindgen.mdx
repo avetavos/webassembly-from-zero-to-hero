@@ -14,20 +14,20 @@ Rust เป็นภาษาที่ได้รับความนิยม
 ## ติดตั้ง Toolchain
 
 ```bash
-# ติดตั้ง Rust (ถ้ายังไม่มี)
+# Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# เพิ่ม WebAssembly Target ลงใน Rust Toolchain
+# Add the WebAssembly target to the Rust toolchain
 rustup target add wasm32-unknown-unknown
 
-# ติดตั้ง wasm-pack — เครื่องมือ Build Rust → Wasm แบบครบวงจร
+# Install wasm-pack — the all-in-one Rust → Wasm build tool
 cargo install wasm-pack
 ```
 
 ## สร้างโปรเจกต์ใหม่
 
 ```bash
-# สร้าง Library Crate (ไม่ใช่ Binary)
+# Create a library crate (not a binary)
 cargo new --lib hello-wasm
 cd hello-wasm
 ```
@@ -49,13 +49,13 @@ wasm-bindgen = "0.2"
 ```rust
 use wasm_bindgen::prelude::*;
 
-/// คืนค่า String ทักทาย
+/// Returns a greeting string.
 #[wasm_bindgen]
 pub fn greet(name: &str) -> String {
     format!("Hello, {}! from WebAssembly", name)
 }
 
-/// บวกเลขจำนวนเต็ม 32 บิตสองตัว
+/// Adds two 32-bit integers.
 #[wasm_bindgen]
 pub fn add(a: i32, b: i32) -> i32 {
     a + b
@@ -67,13 +67,13 @@ Attribute `#[wasm_bindgen]` บอก Code Generator ให้สร้าง Ja
 ## Build ด้วย wasm-pack
 
 ```bash
-# Build สำหรับใช้กับ Bundler (webpack, Vite, Rollup)
+# Build for use in a bundler (webpack, Vite, Rollup)
 wasm-pack build --target bundler
 
-# Build สำหรับใช้โดยตรงในเบราว์เซอร์ผ่าน <script type="module">
+# Build for direct use in a browser via <script type="module">
 wasm-pack build --target web
 
-# Build สำหรับ Node.js
+# Build for Node.js
 wasm-pack build --target nodejs
 ```
 
@@ -90,11 +90,11 @@ pkg/
 ## เรียกใช้จาก JavaScript
 
 ```js
-// เมื่อใช้ --target web (ไม่ต้องการ Bundler)
+// When using --target web (no bundler required)
 import init, { greet, add } from './pkg/hello_wasm.js';
 
 async function main() {
-  // init() ดาวน์โหลดและ Instantiate ไฟล์ .wasm
+  // init() downloads and instantiates the .wasm file
   await init();
 
   console.log(greet('world'));   // Hello, world! from WebAssembly
@@ -107,7 +107,7 @@ main();
 เมื่อใช้ Bundler เช่น Vite, Import จะเหมือนกันแต่ `init()` ถูกจัดการอัตโนมัติ:
 
 ```js
-// Vite / webpack — Bundler จัดการ Instantiation
+// Vite / webpack — bundler handles instantiation
 import { greet, add } from 'hello-wasm';
 
 console.log(greet('WebAssembly'));
@@ -149,7 +149,7 @@ pub fn reverse_string(s: &str) -> String {
 
 > 💡 ตัวอย่างจากของจริง
 >
-> 1Password ใช้ Rust คอมไพล์เป็น Wasm สำหรับส่วน Core Cryptography และ Vault Logic ที่ต้องรันใน browser เพื่อให้ได้ทั้ง Memory Safety และ Performance ใกล้เคียง Native โดยไม่ต้องพึ่ง JavaScript ล้วนๆ
+> งาน Cryptography ฝั่ง client และโค้ดที่ critical ด้าน security อื่นๆ ในเบราว์เซอร์คือหนึ่งในเหตุผลหลักที่ทีมเลือกใช้ Rust คอมไพล์เป็น Wasm ตั้งแต่แรก — ได้ทั้ง Memory Safety จาก Ownership Model และ Performance ใกล้เคียง Native โดยไม่ต้องพึ่ง JavaScript ล้วนๆ สำหรับส่วนที่ sensitive
 
 export const quizRustWasm = [
   { q: "Attribute #[wasm_bindgen] ใน Rust ทำงานอย่างไร?", options: ["ทำเครื่องหมายฟังก์ชันว่า Unsafe", "สร้าง JavaScript Binding สำหรับฟังก์ชันที่ Annotate", "Inline ฟังก์ชันที่จุดที่เรียกใช้", "ปิดใช้งาน Borrow Checker ของ Rust"], answer: 1 },

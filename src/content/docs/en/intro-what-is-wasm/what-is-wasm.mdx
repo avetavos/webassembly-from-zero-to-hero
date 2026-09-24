@@ -61,6 +61,25 @@ console.log('answer() =', instance.exports.answer());`;
   Wasm code has no ambient access to the filesystem, network, or DOM. It can only do what the host explicitly imports into it. This makes untrusted Wasm modules safe to run.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Compile logic to Wasm | Near-native speed, deterministic across platforms, sandboxed safely by default | Adds bundle size (binary + glue code) and must go through fetch/compile/instantiate before it can run |
+| Write it in plain JavaScript | No compile step; mature browser devtools for debugging; source maps just work | Performance depends on JIT warm-up, less deterministic, and no enforced memory-level sandbox |
+
+## Common mistakes
+
+- Assuming a binary format always means faster than JavaScript — a hot JS path that's already been well optimized by the JIT can sometimes beat an unoptimized Wasm build
+- Trying to move an entire app's logic into one big Wasm module, when the sandboxing and determinism only clearly pay off for compute-heavy paths — UI/DOM logic should stay in JS
+- Forgetting to count the fetch+compile+instantiate cost when designing the architecture — if a module is called often but is very small, the repeated instantiation overhead can eat up whatever the compact binary format saved
+
+> 💡 Real-world example
+>
+> Figma rewrote its existing C++ rendering engine to compile straight to a Wasm binary that runs in the browser sandbox, which measurably sped up loading complex design files without a JavaScript rewrite ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/)).
+>
+> Adobe ported the Photoshop desktop C++ codebase to the web as Photoshop on the web, using WebAssembly (via Emscripten) so the original image-processing code could run in the browser without a rewrite ([web.dev case study](https://web.dev/ps-on-the-web/)).
+
 export const quizWhatIsWasm = [
   {
     q: "What does 'deterministic execution' mean for WebAssembly?",

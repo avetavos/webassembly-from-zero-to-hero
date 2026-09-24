@@ -42,9 +42,9 @@ Stack machine มีข้อได้เปรียบหลายประก
 
 ```wasm
 (module
-  (func (export "add") (param $a i32) (param $b i32) (result i32)
-    local.get $a
-    local.get $b
+  (func (export "addThreeAndFour") (result i32)
+    i32.const 3
+    i32.const 4
     i32.add))
 ```
 
@@ -90,9 +90,7 @@ console.log('add(0, 0)   =', instance.exports.add(0, 0));`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Figma เขียน rendering engine ใหม่จาก C++ เป็น Wasm ทำให้เวลาโหลดไฟล์เร็วขึ้นประมาณ 3 เท่า เพราะ Wasm module ถูก validate เป็น stack-based bytecode แล้วคอมไพล์เป็น native code ได้เกือบทันที
->
-> Google Earth พอร์ต C++ engine เดิมมารันใน browser ผ่าน Wasm โดยอาศัยโมเดล stack machine เดียวกันนี้ในการ verify และคอมไพล์ geometry/rendering code จำนวนมหาศาลให้ปลอดภัยและเร็ว
+> Figma เขียน rendering engine ใหม่จาก C++ เป็น Wasm และวัดผลได้ว่าเวลาโหลดไฟล์เร็วขึ้น **มากกว่า 3 เท่า** ในทุกขนาดเอกสาร ส่วนหนึ่งเป็นเพราะ Wasm module ถูก validate เป็น stack-based bytecode แล้วคอมไพล์เป็น native code ได้เกือบทันที ([Figma engineering blog](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/))
 
 export const quizStackMachine = [
   {

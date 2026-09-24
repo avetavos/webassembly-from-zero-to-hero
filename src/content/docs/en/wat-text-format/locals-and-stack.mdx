@@ -79,6 +79,23 @@ console.log('doubleSum(3, 4) =', instance.exports.doubleSum(3, 4));`;
   Each instruction pops its operand(s) from the value stack and pushes its result. `local.get` pushes a local variable's value; `local.set` pops and stores it; `local.tee` pops, stores, and pushes the value back — handy when you need to both save and use a value.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Writing WAT by hand | Forces you to actually understand the value stack and locals — no syntax sugar hides it, great for learning | You have to track stack depth yourself the whole way; forgetting one `local.set` can break validation |
+| Letting a compiler generate Wasm | The compiler handles stack allocation and register-to-local mapping automatically — much more productive for real apps | You don't control local lifetime in fine detail — you have to trust the compiler |
+
+## Common mistakes
+
+- Ending a block or function with more values left on the stack than the declared signature — e.g. forgetting to pop a value pushed along the way — so the module fails to validate
+- Using `local.tee` when `local.set` was intended, leaving an unwanted value sitting on the stack without realizing it
+- Forgetting that a branch like `br`/`br_if` jumping out of a block has to leave the stack in exactly the shape the branch's target expects, not just whatever falls out of normal sequential flow
+
+> 💡 Real-world example
+>
+> Engineers debugging a production `.wasm` blob on any Wasm-hosting platform commonly reach for `wasm2wat` to turn the binary back into readable WAT, so they can step through the stack instruction-by-instruction while tracking down a compiler-generated bug.
+
 export const quizLocalsAndStack = [
   {
     q: "What does `local.tee $x` do?",

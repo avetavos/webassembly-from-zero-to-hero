@@ -120,6 +120,23 @@ console.log('isLess(5, 3) =', instance.exports.isLess(5, 3), '(0 = false)');`;
 WebAssembly integer types (`i32`, `i64`) are just bit patterns — they carry no inherent sign. Division and remainder come in two variants: `div_s` / `rem_s` treat the bits as two's-complement signed integers; `div_u` / `rem_u` treat them as unsigned. Comparisons follow the same rule: `i32.lt_s` vs `i32.lt_u`. The type alone never tells you which interpretation is used.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Writing WAT by hand | You see operand order and opcodes directly, so it's clear exactly how `i32.div_s` differs from `i32.div_u` | You have to track the stack yourself on every line — easy to get wrong as the code grows |
+| Letting a compiler generate Wasm (e.g. from Rust/C) | Write normal high-level code and get optimized output, well suited to real work | You can't see where the compiler chose the `_s` or `_u` variant, harder to debug if the result is wrong |
+
+## Common mistakes
+
+- Pushing operands in the wrong order — e.g. intending `a - b` but pushing `$b` before `$a`, so `i32.sub` computes `b - a` instead, because WAT is stack-based and push order directly affects the result
+- Mixing up `div_s`/`div_u` or `lt_s`/`lt_u` — since `i32` carries no sign of its own, picking the wrong instruction silently produces a wrong result with no error
+- Forgetting that whatever is left on the stack at the end of a function must match the declared `result` exactly — too much or too little left over fails validation
+
+> 💡 Real-world example
+>
+> The official [WebAssembly spec testsuite](https://github.com/WebAssembly/spec/tree/main/test/core) — mirrored for convenience by tools like WABT — contains many hand-written `.wat` files that verify opcodes like `div_s`/`div_u` behave exactly per spec, including edge cases like division by zero.
+
 export const quizArithmetic = [
   {
     q: "What does `i32.lt_s` return when the comparison is true?",

@@ -15,14 +15,14 @@ AssemblyScript คือคอมไพเลอร์ที่แปลง **Ty
 ## ติดตั้ง AssemblyScript
 
 ```bash
-# สร้างโปรเจกต์ Node.js ใหม่
+# Create a new Node.js project
 mkdir as-demo && cd as-demo
 npm init -y
 
-# ติดตั้งคอมไพเลอร์ AssemblyScript
+# Install the AssemblyScript compiler
 npm install --save-dev assemblyscript
 
-# สร้างโครงสร้างโปรเจกต์ (สร้าง assembly/ และ tsconfig.json)
+# Scaffold the project (creates assembly/ and tsconfig.json)
 npx asinit .
 ```
 
@@ -33,18 +33,18 @@ npx asinit .
 เปิด `assembly/index.ts`:
 
 ```ts
-// การบวกเลขจำนวนเต็ม — สังเกตประเภท i32 ที่ระบุชัดเจน
+// Integer addition — notice the explicit i32 types
 export function add(a: i32, b: i32): i32 {
   return a + b;
 }
 
-// Factorial — แบบ Recursive, ใช้ i64 เพื่อป้องกัน Overflow สำหรับ Input ขนาดใหญ่
+// Factorial — recursive, i64 to avoid overflow for larger inputs
 export function factorial(n: i64): i64 {
   if (n <= 1) return 1;
   return n * factorial(n - 1);
 }
 
-// Clamp ค่า Float ระหว่าง lo และ hi
+// Clamp a float value between lo and hi
 export function clamp(value: f64, lo: f64, hi: f64): f64 {
   if (value < lo) return lo;
   if (value > hi) return hi;
@@ -61,20 +61,20 @@ export function clamp(value: f64, lo: f64, hi: f64): f64 {
 ## คอมไพล์ด้วย asc
 
 ```bash
-# Development Build (อ่านได้ง่าย, ไม่ Optimise)
+# Development build (readable, not optimised)
 npx asc assembly/index.ts --outFile build/release.wasm --textFile build/release.wat
 
-# Release Build (Optimise แล้ว, Binary เล็กกว่า)
+# Release build (optimised, smaller binary)
 npx asc assembly/index.ts --outFile build/release.wasm --optimize
 
-# พร้อม Binding สำหรับใช้เป็น ES Module
+# With bindings for use as an ES module
 npx asc assembly/index.ts --outFile build/release.wasm --bindings esm
 ```
 
 ## เรียกใช้จาก JavaScript
 
 ```js
-// ใช้ @assemblyscript/loader Helper
+// Using the @assemblyscript/loader helper
 import { instantiateStreaming } from '@assemblyscript/loader';
 
 const { exports } = await instantiateStreaming(fetch('./build/release.wasm'));
@@ -135,7 +135,7 @@ AssemblyScript ใช้ `i32`, `i64`, `f32`, `f64` แทน `number` ของ
 
 > 💡 ตัวอย่างจากของจริง
 >
-> NEAR Protocol ใช้ AssemblyScript เป็นหนึ่งในภาษาหลักสำหรับเขียน Smart Contract ที่คอมไพล์เป็น Wasm และ Shopify Functions ก็รองรับ AssemblyScript เป็นตัวเลือกให้ Merchant เขียน Custom Checkout Logic ควบคู่กับ Rust
+> AssemblyScript เคยถูกใช้คอมไพล์ Smart Contract เป็น Wasm มาก่อน — NEAR Protocol เคยมี SDK ทางการชื่อ `near-sdk-as` สำหรับสิ่งนี้โดยเฉพาะ — แต่ ณ ปลายปี 2026 SDK ตัวนี้ถูก archive ไปแล้ว และเอกสารของ NEAR เองก็แนะนำ Rust เป็นภาษาหลักสำหรับเขียน Contract แทน ซึ่งเป็นตัวอย่างเตือนใจที่ดีว่าควรเช็คสถานะปัจจุบันของ toolchain มากกว่าเชื่อ claim เก่า ([near-sdk-as บน GitHub](https://github.com/near/near-sdk-as))
 
 export const quizAssemblyScript = [
   { q: "AssemblyScript ใช้ Numeric Type ใดสำหรับเลขจำนวนเต็ม 32 บิต?", options: ["number", "int", "i32", "Int32"], answer: 2 },

@@ -15,13 +15,13 @@ import ProgressTracker from '../../../../components/ProgressTracker.tsx';
 ## การติดตั้งรันไทม์
 
 ```bash
-# wasmtime — ผ่าน installer script
+# wasmtime — via installer script
 curl https://wasmtime.dev/install.sh -sSf | bash
 
-# wasmer — ผ่าน installer script
+# wasmer — via installer script
 curl https://get.wasmer.io -sSfL | sh
 
-# ตรวจสอบ
+# Verify
 wasmtime --version
 wasmer --version
 ```
@@ -29,38 +29,38 @@ wasmer --version
 ## รัน WASI module ด้วย wasmtime
 
 ```bash
-# รันพื้นฐาน
+# Basic execution
 wasmtime my_app.wasm
 
-# ส่ง command-line arguments (-- คั่น runtime flag จาก module arg)
+# Pass command-line arguments (-- separates runtime flags from module args)
 wasmtime my_app.wasm -- hello world
 
-# ให้สิทธิ์เข้าถึง directory
+# Grant access to a directory
 wasmtime --dir /tmp my_app.wasm
 
-# ให้สิทธิ์ด้วย path alias (host path::guest path)
+# Grant access with a path alias (host path::guest path)
 wasmtime --dir /host/data::/data my_app.wasm
 
-# ส่ง environment variable
+# Pass environment variables
 wasmtime --env DATABASE_URL=postgres://localhost/db my_app.wasm
 
-# รวม: dir + env + args
+# Combine: dir + env + args
 wasmtime --dir /data --env LOG_LEVEL=info my_app.wasm -- --config /data/cfg.toml
 ```
 
 ## รัน WASI module ด้วย wasmer
 
 ```bash
-# รันพื้นฐาน
+# Basic execution
 wasmer my_app.wasm
 
-# mount directory
+# Mount a directory
 wasmer --dir /tmp my_app.wasm
 
-# ส่ง environment variable
+# Pass environment variables
 wasmer --env KEY=value my_app.wasm
 
-# รันจาก Wasmer registry (wapm packages)
+# Run from the Wasmer registry (wapm packages)
 wasmer run python/python -- --version
 ```
 
@@ -70,18 +70,18 @@ wasmer run python/python -- --version
 
 ```rust
 use wasmtime::{Engine, Linker, Module, Store};
-use wasmtime_wasi::WasiCtxBuilder;
+use wasmtime_wasi::{p1::WasiP1Ctx, WasiCtxBuilder};
 
 fn run_plugin(wasm_bytes: &[u8]) -> anyhow::Result<()> {
     let engine = Engine::default();
     let module = Module::new(&engine, wasm_bytes)?;
 
-    // สร้าง WASI context ขั้นต่ำ — ไม่มี filesystem, ไม่มี env var
-    let wasi = WasiCtxBuilder::new().inherit_stdio().build();
+    // Build a minimal WASI Preview 1 context — no filesystem, no env vars
+    let wasi: WasiP1Ctx = WasiCtxBuilder::new().inherit_stdio().build_p1();
     let mut store = Store::new(&engine, wasi);
 
     let mut linker = Linker::new(&engine);
-    wasmtime_wasi::add_to_linker_sync(&mut linker, |s| s)?;
+    wasmtime_wasi::p1::add_to_linker_sync(&mut linker, |s| s)?;
 
     let instance = linker.instantiate(&mut store, &module)?;
     let start = instance.get_typed_func::<(), ()>(&mut store, "_start")?;
@@ -125,7 +125,7 @@ export const embedDiagram = `sequenceDiagram
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Fermyon Spin build บน wasmtime เพื่อ embed และรัน serverless Wasm module ส่วน Fastly Compute@Edge และ Cloudflare Workers ใช้หลักการ embedding และ sandboxing แบบเดียวกันเพื่อ isolate tenant code ด้วย cold-start ที่ต่ำมาก
+> [Fermyon Spin](https://github.com/fermyon/spin) build บน Wasmtime เพื่อ embed และรัน serverless Wasm module ส่วน [Fastly Compute](https://www.fastly.com/products/edge-compute) และ [Cloudflare Workers](https://developers.cloudflare.com/workers/runtime-apis/webassembly/) ใช้หลักการ embedding และ sandboxing แบบเดียวกันเพื่อ isolate tenant code ด้วย cold-start ที่ต่ำมาก
 
 export const quizWasmtimeWasmer = [
   { q: "flag ใดที่ให้สิทธิ์ WASI module เข้าถึง host directory ใน wasmtime?", options: ["--allow-dir", "--dir", "--fs", "--mount"], answer: 1 },

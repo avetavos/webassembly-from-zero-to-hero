@@ -120,6 +120,23 @@ export function clamp(value: f64, lo: f64, hi: f64): f64 {
 AssemblyScript uses `i32`, `i64`, `f32`, `f64` instead of TypeScript's `number`. This makes the mapping to Wasm instructions explicit and produces very small binaries — no runtime or GC overhead.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| AssemblyScript | Familiar syntax for anyone already writing TypeScript, fast to get started, no GC or runtime overhead | Much smaller ecosystem than Rust or C, and it is **not semantically identical to TypeScript** — the type system and feature set differ |
+| Rust + wasm-bindgen | Memory safety from the ownership model, small binaries, a much larger ecosystem | A much steeper learning curve for teams new to Rust (ownership/borrowing) |
+
+## Common mistakes
+
+- Treating AssemblyScript as full TypeScript and reaching for a feature `asc` doesn't support (complex union types, `any`), then hitting an unexpected compile error
+- Forgetting that TypeScript's `number` doesn't exist in AssemblyScript — you must always specify `i32`/`i64`/`f32`/`f64` explicitly
+- Choosing AssemblyScript for work that depends on a large library ecosystem (e.g. complex image processing) without checking that ecosystem first, ending up rewriting everything from scratch
+
+> 💡 Real-world example
+>
+> AssemblyScript has been used for compiling smart contracts to Wasm — NEAR Protocol shipped an official `near-sdk-as` SDK for exactly that — though as of late 2026 that SDK is archived and NEAR's own docs now recommend Rust as the primary contract language, a useful reminder to check a toolchain's current status rather than an older claim about it ([near-sdk-as on GitHub](https://github.com/near/near-sdk-as)).
+
 export const quizAssemblyScript = [
   { q: "Which numeric type does AssemblyScript use for a 32-bit integer?", options: ["number", "int", "i32", "Int32"], answer: 2 },
   { q: "How do you make an AssemblyScript function callable from JavaScript?", options: ["Using the export keyword", "Using module.exports", "Annotating with @extern", "Declaring it in asconfig.json"], answer: 0 },

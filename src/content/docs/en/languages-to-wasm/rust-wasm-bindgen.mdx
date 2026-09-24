@@ -134,6 +134,23 @@ pub fn reverse_string(s: &str) -> String {
 `wasm-pack build` compiles Rust, runs `wasm-bindgen` code generation, and produces a ready-to-publish npm package in `pkg/`. You rarely need to invoke `cargo` or `wasm-bindgen-cli` directly.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Rust + wasm-bindgen | Memory safety from the ownership model, small binaries, JS bindings generated automatically | Ownership/borrowing is a steep learning curve for anyone who hasn't written Rust before |
+| C/C++ + Emscripten | Port an existing C/C++ codebase almost immediately | Larger glue code and runtime overhead from the POSIX emulation layer |
+
+## Common mistakes
+
+- Fighting the borrow checker instead of designing simpler ownership up front — e.g. sprinkling `clone()` everywhere to dodge lifetime errors rather than fixing the data structure
+- Forgetting `#[wasm_bindgen]` on a function meant to be exported, so it compiles fine into the `.wasm` but can't be called from JavaScript
+- Choosing an expensive-to-serialize type — `JsValue` or a complex struct through `serde` — for a hot path that's called frequently, hurting performance more than necessary
+
+> 💡 Real-world example
+>
+> Client-side cryptography and other security-critical browser code is one of the reasons teams reach for Rust compiled to Wasm in the first place: it gives memory safety from the ownership model with near-native performance, without relying on plain JavaScript for the sensitive path.
+
 export const quizRustWasm = [
   { q: "What does the #[wasm_bindgen] attribute do in Rust?", options: ["Marks a function as unsafe", "Generates JavaScript bindings for the annotated function", "Inlines the function at the call site", "Disables the Rust borrow checker"], answer: 1 },
   { q: "Which wasm-pack target flag should you use to call a module directly from a browser <script type=\"module\"> without a bundler?", options: ["--target bundler", "--target nodejs", "--target web", "--target deno"], answer: 2 },

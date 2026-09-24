@@ -70,6 +70,23 @@ Wasm does not replace JavaScript. The DOM, event handling, fetch, and most web p
   In the browser, Wasm shines for CPU-heavy work — codecs, cryptography, image/audio processing, physics engines, games. Keep DOM manipulation, event handling, and network IO in JavaScript. The two work best together.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Use Wasm for the compute path | Near-native speed, portable to browser, server, edge, and WASI runtimes without recompiling | Adds bundle size from the binary plus the JS glue code needed to marshal data across the boundary |
+| Use plain JavaScript everywhere | Fully mature debugging tooling (breakpoints, source maps, profilers) and a huge ecosystem | Not as portable in raw compute performance, and no Wasm-style memory sandbox |
+
+## Common mistakes
+
+- Seeing that Wasm is "almost as fast as native" and concluding it's always faster than JavaScript for every workload — modern JS engines optimize hot loops very well too
+- Compiling an entire application to Wasm from the start instead of checking the four reasons (speed, portability, language choice, security) to see that usually only specific modules — a codec, a physics engine — actually belong there
+- Deploying a tiny Wasm module to the edge or a WASI runtime without accounting for the cold-start cost of compiling and instantiating it, which can matter more than execution speed when the module isn't called often
+
+> 💡 Real-world example
+>
+> Adobe used WebAssembly to bring the entire Photoshop C++ codebase to the browser as Photoshop on the web, keeping the original image-processing algorithms intact ([web.dev case study](https://web.dev/ps-on-the-web/)).
+
 export const quizWhyAndWhere = [
   {
     q: 'Which of these is NOT a primary reason to use WebAssembly?',

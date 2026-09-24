@@ -95,7 +95,7 @@ WebAssembly memory ใช้ little-endian ซึ่งหมายความ�
 
 > 💡 ตัวอย่างจากของจริง
 >
-> เครื่องมือแก้ไขภาพใน browser สไตล์ Squoosh อ่าน raw pixel buffer เดียวกันผ่านทั้ง `Uint8ClampedArray` และ `Float32Array` view แล้วแต่ operation ที่กำลังทำ โดยไม่ต้อง copy ข้อมูลภาพไปมาระหว่าง view แต่ละแบบ
+> เครื่องมือแก้ไขภาพใน browser สไตล์ [Squoosh](https://github.com/GoogleChromeLabs/squoosh) อ่าน raw pixel buffer เดียวกันผ่านทั้ง `Uint8ClampedArray` และ `Float32Array` view แล้วแต่ operation ที่กำลังทำ โดยไม่ต้อง copy ข้อมูลภาพไปมาระหว่าง view แต่ละแบบ
 
 export const quizTypedArrayViews = [
   { q: "ถ้า element ของ Int32Array อยู่ที่ index 2 จะอยู่ที่ byte offset เท่าใด?", options: ["2", "4", "8", "16"], answer: 2 },

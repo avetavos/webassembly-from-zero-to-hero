@@ -70,18 +70,18 @@ The real power of standalone runtimes is embedding — loading `.wasm` plugins a
 
 ```rust
 use wasmtime::{Engine, Linker, Module, Store};
-use wasmtime_wasi::WasiCtxBuilder;
+use wasmtime_wasi::{p1::WasiP1Ctx, WasiCtxBuilder};
 
 fn run_plugin(wasm_bytes: &[u8]) -> anyhow::Result<()> {
     let engine = Engine::default();
     let module = Module::new(&engine, wasm_bytes)?;
 
-    // Build a minimal WASI context — no filesystem, no env vars
-    let wasi = WasiCtxBuilder::new().inherit_stdio().build();
+    // Build a minimal WASI Preview 1 context — no filesystem, no env vars
+    let wasi: WasiP1Ctx = WasiCtxBuilder::new().inherit_stdio().build_p1();
     let mut store = Store::new(&engine, wasi);
 
     let mut linker = Linker::new(&engine);
-    wasmtime_wasi::add_to_linker_sync(&mut linker, |s| s)?;
+    wasmtime_wasi::p1::add_to_linker_sync(&mut linker, |s| s)?;
 
     let instance = linker.instantiate(&mut store, &module)?;
     let start = instance.get_typed_func::<(), ()>(&mut store, "_start")?;
@@ -109,6 +109,23 @@ export const embedDiagram = `sequenceDiagram
 <Callout title="AOT compilation for latency-sensitive paths">
 Both wasmtime and wasmer support ahead-of-time (AOT) compilation: `wasmtime compile app.wasm -o app.cwasm` produces a pre-compiled artifact. Load the `.cwasm` at startup to skip JIT latency on the hot path.
 </Callout>
+
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| WASI capability-based security (`--dir`/`--env`) | Much safer — a module wasmtime/wasmer runs only gets the exact permissions the flags grant | Not fully POSIX-compatible; a binary ported from native code that assumes ambient access won't run unmodified |
+| Embedding wasmtime/wasmer for edge/serverless | Microsecond-scale cold starts compared to spinning up a fresh container every time | Container ecosystems still have more mature tooling, orchestration, and library support |
+
+## Common mistakes
+
+- Forgetting to pass `--dir` or `--env` at runtime, then being surprised the module can't reach the filesystem or an environment variable — capabilities must always be granted explicitly
+- Assuming SIMD or the threads proposal is supported identically across every runtime — wasmtime and wasmer can differ in support level, so check the specific runtime version before deploying
+- Embedding an older wasmtime version alongside a component built with a newer Component Model release — the still-evolving WIT interface can break old binding code at link or instantiate time
+
+> 💡 Real-world example
+>
+> [Fermyon Spin](https://github.com/fermyon/spin) is built on Wasmtime to embed and run serverless Wasm modules, while [Fastly Compute](https://www.fastly.com/products/edge-compute) and [Cloudflare Workers](https://developers.cloudflare.com/workers/runtime-apis/webassembly/) apply the same embedding-and-sandboxing principle to isolate tenant code with very low cold-start times.
 
 export const quizWasmtimeWasmer = [
   { q: "Which flag grants a WASI module access to a host directory in wasmtime?", options: ["--allow-dir", "--dir", "--fs", "--mount"], answer: 1 },

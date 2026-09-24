@@ -135,7 +135,7 @@ console.log('isLess(5, 3) =', instance.exports.isLess(5, 3), '(0 = false)');`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> ทีม WABT (WebAssembly Binary Toolkit) ใช้ไฟล์ `.wat` ที่เขียนมือจำนวนมากในชุด test spec compliance เพื่อยืนยันว่า opcode อย่าง `div_s`/`div_u` ทำงานตรงตาม spec ทุกกรณี รวมถึง edge case อย่างการหารด้วยศูนย์
+> [ชุด test อย่างเป็นทางการของ WebAssembly spec](https://github.com/WebAssembly/spec/tree/main/test/core) — ซึ่งเครื่องมืออย่าง WABT นำไป mirror ไว้ให้ใช้งานสะดวก — มีไฟล์ `.wat` ที่เขียนมือจำนวนมากเพื่อยืนยันว่า opcode อย่าง `div_s`/`div_u` ทำงานตรงตาม spec ทุกกรณี รวมถึง edge case อย่างการหารด้วยศูนย์
 
 export const quizArithmetic = [
   {

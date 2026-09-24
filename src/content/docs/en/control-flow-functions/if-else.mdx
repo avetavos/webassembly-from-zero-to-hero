@@ -101,6 +101,23 @@ console.log('abs(3)     =', instance.exports.abs(3),     '(expected 3)');`;
 An `if (result i32)` construct leaves a value on the stack — it behaves like a ternary operator, not a statement. Both the `then` and `else` arms must produce the same stack shape. `select` is a cheaper branchless alternative when both values can be computed upfront.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Structured `if`/`else` expression | Validated at compile time — both arms must leave the same type and count, safer than an arbitrary `goto` | Very complex conditionals (many crossing branches) need nested `if`s or helper `block`s instead of jumping straight to a point |
+| `select` (branchless) | No branch at all — good for hot paths that are hard to predict | Both values must always be computed up front, even the arm that isn't used — wasteful if one side is expensive |
+
+## Common mistakes
+
+- Forgetting that the `then` and `else` arms must leave the same type and count declared by `(result i32)`, so the module fails to validate
+- Using `select` and expecting short-circuit evaluation like a JavaScript ternary — the engine actually evaluates (or at least pushes) both values before choosing one
+- Confusing `br_if` with `if` — `br_if` has no `else` arm of its own; it only conditionally branches out of a single block, it isn't a two-way conditional like `if`/`else`
+
+> 💡 Real-world example
+>
+> When Emscripten compiles C/C++ containing a ternary or a complex if-else chain, its relooper algorithm reconstructs a validatable `if`/`else` structure that matches the original code's arbitrary control-flow graph.
+
 export const quizIfElse = [
   {
     q: "What does `if` pop to decide which branch to take?",

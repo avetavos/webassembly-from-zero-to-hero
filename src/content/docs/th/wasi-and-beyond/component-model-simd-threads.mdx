@@ -33,30 +33,30 @@ world greeter-world {
 ## การสร้าง component จาก Rust
 
 ```bash
-# ติดตั้ง cargo-component (Rust Component Model toolchain)
+# Install cargo-component (Rust Component Model toolchain)
 cargo install cargo-component
 
-# สร้าง component project ใหม่
+# Create a new component project
 cargo component new greeter --lib
 
-# Build เป็น component .wasm
+# Build to a component .wasm
 cargo component build --release
 # Output: target/wasm32-wasip2/release/greeter.wasm
 
-# ตรวจสอบ interface ของ component
+# Inspect the component's interface
 wasm-tools component wit greeter.wasm
 ```
 
 `wasm-tools` suite จัดการกลไก low-level:
 
 ```bash
-# Compose สอง component: greeter และ logger
+# Compose two components: a greeter and a logger
 wasm-tools compose greeter.wasm -d logger.wasm -o composed.wasm
 
-# Validate component
+# Validate a component
 wasm-tools validate --features component-model greeter.wasm
 
-# แปลง core module เป็น component (adapter pattern)
+# Convert a core module to a component (adapter pattern)
 wasm-tools component new core.wasm --adapt wasi_snapshot_preview1.wasm -o component.wasm
 ```
 
@@ -113,13 +113,17 @@ Compiler (Rust, C/Clang) ใช้ SIMD อัตโนมัติผ่าน 
 ใน Rust การคอมไพล์ด้วย `RUSTFLAGS="-C target-feature=+atomics,+bulk-memory"` และ target `wasm32-unknown-unknown` (พร้อม custom allocator) เปิดใช้ multi-threaded Wasm ใน browser threads ต้องการ `SharedArrayBuffer` ซึ่งต้องการ response header `COOP`/`COEP`
 
 ```bash
-# คอมไพล์ Rust ด้วย atomics + bulk-memory สำหรับ browser threads
+# Compile Rust with atomics + bulk-memory for browser threads
 RUSTFLAGS="-C target-feature=+atomics,+bulk-memory" \
   cargo build --target wasm32-unknown-unknown --release
 ```
 
 <Callout title="Component Model คืออนาคตของการ compose Wasm">
 Component Model แทนที่ FFI glue แบบ ad-hoc ระหว่าง Wasm module ด้วย WIT คุณนิยาม typed interface ครั้งเดียว แล้ว `cargo-component` และ `wasm-tools` สร้าง binding code ทั้งสองทิศทางให้
+</Callout>
+
+<Callout title="Phase ของ standard เทียบกับความพร้อมของ tooling">
+ณ ปลายปี 2026 ตัว proposal ของ Component Model เองยังอยู่แค่ **Phase 1** ในกระบวนการของ WebAssembly community group ([WebAssembly/proposals](https://github.com/WebAssembly/proposals)) — ยังไม่ผ่านการรับรองอย่างเป็นทางการ แต่ในทางปฏิบัติ tooling รอบๆ มัน (`wasm-tools`, `cargo-component`, `wit-bindgen`, `jco`) และ interface ของ WASI 0.2 ที่สร้างอยู่บนมันนั้นเสถียรและถูกใช้งานจริงแล้ว ดังนั้น "ยังเป็น proposal phase ต้น" กับ "ใช้งานได้จริงวันนี้" เป็นจริงพร้อมกันได้ ส่วน Threads proposal ที่ใช้ในบทนี้ไปไกลกว่านั้น อยู่ที่ Phase 4
 </Callout>
 
 ## ข้อแลกเปลี่ยน
@@ -137,7 +141,7 @@ Component Model แทนที่ FFI glue แบบ ad-hoc ระหว่า�
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Fermyon Spin ใช้ Component Model ร่วมกับ WASI เป็นแกนหลักในการ build และ deploy serverless Wasm microservice ส่วน Fastly Compute@Edge รัน untrusted customer code เป็น Wasm module พร้อม capability sandboxing แบบ WASI บนเครือข่าย edge ของตัวเอง
+> [Fermyon Spin](https://github.com/fermyon/spin) สร้างบน Component Model และ Wasmtime เพื่อ build และ deploy serverless Wasm microservice ส่วน [Fastly Compute](https://www.fastly.com/products/edge-compute) รัน untrusted customer code เป็น Wasm module ที่ sandbox ไว้ พร้อมการควบคุม capability สไตล์ WASI บนเครือข่าย edge ของตัวเอง
 
 export const quizComponentModelSimdThreads = [
   { q: "ภาษาใดที่ใช้นิยาม Component Model interface contract?", options: ["WAT", "WIT", "WASM-IDL", "Protobuf"], answer: 1 },

@@ -32,13 +32,13 @@ export const sectionsDiagram = `flowchart TD
 วิธีที่เร็วที่สุดในการอ่าน binary ใดก็ตามคือ `wasm2wat` ซึ่งสร้าง WAT text representation ขึ้นมาใหม่ รวมถึงชื่อฟังก์ชันหาก name section มีอยู่
 
 ```bash
-# Dump WAT ทั้งหมดไปยัง stdout
+# Dump the full WAT to stdout
 wasm2wat add.wasm
 
-# บันทึกลงไฟล์สำหรับแก้ไขหรือ diff
+# Save to a file for editing or diffing
 wasm2wat add.wasm -o add.wat
 
-# สร้างชื่อ synthetic เมื่อไม่มีชื่อ
+# Generate synthetic names when none are present
 wasm2wat add.wasm --generate-names
 ```
 
@@ -47,13 +47,13 @@ wasm2wat add.wasm --generate-names
 `wasm-objdump -x` แสดงสรุปที่มีโครงสร้างของทุก section: type signatures, imports, exports และ function indices เร็วกว่า full disassembly เมื่อคุณต้องการแค่ public API ของ module
 
 ```bash
-# สรุป section ทั้งหมด
+# Full section summary
 wasm-objdump -x my.wasm
 
-# Disassemble code section เท่านั้น (แสดงคำสั่งดิบ)
+# Disassemble code section only (shows raw instructions)
 wasm-objdump -d my.wasm
 
-# แสดง section เดียว
+# Show a single section
 wasm-objdump -j export my.wasm
 wasm-objdump -j import my.wasm
 ```
@@ -63,16 +63,16 @@ wasm-objdump -j import my.wasm
 `twiggy` คือ code-size profiler ที่กำหนดทุก byte ใน binary `.wasm` ให้กับฟังก์ชันหรือ section เป็นวิธีที่เร็วที่สุดในการตอบคำถาม "ฟังก์ชันใดทำให้ binary ใหญ่?"
 
 ```bash
-# ติดตั้ง
+# Install
 cargo install twiggy
 
-# แสดง contributors หลักต่อขนาด binary
+# Print the top contributors to binary size
 twiggy top my.wasm
 
-# แสดง retaining paths สำหรับฟังก์ชันเฉพาะ
+# Show the retaining paths for a specific function
 twiggy paths my.wasm --function "some_large_function"
 
-# Output เป็น JSON สำหรับการประมวลผลต่อ
+# Output as JSON for further processing
 twiggy top my.wasm --output-format json
 ```
 
@@ -114,7 +114,7 @@ browser สมัยใหม่มาพร้อมกับการสนั
 
 > 💡 ตัวอย่างจากของจริง
 >
-> **Emscripten** เรียก `wasm-opt` ของ Binaryen อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` ส่วนทีมที่ ship ไปที่ **Cloudflare Workers/CDN** มักตรวจ binary ด้วยเครื่องมือในบทนี้ก่อนเสมอ เพื่อคุม budget ของขนาด binary ให้อยู่ในเป้าที่ตั้งไว้
+> **Emscripten** เรียก `wasm-opt` ของ Binaryen อัตโนมัติเมื่อ build ด้วย `-O2`/`-O3` ([เอกสาร Emscripten](https://emscripten.org/docs/optimizing/Optimizing-Code.html)) ส่วนเครื่องมือในบทนี้ (`wasm-objdump`, `twiggy`, `wasm2wat`) คือสิ่งที่หยิบมาใช้ทีหลัง เมื่อต้องรู้ให้แน่ชัดว่า binary ที่ optimize แล้วมีอะไรอยู่ข้างในบ้าง
 
 export const quizInspecting = [
   { q: "tool ไหนที่ระบุได้ว่าแต่ละ byte ของไฟล์ .wasm เป็นของ function ไหน?", options: ["wasm-objdump", "wasm2wat", "twiggy", "wasm-validate"], answer: 2 },

@@ -68,9 +68,11 @@ export const branchDiagram = `flowchart LR
         (block $zero
           local.get $n
           br_table $zero $one $two $two)  ;; index 0→$zero, 1→$one, ≥2→$two
-        i32.const 0)  ;; $zero case: return 0
-      i32.const 1)    ;; $one case: return 1
-    i32.const 2))     ;; $two case: return 2
+        i32.const 0
+        return)          ;; $zero case: return 0
+      i32.const 1
+      return)            ;; $one case: return 1
+    i32.const 2))        ;; $two case: return 2 (falls through as the function result)
 ```
 
 ## ทดลองรัน

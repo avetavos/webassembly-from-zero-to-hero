@@ -107,6 +107,23 @@ console.log('factorial(10) =', instance.exports.factorial(10), '(expected 362880
 Before `call $fn`, push the function's arguments left-to-right. After the call returns, the result sits on top of the stack — ready for the next instruction. Wasm has no named argument syntax; position on the stack is everything.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Structured `call` (no arbitrary jump across stack frames) | The engine can validate the call graph at compile time — safer than jumping directly to an address | No manual stack manipulation like assembly, so some patterns (e.g. classic coroutines) have to be rewritten |
+| Recursion via plain `call` | Simple and familiar, like recursive functions in any other language | Wasm has no automatic stack growth the way some native threads do; recursion that goes too deep traps with a stack-exhaustion error |
+
+## Common mistakes
+
+- Writing a recursive function without a complete base case (e.g. forgetting to guard `n < 0`), so the recursion never terminates
+- Expecting Wasm to tail-call-optimize automatically like some languages do — every `call` always adds a frame to the call stack, so deep recursion risks stack exhaustion. (The [tail-call proposal](https://github.com/WebAssembly/tail-call) reached Wasm 3.0 as explicit `return_call`/`return_call_indirect` instructions — a compiler has to emit those deliberately; ordinary `call` is never silently turned into one.)
+- Pushing arguments in the wrong order before `call` (WAT has no named arguments), so a parameter silently binds to the wrong position with no compile-time error
+
+> 💡 Real-world example
+>
+> The WebAssembly spec requires every conforming engine to enforce a call-stack limit: unbounded recursion traps with a well-defined runtime error instead of crashing the host process the way an unguarded native stack overflow can. This spec-mandated guarantee is part of what makes it safe to run untrusted Wasm code at all.
+
 export const quizCallsRecursion = [
   {
     q: "How do you call a function named `$add` in WAT?",

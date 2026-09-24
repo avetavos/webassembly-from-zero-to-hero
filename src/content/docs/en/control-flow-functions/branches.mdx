@@ -68,9 +68,11 @@ export const branchDiagram = `flowchart LR
         (block $zero
           local.get $n
           br_table $zero $one $two $two)  ;; index 0→$zero, 1→$one, ≥2→$two
-        i32.const 0)  ;; $zero case: return 0
-      i32.const 1)    ;; $one case: return 1
-    i32.const 2))     ;; $two case: return 2
+        i32.const 0
+        return)          ;; $zero case: return 0
+      i32.const 1
+      return)            ;; $one case: return 1
+    i32.const 2))        ;; $two case: return 2 (falls through as the function result)
 ```
 
 ## Run it
@@ -95,6 +97,23 @@ console.log('relu(7)  =', instance.exports.relu(7),  '(expected 7)');`;
 <Callout title="br in a block exits; br in a loop repeats">
 When `br $label` targets a `block`, it jumps forward to the instruction after `end` — an early exit. When it targets a `loop`, it jumps backward to the loop's beginning — a repeat. The same instruction, opposite directions.
 </Callout>
+
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Structured control flow (`block`/`loop`/`br`) | Statically validatable and safer — there is no arbitrary `goto` that can jump anywhere | Complex control flow is harder to write; you nest several `block`s instead of jumping straight to a point |
+| No raw assembly-style jumps | The engine can check every label at compile time, reducing security risk | A control-flow graph coming from native code (full of `goto`) has to go through an algorithm like Emscripten's relooper before it can map onto Wasm |
+
+## Common mistakes
+
+- Miscounting nesting depth when several `block`s are nested, so `br` or `br_table` targets the wrong label (an off-by-one in depth)
+- Forgetting that `br_table` always needs a default label — any index past the end of the list falls through to the default automatically
+- Mixing up the direction of `br` when switching from `block` to `loop` — the same instruction goes forward in a block but backward in a loop; get the label wrong and the flow goes the wrong way
+
+> 💡 Real-world example
+>
+> Emscripten's relooper algorithm — designed by Emscripten's author for exactly this problem — converts an arbitrary control-flow graph from C/C++ source into the structured `block`/`loop`/`br` shape Wasm requires, because native code is full of `goto`s that Wasm doesn't support directly.
 
 export const quizBranches = [
   {

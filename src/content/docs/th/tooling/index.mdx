@@ -36,19 +36,19 @@ export const toolingOverviewDiagram = `flowchart LR
 `wabt` คือ reference implementation ของ WAT text format binary หลักคือ `wat2wasm` ซึ่งแปลงไฟล์ `.wat` เป็น binary `.wasm` ทิศทางย้อนกลับ — การ disassemble `.wasm` กลับเป็น WAT ที่อ่านได้ — จัดการโดย `wasm2wat` เครื่องมือเสริมสองตัวทำให้ครบชุด: `wasm-objdump` แสดง section headers และ symbol table ของ binary ใดก็ได้ และ `wasm-validate` ตรวจสอบว่า module เป็นไปตามข้อกำหนดหรือไม่
 
 ```bash
-# ติดตั้งผ่าน npm (ทำงานโดยไม่ต้องสร้าง native)
+# Install via npm (works without a native build)
 npm install -g wabt
 
-# คอมไพล์ WAT ให้เป็น binary
+# Compile WAT to binary
 wat2wasm add.wat -o add.wasm
 
-# Disassemble กลับเป็น text
+# Disassemble back to text
 wasm2wat add.wasm -o add.wat
 
-# ตรวจสอบ section headers
+# Inspect section headers
 wasm-objdump -x add.wasm
 
-# Validate โมดูล
+# Validate a module
 wasm-validate add.wasm
 ```
 
@@ -57,13 +57,13 @@ wasm-validate add.wasm
 Binaryen คือโครงสร้างพื้นฐาน compiler สำหรับ WebAssembly ที่ optimise เครื่องมือที่ใช้กันมากที่สุดคือ `wasm-opt` ซึ่งเขียน binary `.wasm` ที่มีอยู่ใหม่เพื่อผลิต output ที่เล็กลงหรือเร็วขึ้น Emscripten, AssemblyScript และ `wasm-pack` (สำหรับ Rust) ทั้งหมดเรียก `wasm-opt` โดยอัตโนมัติเป็นส่วนหนึ่งของ release builds
 
 ```bash
-# ติดตั้ง
+# Install
 npm install -g binaryen
 
-# Optimise เพื่อความเร็ว (ต้องการการทำงานที่รวดเร็ว)
+# Speed-optimise (prefer fast execution)
 wasm-opt -O3 input.wasm -o output.wasm
 
-# Optimise เพื่อขนาด (ต้องการ download ที่เล็ก)
+# Size-optimise (prefer small download)
 wasm-opt -Oz input.wasm -o output.wasm
 ```
 
@@ -72,16 +72,16 @@ wasm-opt -Oz input.wasm -o output.wasm
 `wasm-tools` คือชุดเครื่องมือรุ่นใหม่ของ Bytecode Alliance เขียนด้วย Rust และมีทั้งในรูปแบบ CLI และ library รองรับ WebAssembly Component Model proposals การรวมหลาย module เข้าด้วยกัน การลบ custom sections และการ encode/decode ในรูปแบบ binary
 
 ```bash
-# ติดตั้ง
+# Install
 cargo install wasm-tools
 
 # Validate
 wasm-tools validate add.wasm
 
-# แสดง text format
+# Print text format
 wasm-tools print add.wasm
 
-# ลบ custom sections (ลบ debug info)
+# Strip custom sections (removes debug info)
 wasm-tools strip add.wasm -o add.stripped.wasm
 ```
 

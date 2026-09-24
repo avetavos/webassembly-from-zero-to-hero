@@ -36,7 +36,7 @@ WASI has gone through two major revisions:
 | **Networking** | Not in core (vendor extensions) | `wasi:sockets` in core |
 | **Toolchain** | Rust stable, WASI SDK | `cargo component`, `wasm-tools` |
 
-For most production work today, Preview 1 (`wasm32-wasip1`) is the safe default. Preview 2 is the future, and tooling is maturing quickly.
+For most production work today, Preview 1 (`wasm32-wasip1`) is still a safe, boring default. Preview 2 (`wasm32-wasip2`) is no longer brand-new tooling, though — in the Rust compiler both `wasm32-wasip1` and `wasm32-wasip2` are Tier 2 targets today, and WASI 0.2 has been the stable release since January 2024. A **WASI 0.3 (Preview 3)** is now in preview, replacing 0.2's explicit polling/streams model with native `async` support via the Component Model's `future`/`stream` types — it is not yet the stable release, so treat any "0.3" claim you see elsewhere as forward-looking, not shipped.
 
 ## Compiling Rust to WASI
 
@@ -94,6 +94,23 @@ export const wasiCapDiagram = `flowchart TD
 <Callout title="Principle of least privilege">
 WASI enforces least privilege by default. A module receives only the capabilities the runtime operator explicitly grants — not everything the current OS user can access.
 </Callout>
+
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| WASI capability-based security | Far safer than POSIX ambient authority — a module can only use resources the runtime explicitly hands it | Not fully POSIX-compatible; many native libraries that assume ambient filesystem/network access don't port cleanly |
+| Server-side Wasm (a WASI runtime) vs. containers | Microsecond-scale cold starts, a good fit for edge/serverless work that spins up often | Container ecosystems still have more mature tooling, orchestration, and library support |
+
+## Common mistakes
+
+- Expecting filesystem or network access to "just work" like a normal native program, instead of explicitly granting it via `--dir` or `--env` — the module fails silently or throws a permission error
+- Assuming WASI Preview 1 is fully POSIX-compatible and trying to port a native library that assumes ambient access, unmodified
+- Not tracking that Preview 2 and the Component Model are still evolving standards — planning production on `wasm32-wasip2` today means being ready for breaking interface changes later
+
+> 💡 Real-world example
+>
+> [Fastly Compute](https://www.fastly.com/products/edge-compute) runs untrusted customer code as Wasm modules with WASI-style capability sandboxing on its own edge network, giving each request a safe sandbox without relying on container isolation.
 
 export const quizWasi = [
   { q: "In WASI, how does a module gain access to a directory on the host filesystem?", options: ["It calls open() with an absolute path", "The runtime pre-opens the directory and passes a file descriptor", "WASI grants read access to all directories by default", "The module reads /etc/fstab"], answer: 1 },

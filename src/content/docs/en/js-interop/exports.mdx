@@ -102,6 +102,23 @@ console.log('VERSION =', instance.exports.VERSION.value);`;
 When a Wasm function returns `i64`, JavaScript receives a `BigInt` — not a regular `number`. Check with `typeof result === 'bigint'`. Arithmetic between `BigInt` and `number` requires explicit casting.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| `instantiateStreaming` | Compilation starts the moment bytes start arriving from the network, so exports are ready sooner | Depends on the server correctly setting `Content-Type: application/wasm`, or it rejects immediately |
+| `instantiate` on a full buffer | Simpler, straightforward control flow; works even without control over the server's MIME type | Has to wait for the full download before compiling, so exports are ready later |
+
+## Common mistakes
+
+- Forgetting to convert an `i64` result to `BigInt` before mixing it with a plain `number`, causing a thrown `TypeError` or a silently wrong value
+- Reading or writing large chunks of exported memory byte-by-byte or call-by-call instead of wrapping `.buffer` in a typed array view and reading/writing it in one pass, losing performance for no reason
+- Loading the whole file with `arrayBuffer()` first and instantiating afterward to reach the exports, instead of using `instantiateStreaming` to compile while it downloads
+
+> 💡 Real-world example
+>
+> [Squoosh](https://github.com/GoogleChromeLabs/squoosh), Google's browser image-compression tool, compiles codecs like MozJPEG, WebP, and AVIF to Wasm and calls their exports directly from JS, reading the resulting image bytes back out through exported memory for maximum throughput.
+
 export const quizExports = [
   { q: "What JavaScript type does an exported Wasm i64 value become?", options: ["number", "BigInt", "string", "Int64"], answer: 1 },
   { q: "How do you read the value of an exported Wasm global in JavaScript?", options: ["`exports.NAME`", "`exports.NAME.value`", "`exports.global(NAME)`", "`exports[NAME].get()`"], answer: 1 },

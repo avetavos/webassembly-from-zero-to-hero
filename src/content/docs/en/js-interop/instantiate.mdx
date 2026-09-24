@@ -34,7 +34,7 @@ Because the `Module` object is serialisable, it can be stored in IndexedDB or se
 const { module, instance } = await WebAssembly.instantiate(bytes, importObject);
 
 // Overload 2 — pass an already-compiled Module: instantiates only
-const instance = await WebAssembly.instantiate(module, importObject);
+const instanceOnly = await WebAssembly.instantiate(module, importObject);
 // Note: this overload returns a WebAssembly.Instance directly, not {module, instance}
 ```
 
@@ -93,6 +93,23 @@ console.log('cube(3) =', instance.exports.cube(3));`;
 <Callout title="Compile once, instantiate many times">
 A `WebAssembly.Module` is a compiled artifact that can be stored, transferred via `postMessage`, or re-instantiated multiple times without recompiling. Separate the compile and instantiate steps whenever you need to spin up more than one instance of the same module.
 </Callout>
+
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| `instantiateStreaming` | Compiles while it downloads, so an instance is ready as fast as possible | Needs `Content-Type: application/wasm` from the server, or it rejects immediately with a `TypeError` |
+| `compile` + `instantiate` as separate steps | Fine-grained control — e.g. cache the `Module` and instantiate it again without recompiling | Needs the full file buffer in memory before compilation can even start |
+
+## Common mistakes
+
+- Always loading with `arrayBuffer()` first and then calling `WebAssembly.instantiate()`, instead of using `instantiateStreaming` to compile while it downloads
+- Recompiling the module every time a new instance is needed, instead of calling `WebAssembly.compile()` once and reusing that `Module` with `WebAssembly.instantiate(module, ...)`
+- Forgetting that an `i64` export comes back as a `BigInt` and adding/multiplying it directly with a `number` without converting first, which throws
+
+> 💡 Real-world example
+>
+> [Squoosh](https://github.com/GoogleChromeLabs/squoosh) compiles each Wasm codec once ahead of time, then instantiates it fresh whenever the user picks that codec to compress an image, avoiding repeated compile costs across a session.
 
 export const quizInstantiate = [
   { q: "What does WebAssembly.instantiate(bytes, {}) return?", options: ["A WebAssembly.Module", "A Promise<{module, instance}>", "A Uint8Array", "An ArrayBuffer"], answer: 1 },

@@ -112,7 +112,7 @@ namespace string (`"env"`) และ field name (`"log"`) ใน imports object 
 
 > 💡 ตัวอย่างจากของจริง
 >
-> AutoCAD Web พอร์ต engine C++ เดิมมาเป็น Wasm แล้ว import ฟังก์ชัน host จำนวนมาก (rendering, input handling, file I/O) เพื่อเชื่อม engine เข้ากับ browser APIs ให้ผู้ใช้โต้ตอบกับ CAD model ได้แบบ real-time
+> แอปที่พอร์ต engine native ขนาดใหญ่ (เครื่องมือ CAD, game engine, physics simulator) มารันในเบราว์เซอร์มักจะ `import` host function เป็นสิบๆ ตัว — สำหรับ rendering, input handling, และ file I/O — เพื่อเชื่อม engine ที่พอร์ตมาเข้ากับ browser APIs
 
 export const quizImports = [
   { q: 'ใน `(import "env" "log" ...)` ตัวไหนคือ module namespace?', options: ['"log"', '"env"', '"import"', '"func"'], answer: 1 },

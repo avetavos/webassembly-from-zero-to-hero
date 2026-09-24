@@ -117,7 +117,7 @@ console.log('VERSION =', instance.exports.VERSION.value);`;
 
 > 💡 ตัวอย่างจากของจริง
 >
-> Squoosh (เครื่องมือบีบอัดภาพของ Google) export ฟังก์ชัน codec หลายตัว (MozJPEG, WebP, AVIF ฯลฯ) จาก Wasm module แล้วเรียกใช้ exports เหล่านั้นตรงๆ จาก JS พร้อมอ่านผลลัพธ์ภาพผ่าน exported memory เพื่อให้ได้ throughput สูงสุด
+> [Squoosh](https://github.com/GoogleChromeLabs/squoosh) เครื่องมือบีบอัดภาพของ Google คอมไพล์ codec หลายตัว (MozJPEG, WebP, AVIF ฯลฯ) เป็น Wasm แล้วเรียกใช้ exports เหล่านั้นตรงๆ จาก JS พร้อมอ่านผลลัพธ์ภาพผ่าน exported memory เพื่อให้ได้ throughput สูงสุด
 
 export const quizExports = [
   { q: "ค่า Wasm i64 ที่ถูก export จะกลายเป็น JavaScript type ใด?", options: ["number", "BigInt", "string", "Int64"], answer: 1 },

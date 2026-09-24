@@ -83,6 +83,23 @@ console.log('round-trip:', decoded);`;
 WebAssembly functions cannot accept JavaScript strings directly. The universal convention is to write UTF-8 bytes into memory and pass an integer pointer plus an integer length to the Wasm function.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Send `(ptr, len)` through linear memory instead of a string directly | Zero-copy byte read/write, no re-serializing across the host boundary | You have to encode/decode UTF-8 yourself and compute the byte length correctly every time |
+| A fixed address for writing strings (manual layout) | Simple, no allocator or extra runtime needed | No GC to warn you when a new string is longer than the reserved space — you must budget the buffer size yourself |
+
+## Common mistakes
+
+- Using `str.length` (character count) instead of `encoded.length` (the real byte count after UTF-8 encoding) when computing the length to pass to Wasm, truncating or mis-decoding multi-byte characters like emoji or Thai text
+- Writing bytes at a fixed offset (e.g. 256) without leaving room for the string to grow, letting new data overwrite another region still in use
+- Reusing a cached typed-array view across calls and forgetting that a `memory.grow` in between detaches the old view, causing the string to be written or read at the wrong location
+
+> 💡 Real-world example
+>
+> [FFmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) passes filenames and metadata strings through this same `(ptr, len)` shape across linear memory to drive a decoder compiled from C, avoiding a slower string-conversion glue layer.
+
 export const quizPassingStrings = [
   { q: "How do you pass a JavaScript string to a WebAssembly function?", options: ["Pass it directly as a parameter", "Write UTF-8 bytes into memory and pass (ptr, len)", "Convert it to a number first", "Use postMessage"], answer: 1 },
   { q: "What does TextEncoder.encode(str) return?", options: ["A base64 string", "A UTF-16 ArrayBuffer", "A Uint8Array of UTF-8 bytes", "A number array"], answer: 2 },

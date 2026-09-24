@@ -74,6 +74,23 @@ console.log('bignum is BigInt:', typeof instance.exports.bignum() === 'bigint');
   WebAssembly has exactly four value types: `i32`, `i64`, `f32`, and `f64`. There are no strings, booleans, or objects. When a function returns `i64`, JavaScript receives a `BigInt` — not a regular number.
 </Callout>
 
+## Trade-offs
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Writing WAT by hand | You see clearly that every value on the stack has a fixed type (`i32`, `i64`, `f32`, `f64`), giving a detailed feel for Wasm's type system | You must always pick the matching `const`/instruction yourself; get the type wrong and validation fails immediately |
+| Letting a compiler generate Wasm (Rust/AssemblyScript) | The compiler maps types from the source language to i32/i64/f32/f64 automatically, reducing type mistakes | You have to trust the compiler's conversions, like `i64` becoming a `BigInt`, without seeing exactly what happens in between |
+
+## Common mistakes
+
+- Pushing a value with the wrong-typed instruction — e.g. using `i32.const` when the function declares `(result i64)` — so what's left on the stack at the end doesn't match the signature and validation fails
+- Pushing constants in the wrong order before a computation instruction, producing a wrong result even though every pushed value has the correct type
+- Forgetting that JavaScript must receive an `i64` as a `BigInt`, not a `number`, and then comparing or computing with it mixed directly with a regular number, causing a runtime `TypeError`
+
+> 💡 Real-world example
+>
+> The official [WebAssembly spec testsuite](https://github.com/WebAssembly/spec/tree/main/test/core) — mirrored for convenience by tools like WABT — contains many hand-written `.wat` files covering every value type (`i32`, `i64`, `f32`, `f64`) to verify encoders/decoders interpret each one exactly per spec, including the case where `i64` must convert to `BigInt` on the JavaScript side.
+
 export const quizValueTypes = [
   {
     q: "How many core value types does WebAssembly have?",
